@@ -275,6 +275,15 @@ class ImageHandler
             return false;
         }
 
+        $thumb = $this->getThumbnail($fileName);
+        if ($thumb == null) {
+            return false;
+        }
+
+        if ($thumb->getFileName() == null) {
+            return false;
+        }
+
         if (!$this->isAlias($alias)) {
             return false;
         }
