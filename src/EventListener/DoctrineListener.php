@@ -79,8 +79,8 @@ class DoctrineListener implements EventSubscriber
             // character_set_connection and collation_connection to @@character_set_database
             // and @@collation_database respectively.
             // see: http://stackoverflow.com/questions/1566602/is-set-character-set-utf8-necessary
-            $db->executeQuery('SET NAMES utf8');
-            $db->executeQuery('SET CHARACTER_SET_CONNECTION = utf8');
+            $db->executeQuery('SET NAMES utf8mb4');
+            $db->executeQuery('SET CHARACTER_SET_CONNECTION = utf8mb4');
 
             // Increase group_concat_max_len to 100000. By default, MySQL
             // sets this to a low value – 1024 – which causes issues with
