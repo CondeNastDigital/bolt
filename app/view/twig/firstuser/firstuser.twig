@@ -4,15 +4,61 @@
 
 {% block page_title __('general.phrase.create-user-first') %}
 
+{% form_theme context.form with ['form_bolt_layout.twig', _self] %}
+{# Submit icon #}
+{% block button_icon %}<i class="fa fa-sign-in fa-fw"></i> {% endblock button_icon %}
+
 {% block page_main %}
 
-    {% form_theme context.form 'form_bolt_layout.twig' %}
+    <div class="row">
+        {% if context.required %}
+            <div class="alert alert-danger">
+                <strong><i class="fa fa-minus-circle"> </i> Failed System and/or PHP requirements:</strong>
+                <ol>
+                    {% for item in context.required %}
+                        <li>
+                            {{ item.testMessage }}<br>
+                            &rarr; {{ item.helpHtml|raw }}
+                        </li>
+                    {% endfor %}
+                </ol>
+            </div>
+        {% else %}
+            <div class="alert alert-success">
+                <strong>
+                    <i class="fa fa-check-circle"> </i> No outstanding system or PHP requirements
+                </strong>
+            </div>
+        {% endif %}
+    </div>
+    <div class="row">
+        {% if context.recommended %}
+            <div class="alert alert-warning">
+                <strong><i class="fa fa-info-circle"> </i> Recommended updates:</strong>
+                <ol>
+                    {% for item in context.recommended %}
+                        <li>
+                            {{ item.testMessage }}<br>
+                            &rarr; {{ item.helpHtml|raw }}
+                        </li>
+                    {% endfor %}
+                </ol>
+            </div>
+        {% else %}
+            <div class="alert alert-success">
+                <strong>
+                    <i class="fa fa-check"> </i> No recommended updates
+                </strong>
+            </div>
+        {% endif %}
+    </div>
+
 
     <p class="first-user">
         {{ __('general.phrase.users-none-create-first-extended') }}
     </p>
 
-    <form method="post" class="form-horizontal submitspinner" autocomplete="off">
+    {{ form_start(context.form, {'attr': {'class': 'submitspinner', 'autocomplete': "off"}}) }}
         {# Google Chrome, Firefox, MS edge all require this trick to prevent password fields from auto-filling.
            @see http://stackoverflow.com/questions/15738259/disabling-chrome-autofill #}
         <input type="text" style="display:none;" />
@@ -20,10 +66,7 @@
 
         {{ form_widget(context.form) }}
 
-        <button type="submit" class="btn btn-primary" name="submit" value="login">
-            <i class="fa fa-sign-in fa-fw"></i> {{ __('general.phrase.create-user-first') }}
-        </button>
-    </form>
+    {{ form_end(context.form, { 'render_rest': false }) }}
 
     {% if context.note is not empty %}
         <p class="alert alert-info" style="max-width: 550px; margin-top:10px;">
@@ -38,11 +81,11 @@
     <script type="text/javascript">
         $(function() {
             // Attach and detach the progressbar.
-            var el = $('#progress-wrapper').detach()
-            $('#form_password').parent().append(el);
-
+            var el = $('#progress-wrapper').detach(),
+                pw = $('#user_new_password_first');
             // Initialize complexify, to indicate password strength.
-            $('#form_password').complexify({'strengthScaleFactor': 0.6, 'minimumChars': 6}, function (valid, complexity) {
+            pw.parent().append(el);
+            pw.complexify({'strengthScaleFactor': 0.6, 'minimumChars': 6}, function (valid, complexity) {
                 var progressBar = $('#complexity-bar');
                 progressBar.toggleClass('progress-bar-danger', (complexity < 40 ));
                 progressBar.toggleClass('progress-bar-warning', (complexity < 50 ));

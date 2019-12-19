@@ -3,7 +3,7 @@
 namespace Bolt\Storage\Database\Schema\Comparison;
 
 /**
- * .
+ * @internal
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
@@ -42,7 +42,7 @@ class IgnoredChange
      * @param string $before
      * @param string $after
      *
-     * @return boolean
+     * @return bool
      */
     public function matches($alteration, $propertyName, $before, $after)
     {

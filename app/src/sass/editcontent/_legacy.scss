@@ -1,4 +1,4 @@
-#editcontent {
+form[name="content_edit"] {
 
     /*** General ***/
 
@@ -13,6 +13,7 @@
         border-radius: 2px;
         border-color: #CCC;
         font-size: $font-size-base + 1px;
+        resize: vertical;
     }
 
     .error {
@@ -49,9 +50,25 @@
 
     /*** Dropzone ***/
 
-    .dropzone.hover,
-    .dropzone.in {
-        background: #DEF;
+    .elm-dropzone.hover,
+    .elm-dropzone.in {
+        background:rgba($boltblue, .6);
+        position:relative;
+
+        &:before {
+            content:'\f093';
+            font-family: FontAwesome;
+            font-size:25px;
+            font-style: normal;
+            font-weight: normal;
+            text-decoration: inherit;
+            position:absolute;
+            top:50%;
+            left:50%;
+            z-index:999999999;
+            transform:translate3d(-50%,-50%,0);
+            color:#fff;
+        }
 
         & * {
             opacity: 0.7;
@@ -82,7 +99,7 @@
         overflow: hidden;
 
         img {
-            max-height: 148px;
+            max-height: 150px;
             max-width: 100%;
             border: 1px solid #BBB;
         }

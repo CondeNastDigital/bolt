@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Storage\Entity;
 
 /**
@@ -18,7 +19,12 @@ namespace Bolt\Storage\Entity;
 trait ContentRelationTrait
 {
     /**
-     * Alias for getRelation()
+     * Alias for getRelation().
+     *
+     * @param string|null $filterContentType
+     * @param array       $options
+     *
+     * @return \Bolt\Legacy\Content[]
      */
     public function related($filterContentType = null, $options = [])
     {
@@ -29,10 +35,10 @@ trait ContentRelationTrait
      * Gets one or more related records.
      *
      * @param string $filterContentType ContentType to filter returned results on
-     * @param array  $options           A set of 'WHERE' options to apply to the filter
+     * @param array  $options           a set of 'WHERE' options to apply to the filter
      *
-     * Backward compatability note:
-     * The $options parameter used to be $filterid, an integer.
+     * Backward compatibility note:
+     * The $options parameter used to be $filterid, an integer
      *
      * @return \Bolt\Legacy\Content[]
      */
@@ -55,7 +61,7 @@ trait ContentRelationTrait
             if (!empty($filterContentType) && ($contenttype != $filterContentType)) {
                 continue; // Skip other contenttypes, if we requested a specific type.
             }
-
+            sort($ids);
             $params = ['hydrate' => true];
             $where = ['id' => implode(' || ', $ids)];
             $dummy = false;
@@ -92,31 +98,20 @@ trait ContentRelationTrait
     /**
      * Add a relation.
      *
-     * @param string|array $contenttype
-     * @param integer      $id
-     *
-     * @return void
+     * @param string|array $contentType
+     * @param int          $id
      */
-    public function setRelation($contenttype, $id)
+    public function setRelation($contentType, $id)
     {
-        if (!empty($this->relation[$contenttype])) {
-            $ids = $this->relation[$contenttype];
-        } else {
-            $ids = [];
+        if (empty($this->relation[$contentType]) || !in_array($id, $this->relation[$contentType], false)) {
+            $this->relation[$contentType][] = $id;
         }
-
-        $ids[] = $id;
-        sort($ids);
-
-        $this->relation[$contenttype] = array_unique($ids);
     }
 
     /**
      * Clears a relation.
      *
      * @param string|array $contenttype
-     *
-     * @return void
      */
     public function clearRelation($contenttype)
     {

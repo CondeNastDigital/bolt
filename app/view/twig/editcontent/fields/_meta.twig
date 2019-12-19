@@ -40,7 +40,7 @@
         class:        'form-control',
         disabled:     (not context.can.change_ownership),
         name_id:      'changelog-comment',
-        placeholder:  __('Add a brief, optional comment to describe what\'s changed.'),
+        placeholder:  __('general.phrase.changelog-what-changed'),
         type:         'text',
     },
 } %}
@@ -48,6 +48,7 @@
 {#=== FIELDSET =======================================================================================================#}
 
 {% extends '@bolt/_base/_fieldset.twig' %}
+{% import '@bolt/_macro/_macro.twig' as macro %}
 
 {% block fieldset_type 'meta' %}
 {% block fieldset_widget 'fieldMeta' %}
@@ -71,7 +72,7 @@
                 <input{{ macro.attr(attributes.id) }}>
                 {% if context.content.datecreated > '1970-01-01 01:01:01' %}
                     <p class="form-control-static">
-                        {{ __('contenttypes.generic.created', {'%contenttype%': context.contenttype.slug}) }}
+                        {{ __('contenttypes.generic.created', {'%contenttype%': context.contenttype.name}) }}
                         {{ buic_moment(context.content.datecreated) }}
                         {{ __('general.phrase.edited') }}
                         {{ buic_moment(context.content.datechanged) }}.

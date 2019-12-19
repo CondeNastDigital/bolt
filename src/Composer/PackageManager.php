@@ -3,30 +3,26 @@
 namespace Bolt\Composer;
 
 use Bolt;
+use Bolt\Composer\Package\Dependency;
+use Bolt\Composer\Satis\PingService;
 use Bolt\Extension\ResolvedExtension;
 use Bolt\Filesystem\Exception\ParseException;
-use Bolt\Filesystem\Handler\JsonFile;
 use Bolt\Translation\Translator as Trans;
+use Composer\CaBundle\CaBundle;
 use Composer\Package\CompletePackageInterface;
-use GuzzleHttp\Exception\ClientException;
-use GuzzleHttp\Exception\RequestException;
-use GuzzleHttp\Exception\ServerException;
-use GuzzleHttp\Ring\Client\ClientUtils;
 use Silex\Application;
 
 class PackageManager
 {
     /** @var Application */
     protected $app;
-    /** @var boolean */
+    /** @var bool */
     protected $started = false;
-    /** @var boolean */
+    /** @var bool */
     protected $useSsl;
 
-    /** @var array|null  */
+    /** @var array|null */
     private $json;
-    /** @var string[] */
-    private $messages = [];
 
     /**
      * Constructor.
@@ -47,7 +43,10 @@ class PackageManager
      */
     public function getMessages()
     {
-        return $this->messages;
+        /** @var PingService $pinger */
+        $pinger = $this->app['extend.ping'];
+
+        return $pinger->getMessages()->toArray();
     }
 
     /**
@@ -83,9 +82,6 @@ class PackageManager
 
                 return;
             }
-
-            // Ping the extensions server to confirm connection
-            $this->ping(true);
         }
 
         $this->started = true;
@@ -94,7 +90,9 @@ class PackageManager
     /**
      * Check if we can/should use SSL/TLS/HTTP2 or HTTP.
      *
-     * @return boolean
+     * @throws \Exception
+     *
+     * @return bool
      */
     public function useSsl()
     {
@@ -106,23 +104,11 @@ class PackageManager
             return $this->useSsl = false;
         }
 
-        if (preg_match('{^http:}i', $this->app['extend.site'])) {
-            return $this->useSsl = false;
+        if (!CaBundle::getSystemCaRootBundlePath($this->app['logger.system'])) {
+            throw new \Exception('Unable to get system CA bundle, or the bundled Composer CA. Your system is badly misconfigured and there is nothing Bolt can do.');
         }
 
-        try {
-            if ($this->app['guzzle.api_version'] === 5) {
-                ClientUtils::getDefaultCaBundle();
-            } else {
-                \GuzzleHttp\default_ca_bundle();
-            }
-
-            return $this->useSsl = true;
-        } catch (\RuntimeException $e) {
-            $this->messages[] = $e->getMessage();
-
-            return $this->useSsl = false;
-        }
+        return $this->useSsl = true;
     }
 
     /**
@@ -141,7 +127,7 @@ class PackageManager
      * @param string $packageName
      * @param string $constraint
      *
-     * @return
+     * @return Dependency[]|null
      */
     public function dependsPackage($packageName, $constraint)
     {
@@ -150,6 +136,8 @@ class PackageManager
 
     /**
      * Dump fresh autoloader.
+     *
+     * @return int 0 on success or a positive error code on failure
      */
     public function dumpAutoload()
     {
@@ -159,7 +147,7 @@ class PackageManager
     /**
      * Install configured packages.
      *
-     * @return integer 0 on success or a positive error code on failure
+     * @return int 0 on success or a positive error code on failure
      */
     public function installPackages()
     {
@@ -172,7 +160,7 @@ class PackageManager
      * @param string $packageName
      * @param string $constraint
      *
-     * @return
+     * @return Dependency[]|null
      */
     public function prohibitsPackage($packageName, $constraint)
     {
@@ -184,7 +172,7 @@ class PackageManager
      *
      * @param $packages array Indexed array of package names to remove
      *
-     * @return integer 0 on success or a positive error code on failure
+     * @return int 0 on success or a positive error code on failure
      */
     public function removePackage(array $packages)
     {
@@ -197,7 +185,7 @@ class PackageManager
      * @param $packages array Associative array of package names/versions to remove
      *                        Format: ['name' => '', 'version' => '']
      *
-     * @return integer 0 on success or a positive error code on failure
+     * @return int 0 on success or a positive error code on failure
      */
     public function requirePackage(array $packages)
     {
@@ -236,7 +224,7 @@ class PackageManager
      *
      * @param  $packages array Indexed array of package names to update
      *
-     * @return integer 0 on success or a positive error code on failure
+     * @return int 0 on success or a positive error code on failure
      */
     public function updatePackage(array $packages)
     {
@@ -247,7 +235,7 @@ class PackageManager
      * Initialise a new JSON file.
      *
      * @param string $file File to initialise
-     * @param array  $data Data to be added as JSON paramter/value pairs
+     * @param array  $data Data to be added as JSON parameter/value pairs
      */
     public function initJson($file, array $data = [])
     {
@@ -305,25 +293,6 @@ class PackageManager
             $collection->add($package);
         }
 
-        // Local
-        $extensions = $this->app['extensions']->all();
-        foreach ($extensions as $name => $extension) {
-            if ($collection->get($extension->getId())) {
-                continue;
-            }
-            /** @var JsonFile $composerJson */
-            $composerJson = $extension->getBaseDirectory()->get('composer.json');
-            $package = Package::createFromComposerJson($composerJson->parse());
-            $package->setStatus('local');
-            $package->setTitle($extension->getDisplayName());
-            $package->setReadmeLink($this->linkReadMe($extension));
-            $package->setConfigLink($this->linkConfig($extension));
-            $package->setValid($extension->isValid());
-            $package->setEnabled($extension->isEnabled());
-
-            $collection->add($package);
-        }
-
         // Pending
         $requires = isset($this->json['require']) ? $this->json['require'] : [];
         foreach ($requires as $name => $version) {
@@ -355,20 +324,9 @@ class PackageManager
      */
     private function linkReadMe(ResolvedExtension $extension)
     {
-        $readme = null;
-        $filesystem = $this->app['filesystem']->getFilesystem('extensions');
-
-        if ($filesystem->has(sprintf('%s/README.md', $extension->getRelativePath()))) {
-            $readme = $extension->getRelativePath() . '/README.md';
-        } elseif ($filesystem->has(sprintf('%s/readme.md', $extension->getRelativePath()))) {
-            $readme = $extension->getRelativePath() . '/readme.md';
-        }
-
-        if (!$readme) {
-            return;
-        }
-
-        return $this->app['url_generator']->generate('readme', ['filename' => $readme]);
+        return $this->app['url_generator']->generate('readme', [
+            'extension' => $extension->getId(),
+        ]);
     }
 
     /**
@@ -380,12 +338,12 @@ class PackageManager
      */
     private function linkConfig(ResolvedExtension $extension)
     {
-        $configFileName = sprintf('extensions/%s.%s.yml', strtolower($extension->getInnerExtension()->getName()), strtolower($extension->getInnerExtension()->getVendor()));
-        if ($this->app['filesystem']->getFilesystem('config')->has($configFileName)) {
-            return $this->app['url_generator']->generate('fileedit', ['namespace' => 'config', 'file' => $configFileName]);
+        $file = $this->app['filesystem']->getFile(strtolower("extensions_config://{$extension->getName()}.{$extension->getVendor()}.yml"));
+        if ($file->exists()) {
+            return $this->app['url_generator']->generate('fileedit', ['namespace' => $file->getMountPoint(), 'file' => $file->getPath()]);
         }
 
-        return;
+        return null;
     }
 
     /**
@@ -394,62 +352,5 @@ class PackageManager
     private function updateJson()
     {
         $this->json = $this->app['extend.manager.json']->update();
-    }
-
-    /**
-     * Ping site to see if we have a valid connection and it is responding correctly.
-     *
-     * @param boolean $addQuery
-     */
-    private function ping($addQuery = false)
-    {
-        $uri = $this->app['extend.site'] . 'ping';
-        $query = [];
-        if ($this->app['request_stack']->getCurrentRequest() !== null) {
-            $www = $this->app['request_stack']->getCurrentRequest()->server->get('SERVER_SOFTWARE', 'unknown');
-        } else {
-            $www = 'unknown';
-        }
-        if ($addQuery) {
-            $query = [
-                'bolt_ver'  => Bolt\Version::VERSION,
-                'php'       => phpversion(),
-                'www'       => $www,
-            ];
-        }
-
-        try {
-            $this->app['guzzle.client']->head($uri, ['query' => $query, 'exceptions' => true, 'connect_timeout' => 10, 'timeout' => 30]);
-
-            $this->app['extend.online'] = true;
-        } catch (ClientException $e) {
-            // Thrown for 400 level errors
-            $this->messages[] = Trans::__(
-                'Client error: %errormessage%',
-                ['%errormessage%' => $e->getMessage()]
-            );
-            $this->app['extend.online'] = false;
-        } catch (ServerException $e) {
-            // Thrown for 500 level errors
-            $this->messages[] = Trans::__(
-                'Extension server returned an error: %errormessage%',
-                ['%errormessage%' => $e->getMessage()]
-            );
-            $this->app['extend.online'] = false;
-        } catch (RequestException $e) {
-            // Thrown for connection timeout, DNS errors, etc
-            $this->messages[] = Trans::__(
-                'Testing connection to extension server failed: %errormessage%',
-                ['%errormessage%' => $e->getMessage()]
-            );
-            $this->app['extend.online'] = false;
-        } catch (\Exception $e) {
-            // Catch all
-            $this->messages[] = Trans::__(
-                'Generic failure while testing connection to extension server: %errormessage%',
-                ['%errormessage%' => $e->getMessage()]
-            );
-            $this->app['extend.online'] = false;
-        }
     }
 }

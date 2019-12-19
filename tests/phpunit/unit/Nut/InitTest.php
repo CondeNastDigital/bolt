@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Tests\Nut;
 
 use Bolt\Nut\Init;
@@ -10,7 +11,7 @@ use Symfony\Component\Console\Tester\CommandTester;
  *
  * @author Bob den Otter <bob@bolt.cm>
  */
-class HelloTest extends BoltUnitTest
+class InitTest extends BoltUnitTest
 {
     public function testRun()
     {

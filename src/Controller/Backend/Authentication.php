@@ -1,14 +1,22 @@
 <?php
+
 namespace Bolt\Controller\Backend;
 
 use Bolt\AccessControl\Token\Token;
+use Bolt\Common\Deprecated;
 use Bolt\Events\AccessControlEvent;
 use Bolt\Events\AccessControlEvents;
+use Bolt\Form\FormType;
+use Bolt\Response\TemplateResponse;
+use Bolt\Storage\Entity;
 use Bolt\Translation\Translator as Trans;
 use Silex\ControllerCollection;
+use Symfony\Component\Form\Form;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
  * Backend controller for authentication routes.
@@ -21,9 +29,13 @@ class Authentication extends BackendBase
     protected function addRoutes(ControllerCollection $c)
     {
         $c->get('/login', 'getLogin')
-            ->bind('login');
+            ->bind('login')
+            ->after(function (Request $request, Response $response) {
+                $response->setVary('Cookies', false)->setMaxAge(0)->setPrivate();
+            })
+        ;
 
-        $c->post('/login', 'postLogin')
+        $c->post('/login', 'getLogin')
             ->bind('postLogin');
 
         $c->match('/logout', 'logout')
@@ -36,19 +48,18 @@ class Authentication extends BackendBase
     /**
      * Login page and "Forgotten password" page.
      *
-     * @param \Symfony\Component\HttpFoundation\Request $request
-     * @param boolean                                   $resetCookies
+     * @param Request $request
      *
-     * @return \Bolt\Response\BoltResponse|\Symfony\Component\HttpFoundation\RedirectResponse
+     * @return TemplateResponse|RedirectResponse|Response
      */
-    public function getLogin(Request $request, $resetCookies = false)
+    public function getLogin(Request $request)
     {
         $user = $this->getUser();
         if ($user && $user->getEnabled() == 1) {
             $response = $this->redirectToRoute('dashboard');
 
             $token = $this->session()->get('authentication');
-            $this->setAuthenticationCookie($response, $token);
+            $this->setAuthenticationCookie($request, $response, $token);
 
             return $response;
         }
@@ -57,14 +68,33 @@ class Authentication extends BackendBase
             return $this->redirect(preg_replace('/^http:/i', 'https:', $request->getUri()));
         }
 
-        $response = $this->render('@bolt/login/login.twig', ['randomquote' => true]);
-        $response->setVary('Cookies', false)->setMaxAge(0)->setPrivate();
-
-        if ($resetCookies) {
-            $response->headers->clearCookie($this->app['token.authentication.name']);
+        $userEntity = new Entity\Users();
+        // Generate the form
+        $form = $this->createFormBuilder(FormType\UserLoginType::class, $userEntity)
+            ->getForm()
+            ->handleRequest($request)
+        ;
+        /** @var Form $form */
+        if ($form->isSubmitted() && $form->isValid()) {
+            $action = $form->getClickedButton()->getName();
+            if ($action === 'login') {
+                $response = $this->handlePostLogin($request, $form);
+            } elseif ($action === 'reset') {
+                $response = $this->handlePostReset($request, $form);
+            } else {
+                // Let's not disclose any internal information.
+                throw new HttpException(Response::HTTP_BAD_REQUEST, 'Invalid request');
+            }
+            if ($response instanceof Response) {
+                return $response;
+            }
         }
+        $context = [
+            'form'        => $form->createView(),
+            'randomquote' => true,
+        ];
 
-        return $response;
+        return $this->render('@bolt/login/login.twig', $context);
     }
 
     /**
@@ -72,33 +102,30 @@ class Authentication extends BackendBase
      *
      * @param Request $request The Symfony Request
      *
-     * @return \Symfony\Component\HttpFoundation\RedirectResponse
+     * @return Response|RedirectResponse
      */
     public function postLogin(Request $request)
     {
-        switch ($request->get('action')) {
-            case 'login':
-                return $this->handlePostLogin($request);
+        Deprecated::method(3.4);
 
-            case 'reset':
-                return $this->handlePostReset($request);
-        }
-        // Let's not disclose any internal information.
-        $this->abort(Response::HTTP_BAD_REQUEST, 'Invalid request');
+        return $this->getLogin($request);
     }
 
     /**
      * Logout page.
      *
-     * @return \Symfony\Component\HttpFoundation\RedirectResponse
+     * @param Request $request
+     *
+     * @return RedirectResponse
      */
     public function logout(Request $request)
     {
         $event = new AccessControlEvent($request);
         /** @var Token $sessionAuth */
         $sessionAuth = $this->session()->get('authentication');
-        $userName = $sessionAuth ? $sessionAuth->getToken()->getUsername() : false;
-        if ($userName) {
+        $userId = $sessionAuth ? $sessionAuth->getToken()->getUserId() : false;
+        if ($userId && $sessionAuth->getUser()) {
+            $userName = $sessionAuth->getUser()->getUsername();
             $this->app['logger.system']->info('Logged out: ' . $userName, ['event' => 'authentication']);
             $event->setUserName($userName);
         }
@@ -112,7 +139,7 @@ class Authentication extends BackendBase
         $response = $this->redirectToRoute('login');
         $response->headers->clearCookie(
             $this->app['token.authentication.name'],
-            $this->resources()->getUrl('root'),
+            $request->getBasePath(),
             $this->getOption('general/cookies_domain'),
             $this->getOption('general/enforce_ssl')
         );
@@ -139,18 +166,19 @@ class Authentication extends BackendBase
     /**
      * Handle a login POST.
      *
-     * @param Request $request
+     * @param Request       $request
+     * @param FormInterface $form
      *
      * @return Response
      */
-    private function handlePostLogin(Request $request)
+    private function handlePostLogin(Request $request, FormInterface $form)
     {
         $event = new AccessControlEvent($request);
-        $username = trim($request->request->get('username'));
-        $password = $request->request->get('password');
+        $username = $form->get('username')->getData();
+        $password = $form->get('password')->getData();
 
         if (!$this->login()->login($username, $password, $event)) {
-            return $this->getLogin($request, true);
+            return null;
         }
 
         // Authentication data is cached in the session and if we can't get it
@@ -158,14 +186,14 @@ class Authentication extends BackendBase
         if (!$token = $this->session()->get('authentication')) {
             $this->flashes()->error(Trans::__('general.phrase.error-session-data-login'));
 
-            return $this->getLogin($request);
+            return null;
         }
 
         // Log in, if credentials are correct.
         $this->app['logger.system']->info('Logged in: ' . $username, ['event' => 'authentication']);
 
         $retreat = $this->session()->get('retreat', ['route' => 'dashboard', 'params' => []]);
-        $response = $this->setAuthenticationCookie($this->redirectToRoute($retreat['route'], $retreat['params']), (string) $token);
+        $response = $this->setAuthenticationCookie($request, $this->redirectToRoute($retreat['route'], $retreat['params']), (string) $token);
 
         return $response;
     }
@@ -173,14 +201,15 @@ class Authentication extends BackendBase
     /**
      * Handle a password reset POST.
      *
-     * @param Request $request
+     * @param Request       $request
+     * @param FormInterface $form
      *
      * @return RedirectResponse
      */
-    private function handlePostReset(Request $request)
+    private function handlePostReset(Request $request, FormInterface $form)
     {
         $event = new AccessControlEvent($request);
-        $username = trim($request->request->get('username'));
+        $username = $form->get('username')->getData();
 
         // Send a password request mail, if username exists.
         if ($username === null || $username === '') {
@@ -193,6 +222,6 @@ class Authentication extends BackendBase
             return $response;
         }
 
-        return $this->getLogin($request);
+        return null;
     }
 }

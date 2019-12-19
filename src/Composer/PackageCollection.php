@@ -12,7 +12,7 @@ use JsonSerializable;
 final class PackageCollection implements JsonSerializable
 {
     /** @var Package[] */
-    protected $packages = [];
+    private $packages = [];
 
     /**
      * Add a package to the collection.
@@ -34,13 +34,15 @@ final class PackageCollection implements JsonSerializable
      *
      * @param string $name
      *
-     * @return Package
+     * @return Package|null
      */
     public function get($name)
     {
-        if (isset($this->packages[$name])) {
-            return $this->packages[$name];
+        if (!isset($this->packages[$name])) {
+            return null;
         }
+
+        return $this->packages[$name];
     }
 
     /**

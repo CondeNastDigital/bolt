@@ -2,35 +2,31 @@
 
 namespace Bolt;
 
+use Bolt\Common\Deprecated;
+use Bolt\Logger\Handler\RecordChangeHandler;
+
+/**
+ * @deprecated since 3.3, to be removed in 4.0.
+ */
 class DeepDiff
 {
+    /**
+     * @deprecated since 3.3, to be removed in 4.0.
+     *
+     * @param array $a
+     * @param array $b
+     *
+     * @return array
+     */
     public static function diff($a, $b)
     {
-        if (empty($a)) {
-            $a = [];
-        }
-        if (empty($b)) {
-            $b = [];
-        }
-        $keys = array_keys($a + $b);
-        $result = [];
+        Deprecated::method(3.3);
 
-        foreach ($keys as $k) {
-            if (empty($a[$k])) {
-                $l = null;
-            } else {
-                $l = $a[$k];
-            }
-            if (empty($b[$k])) {
-                $r = null;
-            } else {
-                $r = $b[$k];
-            }
-            if ($l != $r) {
-                $result[] = [$k, $l, $r];
-            }
-        }
+        $cls = new \ReflectionClass(RecordChangeHandler::class);
+        $method = $cls->getMethod('diff');
+        $method->setAccessible(true);
+        $obj = $cls->newInstanceWithoutConstructor();
 
-        return $result;
+        return $method->invoke($obj, $a, $b);
     }
 }

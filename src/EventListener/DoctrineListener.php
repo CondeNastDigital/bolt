@@ -2,13 +2,13 @@
 
 namespace Bolt\EventListener;
 
-use Bolt\Controller;
+use Bolt\Config;
 use Bolt\Events\FailedConnectionEvent;
-use Bolt\Exception\BootException;
-use Bolt\Helpers\Str;
+use Bolt\Exception\Database\DatabaseConnectionException;
 use Doctrine\Common\EventSubscriber;
 use Doctrine\DBAL\Event\ConnectionEventArgs;
 use Doctrine\DBAL\Events;
+use PDO;
 use Psr\Log\LoggerAwareTrait;
 use Psr\Log\LoggerInterface;
 
@@ -22,13 +22,19 @@ class DoctrineListener implements EventSubscriber
 {
     use LoggerAwareTrait;
 
-    /** @var Controller\Exception */
-    private $exceptionController;
+    /** @var Config */
+    private $config;
 
-    public function __construct(LoggerInterface $logger, Controller\Exception $exceptionController)
+    /**
+     * Constructor.
+     *
+     * @param Config          $config
+     * @param LoggerInterface $logger
+     */
+    public function __construct(Config $config, LoggerInterface $logger)
     {
+        $this->config = $config;
         $this->setLogger($logger);
-        $this->exceptionController = $exceptionController;
     }
 
     /**
@@ -36,22 +42,14 @@ class DoctrineListener implements EventSubscriber
      *
      * @param FailedConnectionEvent $args
      *
-     * @throws BootException
+     * @throws DatabaseConnectionException
      */
     public function failConnect(FailedConnectionEvent $args)
     {
         $e = $args->getException();
         $this->logger->debug($e->getMessage(), ['event' => 'exception', 'exception' => $e]);
 
-        /*
-         * Using Driver here since Platform may try to connect
-         * to the database, which has failed since we are here.
-         */
-        $platform = $args->getDriver()->getName();
-        $platform = Str::replaceFirst('pdo_', '', $platform);
-        $response = $this->exceptionController->databaseConnect($platform, $e);
-
-        throw new BootException($e->getMessage(), $e->getCode(), $e, $response);
+        throw new DatabaseConnectionException($args->getDriver()->getName(), $e->getMessage(), $e);
     }
 
     /**
@@ -60,38 +58,35 @@ class DoctrineListener implements EventSubscriber
      * Note: Doctrine expects this method to be called postConnect
      *
      * @param ConnectionEventArgs $args
+     *
+     * @throws \Doctrine\DBAL\DBALException
      */
     public function postConnect(ConnectionEventArgs $args)
     {
         $db = $args->getConnection();
-        $platform = $args->getDatabasePlatform()->getName();
+        $platform = $args->getDatabasePlatform();
+        $platformName = $platform->getName();
 
-        if ($platform === 'sqlite') {
+        if ($platformName === 'sqlite') {
             $db->query('PRAGMA synchronous = OFF');
-        } elseif ($platform === 'mysql') {
-            /**
-             * @link https://groups.google.com/forum/?fromgroups=#!topic/silex-php/AR3lpouqsgs
-             */
-            $db->getDatabasePlatform()->registerDoctrineTypeMapping('enum', 'string');
+        } elseif ($platformName === 'mysql') {
+            /** @see http://docs.doctrine-project.org/en/latest/cookbook/mysql-enums.html */
+            $platform->registerDoctrineTypeMapping('enum', 'string');
 
-            // Set utf8 on names and connection, as all tables have this charset. We don't
-            // also do 'SET CHARACTER SET utf8', because it will actually reset the
-            // character_set_connection and collation_connection to @@character_set_database
-            // and @@collation_database respectively.
-            // see: http://stackoverflow.com/questions/1566602/is-set-character-set-utf8-necessary
-            $db->executeQuery('SET NAMES utf8mb4');
-            $db->executeQuery('SET CHARACTER_SET_CONNECTION = utf8mb4');
+            // Set database character set & collation as configured
+            $charset = $this->config->get('general/database/charset');
+            $collation = $this->config->get('general/database/collate');
+            $db->executeQuery('SET NAMES ? COLLATE ?', [$charset, $collation], [PDO::PARAM_STR]);
 
             // Increase group_concat_max_len to 100000. By default, MySQL
             // sets this to a low value – 1024 – which causes issues with
             // certain Bolt content types – particularly repeaters – where
             // the outcome of a GROUP_CONCAT() query will be more than 1024 bytes.
             // See also: http://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_group_concat_max_len
-            $db->executeQuery('SET SESSION group_concat_max_len = 100000');
-        } elseif ($platform === 'postgresql') {
-            /**
-             * @link https://github.com/doctrine/dbal/pull/828
-             */
+            $groupConcatMaxLen = $this->config->get('general/database/group_concat_max_len', 100000);
+            $db->executeQuery('SET SESSION group_concat_max_len = ?', [$groupConcatMaxLen], [PDO::PARAM_INT]);
+        } elseif ($platformName === 'postgresql') {
+            /** @see https://github.com/doctrine/dbal/pull/828 */
             $db->executeQuery("SET NAMES 'utf8'");
         }
     }

@@ -2,6 +2,8 @@
 
 namespace Bolt\Storage\Mapping;
 
+use Bolt\Common\Deprecated;
+
 /**
  * Trait for mapping a ContentType 'title' to a column name.
  *
@@ -16,39 +18,57 @@ trait ContentTypeTitleTrait
      *
      * @param ContentType|array $contentType
      *
-     * @return array
+     * @return string
      */
     protected function getTitleColumnName($contentType)
     {
-        $fields = $contentType['fields'];
+        Deprecated::method();
+
+        $names = $this->getTitleColumnNames($contentType);
+
+        return reset($names);
+    }
+
+    /**
+     * Get an array of the column name(s) of the title.
+     *
+     * @param ContentType|array $contentType
+     *
+     * @return array
+     */
+    protected function getTitleColumnNames($contentType)
+    {
+        Deprecated::method();
+
+        // If we specified a specific field name or array of field names as 'title'.
+        if (!empty($contentType['title_format'])) {
+            return (array) $contentType['title_format'];
+        }
+
         $names = [
-            // EN
-            'title', 'name', 'caption', 'subject',
-            // NL
-            'titel', 'naam', 'onderwerp',
-            // FR
-            'nom', 'sujet',
-            // ES
-            'nombre', 'sujeto',
-            // PT
-            'titulo', 'nome', 'subtitulo', 'assunto',
+            'title', 'name', 'caption', 'subject', //EN
+            'titel', 'naam', 'onderwerp', // NL
+            'nom', 'sujet', // FR
+            'nombre', 'sujeto', // ES
+            'titulo', 'nome', 'subtitulo', 'assunto', // PT
         ];
 
-        foreach ($fields as $name => $values) {
-            if (in_array($name, $names)) {
-                return $name;
+        foreach ($names as $name) {
+            if (isset($contentType['fields'][$name])) {
+                return [$name];
             }
         }
 
-        foreach ($fields as $name => $values) {
-            if ($values['type'] === 'text') {
-                return $name;
+        // Otherwise, grab the first field of type 'text', and assume that's the title.
+        if (!empty($contentType['fields'])) {
+            foreach ($contentType['fields'] as $key => $field) {
+                if ($field['type'] === 'text') {
+                    return [$key];
+                }
             }
         }
 
-        // If this is a contenttype without any textfields
-        $keys = array_keys($fields);
-
-        return reset($keys);
+        // If this is a ContentType without any text fields, we can't provide a proper title.
+        return [];
     }
 }

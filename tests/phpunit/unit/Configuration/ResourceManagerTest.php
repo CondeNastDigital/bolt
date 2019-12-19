@@ -1,19 +1,25 @@
 <?php
+
 namespace Bolt\Tests\Configuration;
 
 use Bolt\Application;
 use Bolt\Configuration\ResourceManager;
 use Bolt\Configuration\Standard;
+use Bolt\Tests\BoltUnitTest;
 use Eloquent\Pathogen\FileSystem\Factory\PlatformFileSystemPathFactory;
 use Eloquent\Pathogen\FileSystem\PlatformFileSystemPath as Path;
+use Eloquent\Pathogen\PathInterface;
+use PHPUnit\Framework\Assert;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Class to test correct operation and locations of resource manager class and extensions.
  *
+ * @group legacy
+ *
  * @author Ross Riley <riley.ross@gmail.com>
  */
-class ResourceManagerTest extends \PHPUnit_Framework_TestCase
+class ResourceManagerTest extends BoltUnitTest
 {
     public function testConstruction()
     {
@@ -24,7 +30,7 @@ class ResourceManagerTest extends \PHPUnit_Framework_TestCase
             ]
         );
         $config = new ResourceManager($container);
-        $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT), \PHPUnit_Framework_Assert::readAttribute($config, 'root'));
+        $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT), Assert::readAttribute($config, 'root'));
     }
 
     public function testDefaultPaths()
@@ -37,11 +43,13 @@ class ResourceManagerTest extends \PHPUnit_Framework_TestCase
                 ]
             )
         );
+        $config->setPathResolver($config->getPathResolverFactory()->create());
+
         $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT), $config->getPath('rootpath'));
         $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT . '/app'), $config->getPath('apppath'));
         $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT . '/extensions'), $config->getPath('extensions'));
-        $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT . '/files'), $config->getPath('filespath'));
-        $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT), $config->getPath('web'));
+        $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT . '/public/files'), $config->getPath('filespath'));
+        $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT . '/public'), $config->getPath('web'));
         $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT . '/app/cache'), $config->getPath('cache'));
         $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT . '/app/config'), $config->getPath('config'));
     }
@@ -49,6 +57,8 @@ class ResourceManagerTest extends \PHPUnit_Framework_TestCase
     /**
      * @dataProvider exceptionGetPathProvider
      * @expectedException \InvalidArgumentException
+     *
+     * @param mixed $path
      */
     public function testExceptionGetPath($path)
     {
@@ -82,11 +92,13 @@ class ResourceManagerTest extends \PHPUnit_Framework_TestCase
                 ]
             )
         );
+        $config->setPathResolver($config->getPathResolverFactory()->create());
+
         $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT), $config->getPath('root'));
         $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT), $config->getPath('rootpath'));
         $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT . '/app'), $config->getPath('app'));
-        $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT . '/files'), $config->getPath('files'));
-        $this->assertInstanceOf('Eloquent\Pathogen\PathInterface', $config->getPathObject('root'));
+        $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT . '/public/files'), $config->getPath('files'));
+        $this->assertInstanceOf(PathInterface::class, $config->getPathObject('root'));
     }
 
     public function testRelativePathCreation()
@@ -99,6 +111,7 @@ class ResourceManagerTest extends \PHPUnit_Framework_TestCase
                 ]
             )
         );
+        $config->setPathResolver($config->getPathResolverFactory()->create());
 
         $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT . '/app/cache/test'), $config->getPath('cache/test'));
     }
@@ -113,6 +126,8 @@ class ResourceManagerTest extends \PHPUnit_Framework_TestCase
                 ]
             )
         );
+        $app = new Application(['resources' => $config]);
+
         $this->assertEquals('/', $config->getUrl('root'));
         $this->assertEquals('/app/', $config->getUrl('app'));
         $this->assertEquals('/extensions/', $config->getUrl('extensions'));
@@ -124,6 +139,8 @@ class ResourceManagerTest extends \PHPUnit_Framework_TestCase
     /**
      * @dataProvider exceptionGetUrlProvider
      * @expectedException \InvalidArgumentException
+     *
+     * @param mixed $url
      */
     public function testExceptionGetUrl($url)
     {
@@ -161,7 +178,7 @@ class ResourceManagerTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals($config->getPaths(), $app['resources']->getPaths());
 
         // Test that the Application has initialised the resources, injecting in config values.
-        $this->assertContains(Path::fromString(PHPUNIT_WEBROOT . '/theme')->string(), $config->getPath('theme'));
+        $this->assertContains(Path::fromString(PHPUNIT_WEBROOT . '/public/theme')->string(), $config->getPath('theme'));
         $this->assertNotEmpty($config->getUrl('canonical'));
     }
 
@@ -186,6 +203,8 @@ class ResourceManagerTest extends \PHPUnit_Framework_TestCase
     /**
      * @dataProvider exceptionGetRequest
      * @expectedException \InvalidArgumentException
+     *
+     * @param mixed $request
      */
     public function testExceptionGetRequest($request)
     {
@@ -280,7 +299,6 @@ class ResourceManagerTest extends \PHPUnit_Framework_TestCase
         );
         $app = new Application(['resources' => $config]);
         $this->assertEquals('/bolt/', $config->getUrl('bolt'));
-        $this->assertEquals('/bolt/files/files/', $app['config']->get('general/wysiwyg/filebrowser/imageBrowseUrl'));
     }
 
     public function testConfigDrivenUrlsWithBrandingOverride()
@@ -297,7 +315,6 @@ class ResourceManagerTest extends \PHPUnit_Framework_TestCase
         $app['config']->set('general/branding/path', '/custom');
         $config->initialize();
         $this->assertEquals('/custom/', $config->getUrl('bolt'));
-        $this->assertEquals('/custom/files/files/', $app['config']->get('general/wysiwyg/filebrowser/imageBrowseUrl'));
     }
 
     public function testConfigsWithNonRootDirectory()
@@ -328,10 +345,6 @@ class ResourceManagerTest extends \PHPUnit_Framework_TestCase
         $app['config']->set('general/branding/path', '/custom');
         $config->initialize();
         $this->assertEquals('/sub/directory/custom/', $config->getUrl('bolt'));
-        $this->assertEquals(
-            '/sub/directory/custom/files/files/',
-            $app['config']->get('general/wysiwyg/filebrowser/imageBrowseUrl')
-        );
     }
 
     public function testFindRelativePath()
@@ -351,13 +364,12 @@ class ResourceManagerTest extends \PHPUnit_Framework_TestCase
 
     public function testSetThemePath()
     {
-        $config = new Standard(PHPUNIT_WEBROOT);
-        $theme = ['theme' => 'test'];
-        $config->setThemePath($theme);
-        $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT . '/theme/test'), $config->getPath('theme'));
-        $theme = ['theme' => 'test', 'theme_path' => '/testpath'];
-        $config->setThemePath($theme);
-        $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT . '/testpath/test'), $config->getPath('theme'));
+        $resources = new Standard(PHPUNIT_WEBROOT);
+        $app = new Application(['resources' => $resources]);
+        $app['config']->set('general/theme', 'test');
+        $app['config']->set('general/theme_path', '/testpath');
+
+        $this->assertEquals(Path::fromString(PHPUNIT_WEBROOT . '/testpath/test')->string(), $resources->getPath('theme'));
     }
 
     public function testStaticApp()
@@ -366,14 +378,5 @@ class ResourceManagerTest extends \PHPUnit_Framework_TestCase
         $app = new Application(['resources' => $config]);
         $app2 = ResourceManager::getApp();
         $this->assertEquals($app, $app2);
-    }
-
-    /**
-     * @runInSeparateProcess
-     */
-    public function testEarlyStaticFails()
-    {
-        $this->setExpectedException('RuntimeException');
-        $app = ResourceManager::getApp();
     }
 }

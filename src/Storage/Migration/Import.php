@@ -1,221 +1,248 @@
 <?php
+
 namespace Bolt\Storage\Migration;
 
-use Bolt\Helpers\Arr;
+use Bolt\Collection\Bag;
+use Bolt\Collection\MutableBag;
+use Bolt\Storage\Collection;
+use Bolt\Storage\Entity;
+use Bolt\Storage\Entity\Content;
+use Bolt\Storage\EntityManager;
+use Bolt\Storage\Field\Type\RelationType;
+use Bolt\Storage\Field\Type\TaxonomyType;
+use Bolt\Storage\Query\Query;
+use Bolt\Storage\Repository;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use RuntimeException;
 
 /**
- * Database records import class
+ * Database records import class.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
+ * @author Ross Riley <riley.ross@gmail.com>
+ * @author Bob den Otter <bob@twokings.nl>
  */
-class Import extends AbstractMigration
+final class Import
 {
-    /** @var array $data */
-    protected $data;
+    /** @var EntityManager */
+    private $em;
+    /** @var Query */
+    private $query;
+    /** @var Bag */
+    private $contentTypes;
 
     /**
-     * Set the migration files.
+     * Constructor.
      *
-     * Also creates an input file objects.
-     *
-     * @see \Bolt\Storage\Migration\AbstractMigration::setMigrationFiles()
+     * @param EntityManager $em
+     * @param Query         $query
+     * @param Bag           $contentTypes
      */
-    public function setMigrationFiles($files)
+    public function __construct(EntityManager $em, Query $query, Bag $contentTypes)
     {
-        parent::setMigrationFiles($files);
-
-        if ($this->getError()) {
-            return $this;
-        }
-
-        foreach ($this->files as &$file) {
-            if ($file['type'] === 'yaml') {
-                $file['handler'] = new Input\YamlFile($this, $file['file']);
-            } elseif ($file['type'] === 'json') {
-                $file['handler'] = new Input\JsonFile($this, $file['file']);
-            }
-        }
-
-        return $this;
+        $this->em = $em;
+        $this->query = $query;
+        $this->contentTypes = $contentTypes;
     }
 
     /**
-     * Import each migration file
+     * @param Bag        $importData
+     * @param MutableBag $responseBag
+     * @param bool       $overwrite
+     * @param Bag        $importUsers
      *
-     * @return \Bolt\Storage\Migration\Import
+     * @throws \Bolt\Exception\InvalidRepositoryException
+     *
+     * @return MutableBag
      */
-    public function importMigrationFiles()
+    public function run(Bag $importData, MutableBag $responseBag, $overwrite = false, Bag $importUsers = null)
     {
-        if ($this->getError()) {
-            return $this;
+        $this->validateContentTypes($importData);
+        $relationQueue = MutableBag::from([]);
+        if ($importUsers) {
+            $this->importUsers($importUsers, $responseBag);
         }
 
-        foreach ($this->files as $file) {
-            // Read the file data in
-            if (!$file['handler']->readFile()) {
+        foreach ($importData as $contentTypeName => $recordsData) {
+            $this->importContentType($contentTypeName, $recordsData, $relationQueue, $responseBag, $overwrite);
+        }
+        $this->processRelationQueue($relationQueue);
+
+        return $responseBag;
+    }
+
+    /**
+     * @param Bag        $importUsers
+     * @param MutableBag $responseBag
+     *
+     * @throws \Bolt\Exception\InvalidRepositoryException
+     */
+    private function importUsers(Bag $importUsers, MutableBag $responseBag)
+    {
+        /** @var Repository\UsersRepository $repo */
+        $repo = $this->em->getRepository(Entity\Users::class);
+
+        foreach ($importUsers as $user) {
+            $entity = new Entity\Users($user->toArrayRecursive());
+            $entity->setId(null);
+            try {
+                $repo->save($entity);
+                $responseBag->get('success')->add(sprintf('Added user "%s".', $entity->getUsername()));
+            } catch (UniqueConstraintViolationException $e) {
+                $responseBag->get('warning')->add(sprintf('Skipping user "%s" as it already exists.', $entity->getUsername()));
+            }
+        }
+    }
+
+    /**
+     * Perform an import for records under a single ContentType key.
+     *
+     * @param string     $contentTypeName
+     * @param Bag        $importData
+     * @param MutableBag $relationQueue
+     * @param MutableBag $responseBag
+     * @param bool       $overwrite
+     *
+     * @throws \Bolt\Exception\InvalidRepositoryException
+     */
+    private function importContentType(
+        $contentTypeName,
+        Bag $importData,
+        MutableBag $relationQueue,
+        MutableBag $responseBag,
+        $overwrite
+    ) {
+        $count = 0;
+        /** @var Repository $repo */
+        $repo = $this->em->getRepository($contentTypeName);
+
+        // Build a list of the relationship field names for this ContentType
+        $relationFields = MutableBag::from([]);
+        $taxonomyFields = MutableBag::from([]);
+        foreach ($repo->getClassMetadata()->getFieldMappings() as $field) {
+            if (is_a($field['fieldtype'], RelationType::class, true)) {
+                $relationFields->add($field['fieldname']);
+            }
+            if (is_a($field['fieldtype'], TaxonomyType::class, true)) {
+                $taxonomyFields->add($field['fieldname']);
+            }
+        }
+
+        /** @var MutableBag $importDatum */
+        foreach ($importData as $importDatum) {
+            /** @var Content $entity */
+            $entity = $repo->create(['contenttype' => $contentTypeName]);
+            $values = $importDatum->toArrayRecursive();
+            $entity->setValues($values);
+            // Add relations now so they can still be applied if required on re-runs
+            $this->addRelations($repo, $relationQueue, $importDatum, $relationFields);
+            // Add taxonomy fields
+            $this->addTaxonomy($entity, $taxonomyFields, $importDatum);
+
+            $existing = $this->query->getContent($entity->getContenttype() . '/' . $entity->getSlug());
+            if ($existing instanceof Content) {
+                $entity->setId($existing->getId());
+            }
+            // If the entity already exists and we're not doing overwrite, exit early
+            if ($entity->getId() !== null && $overwrite === false) {
+                $responseBag->get('warning')->add(sprintf('ContentType "%s" with slug "%s" exists already! Skipping record.', $contentTypeName, $entity->getSlug()));
                 continue;
             }
 
-            // Get the file name
-            $filename = (string) $file['file'];
+            $repo->save($entity);
+            ++$count;
+        }
 
-            // Our import arrays should be indexed, if not we have a problem
-            if (!Arr::isIndexedArray($this->data)) {
-                $this->setError(true)->setErrorMessage("File '$filename' has an invalid import format!");
+        $responseBag->get('success')->add("- $count records for '$contentTypeName'");
+    }
+
+    /**
+     * @param Content $entity
+     * @param Bag     $taxonomyFields
+     * @param Bag     $importDatum
+     */
+    private function addTaxonomy(Content $entity, Bag $taxonomyFields, Bag $importDatum)
+    {
+        /** @var Collection\Taxonomy $taxonomies */
+        $taxonomies = $this->em->createCollection(Entity\Taxonomy::class);
+        $taxonomy = [];
+        foreach ($taxonomyFields as $taxonomyField) {
+            if ($importDatum->get($taxonomyField) === null) {
                 continue;
             }
-
-            // Import the records from the given file
-            $this->importRecords($filename);
+            foreach ($importDatum->get($taxonomyField) as $value) {
+                $taxonomy[$taxonomyField][] = $value->toArray();
+                $entity->set($taxonomyField, null);
+            }
         }
 
-        return $this;
+        $taxonomies->setFromPost(['taxonomy' => $taxonomy], $entity);
+        $entity->setTaxonomy($taxonomies);
     }
 
     /**
-     * Setter for data
+     * Queue an entities relations for later processing.
      *
-     * @param array $data
+     * @param Repository $repo
+     * @param MutableBag $relationQueue
+     * @param Bag        $importDatum
+     * @param MutableBag $relationFields
      */
-    public function setData(array $data)
+    private function addRelations(Repository $repo, MutableBag $relationQueue, Bag $importDatum, MutableBag $relationFields)
     {
-        $this->data = $data;
-    }
+        $classMeta = $repo->getClassMetadata();
+        foreach ($relationFields as $fieldName) {
+            $relationName = $classMeta->getBoltName() . '/' . $importDatum->get('slug');
 
-    /**
-     * Import records from an import file
-     *
-     * @param string $filename
-     *
-     * @return boolean
-     */
-    private function importRecords($filename)
-    {
-        foreach ($this->data as $data) {
-            // Test that we've at the least of an array
-            if (!is_array($data)) {
-                $this->setError(true)->setErrorMessage("File '$filename' has malformed ContentType import data! Skipping file.");
+            $existing = (array) $relationQueue->get($relationName);
+            $relatedEntities = $importDatum->get($fieldName);
 
-                return false;
-            }
-
-            // Validate all the contenttypes in this file
-            foreach ($data as $contenttypeslug => $values) {
-                if (!$this->checkContenttypesValid($filename, $contenttypeslug)) {
-                    return false;
-                }
-            }
-
-            // Insert the record
-            foreach ($data as $contenttypeslug => $values) {
-                $this->insertRecord($filename, $contenttypeslug, $values);
+            if ($relatedEntities) {
+                $relationQueue->set($relationName, array_merge($relatedEntities->toArray(), $existing));
             }
         }
     }
 
     /**
-     * Check that the ContentType specified in the record data is valid.
+     * Since relations can't be processed until we are sure all the individual
+     * records are saved this goes through the queue after an import and links
+     * up all the related ones.
      *
-     * @param string $filename
-     * @param string $contenttypeslug
-     *
-     * @return boolean
+     * @param Bag $relationQueue
      */
-    private function checkContentTypesValid($filename, $contenttypeslug)
+    private function processRelationQueue(Bag $relationQueue)
     {
-        if (isset($this->contenttypes[$contenttypeslug])) {
-            return true;
-        }
+        foreach ($relationQueue as $source => $links) {
+            $entity = $this->query->getContent($source);
+            $relations = [];
+            foreach ($links as $linkKey) {
+                $relation = $this->query->getContent($linkKey);
+                $relatedKey = (string) $relation->getContentType();
 
-        $contenttype = $this->app['storage']->getContentType($contenttypeslug);
-
-        if (empty($contenttype)) {
-            $this->setError(true)->setErrorMessage("File '$filename' has and invalid ContentType '$contenttypeslug'! Skipping file.");
-
-            return false;
-        }
-
-        $this->contenttypes[$contenttypeslug] = $contenttype;
-
-        return true;
-    }
-
-    /**
-     * Insert an individual Contenttype record into the database
-     *
-     * @param string $filename
-     * @param string $contenttypeslug
-     * @param array  $values
-     *
-     * @return boolean
-     */
-    private function insertRecord($filename, $contenttypeslug, array $values)
-    {
-        // Determine a/the slug
-        $slug = isset($values['slug']) ? $values['slug'] : substr($this->app['slugify']->slugify($values['title']), 0, 127);
-
-        if (!$this->isRecordUnique($contenttypeslug, $slug)) {
-            $this->setWarning(true)->setWarningMessage("File '$filename' has an exiting ContentType '$contenttypeslug' with the slug '$slug'! Skipping record.");
-
-            return false;
-        }
-
-        // Get a status
-        if (isset($values['status'])) {
-            $status = $values['status'];
-        } else {
-            $status = $this->contenttypes[$contenttypeslug]['default_status'];
-        }
-
-        // Transform the 'publish' action to a 'published' status
-        $status = $status === 'publish' ? 'published' : $status;
-
-        // Insist on a title field
-        if (!isset($values['title'])) {
-            $this->setWarning(true)->setWarningMessage("File '$filename' has a '$contenttypeslug' with a missing title field! Skipping record.");
-
-            return false;
-        }
-
-        // Set up default meta
-        $meta = [
-            'slug'        => $slug,
-            'datecreated' => date('Y-m-d H:i:s'),
-            'datepublish' => $status == 'published' ? date('Y-m-d H:i:s') : null,
-            'ownerid'     => 1,
-        ];
-
-        $values = Arr::mergeRecursiveDistinct($values, $meta);
-
-        $record = $this->app['storage']->getEmptyContent($contenttypeslug);
-        $record->setValues($values);
-
-        if ($this->app['storage']->saveContent($record) === false) {
-            $this->setWarning(true)->setWarningMessage("Failed to imported record with title: {$values['title']} from '$filename'! Skipping record.");
-
-            return false;
-        } else {
-            $this->setNotice(true)->setNoticeMessage("Imported record with title: {$values['title']}.");
-
-            return true;
+                $relations[$relatedKey][] = $relation->getId();
+            }
+            /** @var Collection\Relations $related */
+            $related = $this->em->createCollection(Entity\Relations::class);
+            $related->setFromPost(['relation' => $relations], $entity);
+            $entity->setRelation($related);
+            $this->em->save($entity);
         }
     }
 
     /**
-     * Test is a record already exists.
+     * Check that the import file's ContentTypes exists.
      *
-     * @param string $contenttypeslug
-     * @param string $slug
+     * @param Bag $importData
      *
-     * @return boolean
+     * @throws RuntimeException
      */
-    private function isRecordUnique($contenttypeslug, $slug)
+    private function validateContentTypes(Bag $importData)
     {
-        $record = $this->app['storage']->getContent("$contenttypeslug/$slug");
-        if (empty($record)) {
-            return true;
-        }
-
-        return false;
+        $contentTypeNames = $this->contentTypes->keys()->toArray();
+        $importData->filter(function ($k, $v) use ($contentTypeNames) {
+            if (!in_array($k, $contentTypeNames)) {
+                throw new RuntimeException(sprintf('ContentType "%s" is not configured.', $k));
+            }
+        });
     }
 }

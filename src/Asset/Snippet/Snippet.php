@@ -2,7 +2,10 @@
 
 namespace Bolt\Asset\Snippet;
 
+use Bolt\Common\Exception\DumpException;
+use Bolt\Common\Serialization;
 use Bolt\Controller\Zone;
+use Twig\Markup;
 
 /**
  * Snippet objects.
@@ -11,7 +14,7 @@ use Bolt\Controller\Zone;
  */
 class Snippet implements SnippetAssetInterface
 {
-    /** @var integer */
+    /** @var int */
     protected $priority;
     /** @var string */
     protected $location;
@@ -21,6 +24,14 @@ class Snippet implements SnippetAssetInterface
     protected $callbackArguments;
     /** @var string */
     protected $zone = Zone::FRONTEND;
+
+    /**
+     * @return SnippetAssetInterface
+     */
+    public static function create()
+    {
+        return new static();
+    }
 
     /**
      * {@inheritdoc}
@@ -135,14 +146,14 @@ class Snippet implements SnippetAssetInterface
     {
         if (is_callable($this->callback)) {
             return call_user_func_array($this->callback, (array) $this->callbackArguments);
-        } elseif (is_string($this->callback) || $this->callback instanceof \Twig_Markup) {
+        } elseif (is_string($this->callback) || $this->callback instanceof Markup) {
             // Insert the 'callback' as a string.
             return (string) $this->callback;
         }
 
         try {
-            $msg = sprintf('Snippet loading failed with callable %s', serialize($this->callback));
-        } catch (\Exception $e) {
+            $msg = sprintf('Snippet loading failed with callable %s', Serialization::dump($this->callback));
+        } catch (DumpException $e) {
             $msg = sprintf('Snippet loading failed with an unknown callback.');
         }
 

@@ -7,47 +7,32 @@
 #          process and your PR so that it will eventually be necessary to
 #          re-map your translations.
 
-#   0 Unused messages
-#  43 Legacy untranslated messages
-# 197 Untranslated messages
-#  49 Legacy translation messages
-# 334 Translation messages
+#   3 Unused messages
+#  22 Legacy untranslated messages
+# 249 Untranslated messages
+#  19 Legacy translation messages
+# 321 Translation messages
+
+#--- Unused messages ----------------------------------------------------------
+
+"general.phrase.duplicate-set": # "Duplicate Set"
+"contenttypes.generic.no-proper-type": "“%contenttype%(Entry)”的内容格式配置中，设置为'type: %type%'的字段'%field%'不是合适的字段类型(fieldtype)。请编辑contenttypes.yml文件，修复此问题。"
+"users.your-password": "你的密码"
 
 #--- Legacy untranslated messages ---------------------------------------------
 
+"Added records to the ContentType <tt>%CONTENTYPE%</tt> titled": #
 "An error occured while updating `%TABLE%`. The error is %ERROR%": #
-"Are you sure you want to delete %FILENAME%?": #
-"Are you sure you want to do this for %NUMBER% records?": #
-"Are you sure you want to do this for 1 record?": #
-"Are you sure you want to remove these files?": #
-"Are you sure you want to remove these images?": #
-"Are you sure you want to remove this file?": #
-"Are you sure you want to remove this image?": #
-"Are you sure you wish to delete this record? There is no undo.": #
-"Client error: %errormessage%": #
 "Dependencies": #
 "Detected Bolt version change to <b>%VERSION%</b>, and the cache has been cleared. Please <a href=\"%URI%\">check the database</a>, if you haven't done so already.": #
 "Do you really want to delete %FOLDERNAME%?": #
 "Error reading extensions/composer.json file: %ERROR%": #
 "Everybody": #
-"Extend": #
-"Extension package %NAME% base class '%CLASS%' does not implement \\\\Bolt\\\\Extension\\\\ExtensionInterface and has been skipped.": #
-"Extension package %NAME% has an invalid class '%CLASS%' and has been skipped.": #
-"Extension server returned an error: %errormessage%": #
 "Finding packages that require this one…": #
-"Generic failure while testing connection to extension server: %errormessage%": #
-"Group": #
-"Groups": #
-"Html": #
 "Invalid menu path (%PATH%) set in menu.yml. Does not match any configured contenttypes or routes.": # "Invalid menu path (%PATH%) set in menu.yml. Does not match any configured ContentTypes or routes."
 "Invalid menu path (%PATH%) set in menu.yml. Probably should be a link: instead!": #
-"Link": #
-"Markdown": #
-"Menu item property \"add\" is deprecated. Use \"#\" under \"param\" instead.": #
-"Repeater": #
-"Slug": #
-"Testing connection to extension server failed: %errormessage%": #
-"The database needs to be updated/repaired. Go to 'Configuration' > '<a href=\"%link%\">Check Database</a>' to do this now.": #
+"Menu": #
+"Search": #
 "The field %field% has been changed to \"%newValue%\"": #
 "Unable to create directory: %DIR%": #
 "Unable to create file: %FILE%": #
@@ -57,13 +42,26 @@
 "Unable to rename directory: %DIR%": #
 "Unable to rename file: %FILE%": #
 "Unfortunately, no content could be found. Try another page, or go to the <a href=\"%paths_root%\">homepage</a>.": #
-"filtered by <em>'%filter%'</em>": #
+"field.embed.provider_name": #
 
 #--- Untranslated messages ----------------------------------------------------
 
+contenttypes.generic.consecutive-underscores: # "In the ContentType for '%contenttype%', the field '%field%' has consecutive underscores, which is not supported. Please edit contenttypes.yml and use a single underscore."
 contenttypes.generic.invalid-hyphen: # "In the ContentType for '%contenttype%', you have used a hyphen in the definition which is not supported. Please edit contenttypes.yml and remove the hyphen or alternatively replace with an underscore."
 contenttypes.generic.invalid-relation: # "In the ContentType for '%contenttype%', the relation '%relation%' is defined, which is not a valid ContentType. Please edit contenttypes.yml, and correct this."
 contenttypes.generic.recent-changes-one: # "Recent changes to this %contenttype%"
+
+field.block.label.add-new: # "Add new..."
+field.block.label.add-set: # "Add new %label% set"
+
+field.embed.height: # "Height"
+field.embed.label.preview: # "Preview"
+field.embed.label.size: # "Size"
+field.embed.label.url: # "URL of content to embed"
+field.embed.matched-embed: # "Matched Embed"
+field.embed.pixel: # "pixel"
+field.embed.placeholder.url: # "URL of content on Facebook, Twitter, Soundcloud or other media website"
+field.embed.width: # "Width"
 
 field.general.stack: # "Stack"
 
@@ -72,6 +70,13 @@ field.geolocation.label.snap: # "Snap to nearest address"
 field.image.label.alt: # "Alt"
 
 field.markdown.label.markedview: # "Markdown"
+
+field.repeater.collapse: # "Collapse this set"
+field.repeater.collapse-all: # "Collapse all"
+field.repeater.delete-set: # "Delete Set"
+field.repeater.expand: # "Expand this set"
+field.repeater.expand-all: # "Expand all"
+field.repeater.label.add-set: # "Add new %label% set"
 
 field.slug.button.generate: # "Generate from:"
 field.slug.button.lock: # "Lock"
@@ -94,29 +99,42 @@ general.phrase.access-denied-self-action: # "You cannot '%s' yourself."
 general.phrase.add-selected: # "Add Selected"
 general.phrase.author: # "Author"
 general.phrase.change-log: # "Change Log"
+general.phrase.changelog-not-enabled: # "The changelog is not enabled. If you enable it, any changes made to the content in all ContentTypes will be logged on this page, for reference. See the section <code>changelog:</code> in your <code>config.yml</code> to change this setting."
+general.phrase.changelog-note: # "Note: The database table will continue to grow as the editors keep adding content. If you enable this functionality in a production environment the table may end up taking up a lot of space."
 general.phrase.clashing-relation: # "In the ContentType for '%contenttype%', both a field and a relation are named '%relation%' which will prevent the relation from working. Please edit contenttypes.yml, and correct this."
 general.phrase.clear-cache-complete: # "Cleared cache."
 general.phrase.clear-change-log: # "Clear Change Log"
 general.phrase.clear-system-log: # "Clear System Log"
 general.phrase.close-editor: # "Close editor"
+general.phrase.confirm-delete-file: # "Are you sure you want to delete %FILENAME%?"
+general.phrase.confirm-record-multiple: # "Are you sure you want to do this for %NUMBER% records?"
+general.phrase.confirm-record-single: # "Are you sure you want to do this for 1 record?"
+general.phrase.confirm-remove-file: # "Are you sure you want to remove this file?"
+general.phrase.confirm-remove-files: # "Are you sure you want to remove these files?"
+general.phrase.confirm-remove-image: # "Are you sure you want to remove this image?"
+general.phrase.confirm-remove-images: # "Are you sure you want to remove these images?"
+general.phrase.confirm-remove-record: # "Are you sure you wish to delete this record? There is no undo."
+general.phrase.database-check: # "Check Database"
+general.phrase.database-update-required-post: # "to do this now."
+general.phrase.database-update-required-pre: # "The database needs to be updated/repaired. Go to 'Configuration'"
 general.phrase.delete: # "Delete"
-general.phrase.delete-set: # "Delete Set"
 general.phrase.depublish: # "Depublish"
 general.phrase.depublish-date-past: # "Depublish date is in the past. Change the status if you want to depublish now."
 general.phrase.depublish-explanation: # "If set, the record will be automatically depublished on the given date."
-general.phrase.duplicate-set: # "Duplicate Set"
 general.phrase.edit-role-permissions: # "Edit Roles and Permissions"
 general.phrase.error-cache-clear: # "Failed to clear cache. You should delete it manually."
-general.phrase.error-local-extension-set-up-incomplete: # "Local extension set up incomplete. Please run 'Install all packages' on the Extensions page."
 general.phrase.error-login-invalid-parameters: # "Invalid login parameters."
 general.phrase.error-mail-options-not-set: # "The email configuration setting 'mailoptions' hasn't been set. Bolt may be unable to send password reset."
 general.phrase.error-send-password-request: # "Failed to send password request. Please check the email settings."
 general.phrase.error-session-data-login: # "Unable to retrieve login session data. Please check your system's PHP session settings."
+general.phrase.extensions-overview: # "Extensions Overview"
 general.phrase.field-fieldname: # "Field “%FIELD_NAME%”:"
 general.phrase.file-not-exist: # "The file '%s' doesn't exist."
 general.phrase.file-not-readable: # "The file '%s' is not readable."
 general.phrase.file-upload-failed: # "Files could not be uploaded."
+general.phrase.filtered-by: # "filtered by"
 general.phrase.floating-point-required-bang: # "Has to be a floating point number!"
+general.phrase.folder: # "Folder"
 general.phrase.hints-colon: # "Hints:"
 general.phrase.id: # "Id"
 general.phrase.invalid-taxonomy-slug: # "In the taxonomy '%taxonomy%' the slug for option '%option%' contains a slash. Please edit taxonomy.yml, and correct this."
@@ -158,7 +176,9 @@ general.phrase.system-config-checks: # "System Configuration Checks"
 general.phrase.thumbnail: # "Thumbnail"
 general.phrase.time-format-24-12: # "Time in 24h/12h format"
 general.phrase.toggle-all: # "Check/Uncheck all"
+general.phrase.upload-drop-here: # "Drop files in the file manager to upload them or use the button below."
 general.phrase.upload-not-allowed: # "Upload not allowed"
+general.phrase.upload-progress: # "Current uploads"
 general.phrase.users-permissions: # "Users & Permissions"
 general.phrase.value-maximum-variable: # "The value must not be greater than “%MAXVAL%”!"
 general.phrase.value-minimum-variable: # "The value has to be at least “%MINVAL%”!"
@@ -178,19 +198,25 @@ logs.system-log: # "System Log"
 logs.system-log.cleared: # "The system log has been cleared."
 logs.system-log.trimmed: # "The system log has been trimmed."
 
+menu.configuration.checks: # "Set-up checks"
 menu.configuration.routing: # "Routing set up"
 
 nut.greeting: # "Welcome to Bolt!"
 
 nut.version: # "version"
 
-page.checks.run-all: # "Run all checks"
-page.checks.run-directory-checks: # "Run directory checks"
-page.checks.run-email-checks: # "Run email checks"
-page.checks.run-php-ext-checks: # "Run PHP extension checks"
+page.checks.php-pass: # "All PHP configuration checks pass!"
+page.checks.php-problem: # "PHP configuration check found problems!"
+page.checks.show-all: # "Show all checks"
+page.checks.show-failed: # "Show only failed checks"
+page.checks.system-pass: # "All system configuration checks pass!"
+page.checks.system-problem: # "System configuration check found problems!"
 
+page.edit-users.error.email-invalid: # "This email address is not valid."
 page.edit-users.error.password-different-displayname: # "Password must not be a part of the display name."
+page.edit-users.error.password-different-email: # "Password must not match the email address."
 page.edit-users.error.password-different-username: # "Password must not match the username."
+page.edit-users.error.password-long: # "This value is too long. It should have 128 characters or less."
 page.edit-users.label.email: # "Email"
 page.edit-users.message.change-self: # "You've been logged off, because you changed your own username. Please log on again."
 
@@ -209,8 +235,15 @@ page.extend.button.manage: # "Manage"
 page.extend.button.package-dependencies: # "Identify installed packages requiring this"
 page.extend.button.show-all-versions: # "Show all versions"
 page.extend.button.update-package: # "Update Package"
+page.extend.error-class-implement: # "Extension package %NAME% base class '%CLASS%' does not implement %TARGET% and has been skipped."
+page.extend.error-class-invalid: # "Extension package %NAME% has an invalid class '%CLASS%' and has been skipped."
 page.extend.error-composer-json-not-readable: # "The Bolt extensions composer.json isn't readable."
 page.extend.error-composer-json-not-writable: # "The Bolt extensions composer.json isn't writable."
+page.extend.error-message-client: # "Client error: %errormessage%"
+page.extend.error-message-connection: # "Testing connection to extension server failed: %errormessage%"
+page.extend.error-message-generic: # "Generic failure while testing connection to extension server: %errormessage%"
+page.extend.error-message-server: # "Extension server returned an error: %errormessage%"
+page.extend.headline.bundled: # "Bundled Extensions"
 page.extend.headline.currently-installed: # "Your Currently Installed Extensions"
 page.extend.headline.install-new-extension: # "Install a new Extension"
 page.extend.headline.installation-complete: # "Installation complete"
@@ -220,7 +253,9 @@ page.extend.headline.stable-versions: # "Stable versions"
 page.extend.headline.test-versions: # "Unstable test versions"
 page.extend.headline.theme-installation-complete: # "Theme installation complete"
 page.extend.headline.updates: # "Updates"
+page.extend.listheader.class: # "Class"
 page.extend.listheader.extension: # "Extension"
+page.extend.listheader.name: # "Name"
 page.extend.listheader.status: # "Status"
 page.extend.listheader.version: # "Version"
 page.extend.message.add-extension-with-form: # "Add a new extension using the form below."
@@ -268,9 +303,16 @@ page.extend.theme.generation.failure: # "We were unable to generate the theme. I
 page.extend.theme.generation.missing.name: # "No theme name found. Theme is not generated."
 page.extend.theme.generation.success: # "Theme successfully generated. You can now edit it directly from your theme folder."
 
-page.file-management.label.create-file: # "Create File"
+page.file-management.actions-for-files: # "Actions for files"
+page.file-management.label.create-file: # "Create file"
 page.file-management.message.save-failed-invalid-form: # "File '%s' could not be saved, because the form wasn't valid."
 page.file-management.message.upload-not-writable: # "Unable to write to upload destination. Check permissions on %TARGET%"
+
+page.login.placeholder.username: # "Your username"
+
+page.prefill.connection-timeout: # "Timeout attempting connection to the 'Lorem Ipsum' generator. Unable to add dummy content."
+page.prefill.database-update-required: # "Table not found for ContentType %CONTENTTYPE%, a database update is probably required."
+page.prefill.skipped-singleton: # "Skipped singleton <code>%key%</code> (already has a record)"
 
 panel.latest-activity.change: # "Latest changes"
 panel.latest-activity.created: # "Created"
@@ -288,49 +330,19 @@ permissions.roles.description.root: # "Built-in superuser role, automatically gr
 "(no category)": "(没有分类)"
 "(no group)": "(没有分组)"
 "(none)": "(无)"
-"Add a brief, optional comment to describe what's changed.": "添加一个可选的简短注释描述变更。"
 "Add some sample <a href='%url%' class='btn btn-default'>Records with Loripsum text</a>": "可以添加一些 <a href='%url%' class='btn btn-default'>带有 Loripsum 示例文本</a> 的记录"
 "Added to <tt>%key%</tt> '%title%'": "添加到 <tt>%key%</tt> '%title%'"
-"Are you sure you want to delete %username%?": "确定要删除 %username% 吗？"
-"Body": "主体"
-"Categories": "类别"
-"Category": "类别"
-"Choose an entry": "选择条目"
-"Content": "内容"
 "Current (saved) status:": "当前(保存的)状态:"
-"Date": "日期"
-"Datetime": "日期时间"
 "Excerpt": "摘要"
 "Expand sidebar": "展开"
-"File": "文件"
 "File '%file%' could not be uploaded (wrong/disallowed file type). Make sure the file extension is one of the following:": "无法上传文件 '%file%' (错误的/不允许的文件类型)。确保文件扩展名是以下类型之一："
-"Filelist": "文件列表"
-"Floatfield": "Floatfield"
-"Geolocation": "地理位置"
-"Image": "图像"
-"Imagelist": "图像列表"
-"Integerfield": "整数字段"
-"Multiselect": "多选"
-"Select a page": "选择一个页面"
-"Select zero or more pages": "选择零或多个页面"
-"Selectentry": "条目选择"
-"Selectfield": "字段选择"
-"Skipped <tt>%key%</tt> (already has records)": "跳过 <tt>%key%</tt> (已有记录)"
-"Skipped <tt>%key%</tt> (not checked)": "跳过 <tt>%key%</tt> (已检查)"
-"Tag": "标签"
-"Tags": "标签"
-"Teaser": "摘要"
-"Template": "模板"
-"Textarea": "编辑区域"
 "The identifier and slug for '%taxonomytype%' are the not the same ('%slug%' vs. '%taxonomytype%'). Please edit taxonomy.yml, and make them match to prevent inconsistencies between database storage and your templates.": "'%taxonomytype%' 的标识符和 slug 不同。('%slug%' 与 '%taxonomytype%')。请编辑 taxonomy.yml 保持一致，避免数据库存储和模板不一致。"
 "The settings for roles and permissions are stored in <code>%permissions%</code>.": "角色和权限设置保存在 <code>%permissions%</code> 文件中。"
 "The slug '%slug%' is used in more than one contenttype. Please edit contenttypes.yml, and make them distinct.": "slug '%slug%'用在了多个内容格式中。请编辑 contenttypes.yml 区分它们。"
 "The translations file '%s' can't be created. You will have to use your own editor to make modifications to this file.": "无法创建翻译文件 '%s'。你需要自行使用编辑器修改文件。"
-"This is a checkbox": "这是个复选框"
 "This website is <a href='%url%' target='_blank' title='Sophisticated, lightweight & simple CMS'>Built with Bolt</a>.": "本网站由<a href='%url%' target='_blank' title='精致、轻量、简洁的 CMS'>Bolt 构建</a>。"
 "Title": "标题"
 "Try logging in with your ftp-client and make the file readable. Else try to go <a>back</a> to the last page.": "可以试着用FTP客户端登录，将文件设置可读权限，也可以尝试<a>返回</a>上一个页面。"
-"Video": "视频"
 "View (saved version) on site": "观看站点中(保存的版本)"
 "You've been logged on successfully.": "你已成功登录。"
 
@@ -352,7 +364,6 @@ contenttypes.generic.invalid-field: "未能设置%contenttype%的%field%字段�
 contenttypes.generic.last-modified: "最近修改的%contenttypes%"
 contenttypes.generic.new: "新建%contenttype%"
 contenttypes.generic.no-latest: "无最新%contenttype%"
-contenttypes.generic.no-proper-type: "“%contenttype%(Entry)”的内容格式配置中，设置为'type: %type%'的字段'%field%'不是合适的字段类型(fieldtype)。请编辑contenttypes.yml文件，修复此问题。"
 contenttypes.generic.no-recent: "无历史%contenttype%。"
 contenttypes.generic.none-available: "无可用%contenttypes%。"
 contenttypes.generic.not-existing: "未找到你所寻找的%contenttype%，它可能已经被删除，或者根本不存在。"
@@ -414,7 +425,6 @@ general.bolt-third-party-libraries: "以下是Bolt所用到的第三方库。"
 general.phrase.access-denied-logged-out: "你已成功退出登录。"
 general.phrase.access-denied-permissions-edit-file: "你没有权限编辑文件 '%s'。"
 general.phrase.access-denied-permissions-view-file-directory: "你没有权限显示文件/目录 '%s'。"
-general.phrase.access-denied-privilege-edit-record: "你没有权限编辑那条记录。"
 general.phrase.access-denied-privilege-view-page: "你没有权限查看那个页面。"
 general.phrase.action-plural: "操作"
 general.phrase.author-colon: "作者："
@@ -422,17 +432,19 @@ general.phrase.browswer-platform: "浏览器 / 平台"
 general.phrase.by: "由"
 general.phrase.cancel: "取消"
 general.phrase.change-current-status: "点击改变当前状态。"
+general.phrase.changelog-what-changed: "添加一个可选的简短注释描述变更。"
 general.phrase.check-again: "再次检查"
 general.phrase.check-database: "检查数据库"
 general.phrase.choose-record-link-to: "请选择要链接的记录："
 general.phrase.clear-cache: "清理缓存"
 general.phrase.clear-cache-again: "再次清理缓存"
-general.phrase.clear-filter: "清理过滤器"
 general.phrase.clear-filter-sort: "清理排序/过滤器"
 general.phrase.code-colon: "代码:"
 general.phrase.collapse-sidebar: "折叠侧边栏"
 general.phrase.configuration: "配置"
 general.phrase.configuration-main: "主配置文件"
+general.phrase.confirm-delete-user: "确定要删除 %username% 吗？"
+general.phrase.content: "内容"
 general.phrase.content-type-permissions: "内容格式的权限"
 general.phrase.content-types: "内容格式"
 general.phrase.create-user-first: "创建第一个用户"
@@ -450,9 +462,7 @@ general.phrase.delete-user-name: "删除 %username%"
 general.phrase.depublication-date-colon: "撤除日期："
 general.phrase.deselect-all: "取消全选"
 general.phrase.details: "详情"
-general.phrase.directory-not-found-writable: "无法找到文件夹 '%s'，或者它不可读。"
 general.phrase.disable-user-name: "禁用 %username%"
-general.phrase.done-bang: "完成!"
 general.phrase.draft: "草稿"
 general.phrase.duplicate-file-name: "复制 %filename%"
 general.phrase.edit: "编辑"
@@ -462,19 +472,18 @@ general.phrase.enable-user-name: "启用 %username%"
 general.phrase.error-translation-file-not-readable: "翻译文件 '%s' 不可读取。"
 general.phrase.error-user-name-password-incorrect: "用户名或密码不正确，请检查输入。"
 general.phrase.extensions: "查看/安装扩展"
-general.phrase.extras: "附加功能"
 general.phrase.field: "字段"
 general.phrase.file-management: "文件管理"
 general.phrase.file-not-readable-following-colon: "不能读取以下文件："
 general.phrase.file-not-writable: "文件 '%s' 不可写。你需要自行使用编辑器修改文件。"
 general.phrase.file-size: "文件大小"
 general.phrase.filter: "筛选"
-general.phrase.filtering: "筛选"
 general.phrase.find: "查找"
 general.phrase.folders: "文件夹"
 general.phrase.full-list-ellipsis: "完整列表 …"
 general.phrase.general.phrase.uploaded-files: "已上传的文件"
 general.phrase.global-permissions: "全局权限"
+general.phrase.image: "图像"
 general.phrase.info: "信息"
 general.phrase.ip.address: "IP 地址"
 general.phrase.last-edited-on-colon: "上一次编辑于:"
@@ -498,7 +507,6 @@ general.phrase.modifications-database-colon: "对数据库作出的变更："
 general.phrase.modifications-needed-colon: "需要作出的修改："
 general.phrase.modified: "已修改"
 general.phrase.no-content: "无内容 …"
-general.phrase.no-relations-found-bang: "没有找到关联！"
 general.phrase.no-result-for-search-term: "没有找到 '%SEARCHTERM%'，请尝试其他关键词。"
 general.phrase.no-such-action-for-user: "用户 '%s' 无此项操作。"
 general.phrase.no-title: "无标题 …"
@@ -513,11 +521,8 @@ general.phrase.overview: "概览"
 general.phrase.overview-for: "概览"
 general.phrase.owner-colon: "所有者："
 general.phrase.pager-showing-from-to-of: "显示 %count% 条记录中的 %from% 到 %to% 条%pager_for%记录"
-general.phrase.path: "路径"
-general.phrase.path-colon: "路径:"
 general.phrase.path-image-file: "图像文件路径"
 general.phrase.permalink: "永久链接"
-general.phrase.permissions: "权限"
 general.phrase.please-logon: "请登录。"
 general.phrase.please-provide-username: "请提供一个用户名"
 general.phrase.preview: "预览"
@@ -587,18 +592,15 @@ general.phrase.value-new: "新值"
 general.phrase.value-old: "旧值"
 general.phrase.view-edit-templates: "查看/编辑模板"
 general.phrase.view-on-site: "在站点上观看"
-general.phrase.view-related: "查看相关内容"
 general.phrase.view-site: "查看站点"
 general.phrase.written-by-on: "由<em>%name%</em>在%date%书写"
 
-generic.noscript.headline: "JavaScript 已禁用"
 generic.noscript.message: "你的浏览器当前已禁用JavaScript。Bolt的大多数功能无需它的支持，但是为何获得更好的体验我们建议你启用浏览器的JavaScript。"
 
 logs.change-log.contenttypes.all: "所有内容格式"
 logs.change-log.not-found: "所请求的 changelog 条目不存在。"
 
 page.ckeditor-browse-server.files: "文件"
-page.ckeditor-browse-server.folders: "文件夹"
 page.ckeditor-browse-server.modified: "已修改"
 page.ckeditor-browse-server.size: "文件大小"
 page.ckeditor-browse-server.title: "文件"
@@ -615,7 +617,6 @@ page.edit-file.note-related: "注意，此文件与以下文件有联系:"
 page.edit-file.title.edit: "编辑文件"
 page.edit-file.title.view: "查看文件"
 
-page.edit-locale.button.save: "保存"
 page.edit-locale.title.edit: "编辑文件"
 page.edit-locale.title.view: "查看文件"
 
@@ -663,8 +664,6 @@ page.file-management.message.access-denied: "不允许上传到此文件夹。"
 page.file-management.message.create-file: "请输入新文件名"
 page.file-management.message.create-folder: "请输入新文件夹名"
 page.file-management.message.file-not-readable: "文件不可读取！"
-page.file-management.message.files-in: "%s 中的文件"
-page.file-management.message.folder-access-denied: "文件夹权限不足"
 page.file-management.message.folder-not-found: "找不到 '%s' 文件夹，或者该文件夹不可读。"
 page.file-management.message.save-failed-colon: "无法保存文件 '%s'："
 page.file-management.message.save-failed-unknown: "由于某种原因，文件 '%s' 不能保存。"
@@ -685,6 +684,8 @@ page.login.password-show: "显示"
 page.login.placeholder.password: "你的用户名"
 page.login.title: "登录 Bolt"
 
+page.prefill.skipped-existing: "跳过 <code>%key%</code> (已有记录)"
+
 panel.latest-activity.button.more: "更多活动日志"
 panel.latest-activity.by: "由"
 panel.latest-activity.logged-in: "登录"
@@ -698,5 +699,3 @@ permissions.roles.label.anonymous: "匿名"
 permissions.roles.label.owner: "所有者"
 
 users.actions-for-users: "用户操作"
-
-users.your-password: "你的密码"

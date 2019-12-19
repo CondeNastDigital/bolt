@@ -13,12 +13,12 @@ database:
 sitename: A sample site
 payoff: The amazing payoff goes here
 
-# The theme to use. Be sure to copy the {theme_path}/base-2016 folder, and
-# change the name here accordingly.
+# The theme to use.
 #
-# Don't edit the templates in theme/base-2016, because they _will_ get updated
-# in next releases
-theme: base-2016
+# Don't edit the provided templates directly, because they _will_ get updated
+# in next releases. If you wish to modify a default theme, copy its folder, and
+# change the name here accordingly.
+theme: base-2018
 
 # The locale that'll be used by the application. If no locale is set the
 # fallback locale is 'en_GB'. For available options, see:
@@ -79,20 +79,14 @@ cron_hour: 3
 # Note: If you've changed the filename, and your changes do not show up on
 #       the website, be sure to check for a theme.yml file in your theme's
 #       folder. If a template is set there, it will override the setting here.
-homepage: page/1
+homepage: homepage/1
 homepage_template: index.twig
 
-# The default content for the 404 page. Uses the 'record_template' template by
-# default.
+# The default content for the 404 page. Can be an (array of) template names or
+# identifiers for records, which will be tried until a match is found.
 #
-# Make sure this is set to an existing record, otherwise visitors will get an
-# error-page when the request a non-existing page.
-#
-# Note 1: The record specified in this parameter must be set to 'published'
-# Note 2: If you are logged on, and debug is set to 'true', you will NOT see the
-#         404 page!
-# Note 3: This may also point to a template without a record, eg 'error404.twig'
-notfound: block/404-not-found
+# Note: The record specified in this parameter must be set to 'published'.
+notfound: [ not-found.twig, block/404-not-found ]
 
 # The default template and amount of records to use for listing-pages on the
 # site.
@@ -206,8 +200,8 @@ thumbnails:
     default_image: [ 1000, 750 ]
     quality: 80
     cropping: crop
-    notfound_image: view/img/default_notfound.png
-    error_image: view/img/default_error.png
+    notfound_image: bolt_assets://img/default_notfound.png
+    error_image: bolt_assets://img/default_error.png
     save_files: false
     allow_upscale: false
     exif_orientation: true
@@ -218,8 +212,11 @@ thumbnails:
 # is used for sanitizing HTML, to make sure there are no undesirable elements
 # left in the content that is shown to users. For example, tags like `<script>`
 # or `onclick`-attributes.
+# Note: enabling options in the `wysiwyg` settings will implicitly add items to
+# the allowed tags. For example, if you set `images: true`, the `<img>` tag
+# will be allowed, regardless of it being in the `allowed_tags` setting.
 htmlcleaner:
-    allowed_tags: [ div, span, p, br, hr, s, u, strong, em, i, b, li, ul, ol, mark, blockquote, pre, code, tt, h1, h2, h3, h4, h5, h6, dd, dl, dt, table, tbody, thead, tfoot, th, td, tr, a, img, address, abbr, iframe, caption, figure, figcaption ]
+    allowed_tags: [ div, span, p, br, hr, s, u, strong, em, i, b, li, ul, ol, mark, blockquote, pre, code, tt, h1, h2, h3, h4, h5, h6, dd, dl, dt, table, tbody, thead, tfoot, th, td, tr, a, img, address, abbr, iframe, caption, sub, super, figure, figcaption ]
     allowed_attributes: [ id, class, style, name, value, href, src, alt, title, width, height, frameborder, allowfullscreen, scrolling, target, colspan, rowspan ]
 
 # Uploaded file handling
@@ -268,6 +265,7 @@ debug_permission_audit_mode: false
 # debug_error_level: 8181           # equivalent to E_ALL &~ E_NOTICE &~ E_DEPRECATED &~ E_USER_DEPRECATED &~ E_WARNING
 debug_error_level: -1               # equivalent to E_ALL
 debug_error_use_symfony: false      # When set to true, Symfony Profiler will be used for exception display when possible
+debug_trace_argument_limit: 4       # Determine how many steps in the backtrace will show (dump) arguments.
 
 # error level when debug is disabled
 #production_error_level: 8181 # = E_ALL &~ E_NOTICE &~ E_WARNING &~ E_DEPRECATED &~ E_USER_DEPRECATED
@@ -309,6 +307,8 @@ wysiwyg:
     blockquote: false        # Allows the user to insert blockquotes using the `<blockquote>`-tag.
     codesnippet: false       # Allows the user to insert code snippets using `<pre><code>`-tags.
     specialchar: false       # Adds a button to insert special chars like '€' or '™'.
+    clipboard: false         # Adds buttons to 'undo' and 'redo'.
+    copypaste: false         # Adds buttons to 'cut', 'copy' and 'paste'.
     ck:
         autoParagraph: true  # If set to 'true', any pasted content is wrapped in `<p>`-tags for multiple line-breaks
         disableNativeSpellChecker: true # If set to 'true' it will stop browsers from underlining spelling mistakes
@@ -432,14 +432,6 @@ hash_strength: 10
 #     - 127.0.0.1
 #     - 10.0.0.0/8
 
-# Theme file path where themes are. They are under /theme in project's root
-# folder by default but can be relocated. This case you should define theme_path
-# accordingly.
-#
-# Make sure the path exists, and be aware that you'll get a new 'theme' folder on any
-# subsequent Bolt update. Changing this setting is not advised.
-# theme_path: theme
-
 # If you want Bolt installation get news through a proxy
 # httpProxy:
 #     host: my.proxy.server
@@ -452,3 +444,12 @@ hash_strength: 10
 #        disable: true     # Disable news panel. Defaults to false. "Alerts" will still be shown.
 #    stack:
 #        disable: true     # Disable stack usage. Defaults to false.
+
+# Options that will be forced in next major version
+compatibility:
+    # Whether to return TemplateView instead of TemplateResponse from Controller\Base::render()
+    # Response methods cannot be used on TemplateView objects.
+    # Setting this value to false is deprecated.
+    template_view: true
+    # Set to 'false' to enable using a newer version of the setcontent parser.
+    setcontent_legacy: true

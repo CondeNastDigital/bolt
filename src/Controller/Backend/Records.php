@@ -1,12 +1,16 @@
 <?php
+
 namespace Bolt\Controller\Backend;
 
 use Bolt\Exception\InvalidRepositoryException;
-use Bolt\Storage\ContentRequest\Listing;
+use Bolt\Form\FormType\ContentEditType;
 use Bolt\Storage\ContentRequest\ListingOptions;
 use Bolt\Translation\Translator as Trans;
 use Silex\ControllerCollection;
+use Symfony\Component\Form\Button;
+use Symfony\Component\Form\Form;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Backend controller for record manipulation routes.
@@ -29,10 +33,6 @@ class Records extends BackendBase
 
         $c->get('/overview/{contenttypeslug}', 'overview')
             ->bind('overview');
-
-        $c->get('/relatedto/{contenttypeslug}/{id}', 'related')
-            ->bind('relatedto')
-            ->assert('id', '\d*');
     }
 
     /**
@@ -40,63 +40,117 @@ class Records extends BackendBase
      *
      * @param Request $request         The Symfony Request
      * @param string  $contenttypeslug The content type slug
-     * @param integer $id              The content ID
+     * @param int     $id              The content ID
      *
-     * @return \Bolt\Response\BoltResponse|\Symfony\Component\HttpFoundation\RedirectResponse
+     * @return \Bolt\Response\TemplateResponse|\Symfony\Component\HttpFoundation\Response
      */
     public function edit(Request $request, $contenttypeslug, $id)
     {
-        // Is the record new or existing
-        $new = empty($id);
+        $contentTypeKey = $contenttypeslug;
+        $duplicate = $request->query->getBoolean('duplicate');
+        $new = $duplicate ? false : empty($id);
+
+        // Override return redirect for singletons
+        $isSingleton = $this->getOption('contenttypes/' . $contentTypeKey . '/singleton');
+        $deleteRoute = $isSingleton ? 'editcontent' : 'overview';
 
         // Test the access control
-        if ($response = $this->checkEditAccess($contenttypeslug, $id)) {
+        if ($response = $this->checkEditAccess($contentTypeKey, $id)) {
             return $response;
         }
 
-        // Set the editreferrer in twig if it was not set yet.
-        $this->setEditReferrer($request);
-
         // Get the ContentType object
-        $contenttype = $this->getContentType($contenttypeslug);
+        $contentType = $this->getContentType($contentTypeKey);
 
-        // Save the POSTed record
-        if ($request->isMethod('POST')) {
-            $this->validateCsrfToken();
+        $data = null;
+        $options = ['contenttype_name' => $contentType['singular_name']];
+        /** @var Form $form */
+        $form = $this->createFormBuilder(ContentEditType::class, $data, $options)
+            ->getForm()
+        ;
+        $form->handleRequest($request);
+        $button = $form->getClickedButton();
 
+        if ($form->isSubmitted() && $form->isValid() && $button !== null) {
+            // Save the POSTed record
             $formValues = $request->request->all();
-            $returnTo = $request->get('returnto');
+            $returnTo = $this->getReturnTo($request, $button);
             $editReferrer = $request->get('editreferrer');
 
-            return $this->recordSave()->action($formValues, $contenttype, $id, $new, $returnTo, $editReferrer);
+            if ($button->getName() === 'delete') {
+                $this->app['storage.request.modify']->action($contentTypeKey, [$id => ['delete' => true]]);
+
+                return $this->redirectToRoute($deleteRoute, ['contenttypeslug' => $contentTypeKey]);
+            } else {
+                $response = $this->recordSave()->action($formValues, $contentType, $id, $new || $duplicate, $returnTo, $editReferrer);
+            }
+            if ($response instanceof Response) {
+                return $response;
+            }
         }
 
         try {
             // Get the record
-            $repo = $this->getRepository($contenttypeslug);
+            $repo = $this->getRepository($contentTypeKey);
         } catch (InvalidRepositoryException $e) {
-            $this->flashes()->error(Trans::__('contenttypes.generic.not-existing', ['%contenttype%' => $contenttypeslug]));
+            $this->flashes()->error(Trans::__('contenttypes.generic.not-existing', ['%contenttype%' => $contentTypeKey]));
 
             return $this->redirectToRoute('dashboard');
         }
 
         if ($new) {
-            $content = $repo->create(['contenttype' => $contenttypeslug, 'status' => $contenttype['default_status']]);
+            $content = $repo->create(['contenttype' => $contentTypeKey, 'status' => $contentType['default_status']]);
+        } elseif ($duplicate) {
+            $source = $request->query->getInt('source');
+            $content = $repo->find($source);
         } else {
             $content = $repo->find($id);
-            if ($content === false) {
-                // Record not found, advise and redirect to the dashboard
-                $this->flashes()->error(Trans::__('contenttypes.generic.not-existing', ['%contenttype%' => $contenttypeslug]));
+        }
+        if ($content === false) {
+            // Record not found, advise and redirect to the dashboard
+            $this->flashes()->error(Trans::__('contenttypes.generic.not-existing', ['%contenttype%' => $contentTypeKey]));
 
-                return $this->redirectToRoute('dashboard');
-            }
+            return $this->redirectToRoute('dashboard');
         }
 
-        // We're doing a GET
-        $duplicate = $request->query->get('duplicate', false);
+        // Ensure custom entities have the legacy ContentType set
+        $this->app['storage.legacy_service']->setupContenttype($content);
+
         $context = $this->recordEdit()->action($content, $content->getContenttype(), $duplicate);
+        $context['file_matcher'] = $this->app['filesystem.matcher'];
+        $context['form'] = $form->createView();
+
+        // Get the editreferrer
+        $referrer = $this->getEditReferrer($request);
+        if ($referrer) {
+            $content['editreferrer'] = $referrer;
+        }
 
         return $this->render('@bolt/editcontent/editcontent.twig', $context);
+    }
+
+    /**
+     * Calculate the parameter used to determine response.
+     *
+     * @internal to be removed when forms cut-over is complete
+     *
+     * @param Request $request
+     * @param Button  $button
+     *
+     * @return string
+     */
+    private function getReturnTo(Request $request, Button $button)
+    {
+        $name = $button->getName();
+        $isAjax = $request->isXmlHttpRequest();
+        if ($request->attributes->has('_test')) {
+            return 'test';
+        }
+        if ($name === 'save') {
+            return $isAjax ? 'ajax' : $name;
+        }
+
+        return $name;
     }
 
     /**
@@ -105,7 +159,7 @@ class Records extends BackendBase
      * @param Request $request         The Symfony Request
      * @param string  $contenttypeslug The content type slug
      *
-     * @return \Bolt\Response\BoltResponse|\Symfony\Component\HttpFoundation\RedirectResponse
+     * @return \Bolt\Response\TemplateResponse|\Symfony\Component\HttpFoundation\RedirectResponse
      */
     public function overview(Request $request, $contenttypeslug)
     {
@@ -129,6 +183,7 @@ class Records extends BackendBase
             ->setPage($request->query->get('page_' . $contenttypeslug))
             ->setFilter($request->query->get('filter'))
             ->setTaxonomies($taxonomy)
+            ->setGroupSort(true)
         ;
 
         $context = [
@@ -142,74 +197,10 @@ class Records extends BackendBase
     }
 
     /**
-     * Get related records.
-     *
-     * @param Request $request         The Symfony Request
-     * @param string  $contenttypeslug The content type slug
-     * @param integer $id              The ID
-     *
-     * @return \Bolt\Response\BoltResponse|\Symfony\Component\HttpFoundation\RedirectResponse
-     */
-    public function related(Request $request, $contenttypeslug, $id)
-    {
-        // Make sure the user is allowed to see this page, based on 'allowed contenttypes' for Editors.
-        if (!$this->isAllowed('contenttype:' . $contenttypeslug)) {
-            $this->flashes()->error(Trans::__('general.phrase.access-denied-privilege-edit-record'));
-
-            return $this->redirectToRoute('dashboard');
-        }
-
-        // Get content record, and the contenttype config from $contenttypeslug
-        $content = $this->getContent($contenttypeslug, ['id' => $id]);
-        $contenttype = $this->getContentType($contenttypeslug);
-
-        // Get relations
-        $showContentType = null;
-        $relations = null;
-        if (isset($contenttype['relations'])) {
-            $relations = $contenttype['relations'];
-
-            // Which related contenttype is to be shown?
-            // If non is selected or selection does not exist, take the first one
-            $showSlug = $request->get('show') ? $request->get('show') : null;
-            if (!isset($relations[$showSlug])) {
-                reset($relations);
-                $showSlug = key($relations);
-            }
-
-            foreach (array_keys($relations) as $relatedslug) {
-                $relatedtype = $this->getContentType($relatedslug);
-
-                if ($relatedtype['slug'] == $showSlug) {
-                    $showContentType = $relatedtype;
-                }
-
-                $relations[$relatedslug] = [
-                    'name'   => Trans::__($relatedtype['name']),
-                    'active' => ($relatedtype['slug'] === $showSlug),
-                ];
-            }
-        }
-
-        $context = [
-            'id'               => $id,
-            'name'             => Trans::__($contenttype['singular_name']),
-            'title'            => $content['title'],
-            'contenttype'      => $contenttype,
-            'relations'        => $relations,
-            'show_contenttype' => $showContentType,
-            'related_content'  => is_null($relations) ? null : $content->related($showContentType['slug']),
-            'permissions'      => $this->getContentTypeUserPermissions($contenttypeslug, $this->users()->getCurrentUser()),
-        ];
-
-        return $this->render('@bolt/relatedto/relatedto.twig', $context);
-    }
-
-    /**
      * Check that the user is allowed to edit the record.
      *
-     * @param string  $contenttypeslug
-     * @param integer $id
+     * @param string $contenttypeslug
+     * @param int    $id
      *
      * @return bool|\Symfony\Component\HttpFoundation\RedirectResponse
      */
@@ -242,20 +233,26 @@ class Records extends BackendBase
      *
      * @param Request $request
      *
-     * @return void
+     * @return string|null
      */
-    private function setEditReferrer(Request $request)
+    private function getEditReferrer(Request $request)
     {
         $tmp = parse_url($request->server->get('HTTP_REFERER'));
 
-        $tmpreferrer = $tmp['path'];
+        $referrer = $tmp['path'];
         if (!empty($tmp['query'])) {
-            $tmpreferrer .= '?' . $tmp['query'];
+            $referrer .= '?' . $tmp['query'];
         }
 
-        if (strpos($tmpreferrer, '/overview/') !== false || ($tmpreferrer === $this->resources()->getUrl('bolt'))) {
-            $this->app['twig']->addGlobal('editreferrer', $tmpreferrer);
+        if (strpos($referrer, '/overview/') !== false || ($referrer === $this->generateUrl('dashboard') . '/')) {
+            if ($this->getOption('general/compatibility/twig_globals', true)) {
+                $this->app['twig']->addGlobal('editreferrer', $referrer);
+            }
+
+            return $referrer;
         }
+
+        return null;
     }
 
     /**

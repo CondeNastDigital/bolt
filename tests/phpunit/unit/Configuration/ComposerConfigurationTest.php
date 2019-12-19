@@ -1,23 +1,31 @@
 <?php
+
 namespace Bolt\Tests\Configuration;
 
 use Bolt\Configuration\Composer;
 use Bolt\Configuration\ComposerChecks;
-use Bolt\Configuration\ResourceManager;
 use Bolt\Exception\BootException;
+use PHPUnit\Framework\TestCase;
+use PHPUnit_Extension_FunctionMocker as FunctionMocker;
+use PHPUnit_Framework_MockObject_MockObject as MockObject;
 
 /**
  * Class to test correct operation and locations of composer configuration.
+ *
+ * @group legacy
  *
  * @author Ross Riley <riley.ross@gmail.com>
  *
  * @runTestsInSeparateProcesses
  */
-class ComposerConfigurationTest extends \PHPUnit_Framework_TestCase
+class ComposerConfigurationTest extends TestCase
 {
+    /** @var MockObject */
+    protected $php;
+
     public function setup()
     {
-        $this->php = \PHPUnit_Extension_FunctionMocker::start($this, 'Bolt\Configuration')
+        $this->php = FunctionMocker::start($this, 'Bolt\Configuration')
             ->mockFunction('is_writable')
             ->mockFunction('is_dir')
             ->getMock();
@@ -58,10 +66,11 @@ class ComposerConfigurationTest extends \PHPUnit_Framework_TestCase
     {
         $config = new Composer(TEST_ROOT);
         $verifier = new ComposerChecks($config);
+        $config->setPathResolver($config->getPathResolverFactory()->create());
 
         try {
             $verifier->checkDir('/non/existent/path');
-            $this->fail('Bolt\Exception\BootException not thrown');
+            $this->fail(sprintf('%s not thrown', BootException::class));
         } catch (BootException $e) {
             $message = strip_tags($e->getMessage());
             $this->assertRegExp("/The default folder \/non\/existent\/path doesn't exist/", $message);
@@ -75,10 +84,11 @@ class ComposerConfigurationTest extends \PHPUnit_Framework_TestCase
         $config = new Composer(TEST_ROOT);
         $config->setPath('database', '/path/to/nowhere');
         $verifier = new ComposerChecks($config);
+        $config->setPathResolver($config->getPathResolverFactory()->create());
 
         try {
             $verifier->checkDir('/path/to/nowhere');
-            $this->fail('Bolt\Exception\BootException not thrown');
+            $this->fail(sprintf('%s not thrown', BootException::class));
         } catch (BootException $e) {
             $message = strip_tags($e->getMessage());
             $this->assertRegExp("/The default folder \/path\/to\/nowhere doesn't exist/", $message);
@@ -92,9 +102,9 @@ class ComposerConfigurationTest extends \PHPUnit_Framework_TestCase
         $fakeLocation = '/path/to/nowhere';
         $config = new Composer(TEST_ROOT);
         $verifier = new ComposerChecks($config);
+        $config->setPathResolver($config->getPathResolverFactory()->create());
 
         $app['resources'] = $config;
-        ResourceManager::$theApp = $app;
 
         // Check we get an exception if the directory isn't writable
         $this->php
@@ -114,7 +124,7 @@ class ComposerConfigurationTest extends \PHPUnit_Framework_TestCase
 
         try {
             $verifier->checkDir($fakeLocation);
-            $this->fail('Bolt\Exception\BootException not thrown');
+            $this->fail(sprintf('%s not thrown', BootException::class));
         } catch (BootException $e) {
             $message = strip_tags($e->getMessage());
             $this->assertRegExp("/The default folder \/path\/to\/nowhere isn't writable. Make sure it's writable to the user that the web server is using/", $message);

@@ -1,10 +1,13 @@
 <?php
+
 namespace Bolt\Tests\Composer\Action;
 
 use Bolt\Composer\Action\InstallPackage;
 
 /**
  * Class to test src/Composer/Action/InstallPackage.
+ *
+ * @group slow
  *
  * @author Ross Riley <riley.ross@gmail.com>
  */

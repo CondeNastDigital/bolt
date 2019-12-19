@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Storage\Database\Schema\Table;
 
 /**
@@ -19,7 +20,7 @@ class Taxonomy extends BaseTable
         $this->table->addColumn('contenttype',  'string',  ['length' => 32]);
         $this->table->addColumn('taxonomytype', 'string',  ['length' => 32]);
         $this->table->addColumn('slug',         'string',  ['length' => 64]);
-        $this->table->addColumn('name',         'string',  ['length' => 64, 'default' => '']);
+        $this->table->addColumn('name',         'string',  ['length' => 64]);
         $this->table->addColumn('sortorder',    'integer', ['default' => 0]);
         // @codingStandardsIgnoreEnd
     }

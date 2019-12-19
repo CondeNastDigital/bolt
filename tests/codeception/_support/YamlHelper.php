@@ -7,7 +7,7 @@ use Symfony\Component\Yaml\Dumper;
 use Symfony\Component\Yaml\Parser;
 
 /**
- * YAML Helper class
+ * YAML Helper class.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
@@ -29,13 +29,13 @@ class YamlHelper extends \Codeception\Module
 
         if (is_readable($fileName)) {
             return $parser->parse(file_get_contents($fileName) . "\n");
-        } else {
-            throw new IOException($fileName . ' is not readable!');
         }
+
+        throw new IOException($fileName . ' is not readable!');
     }
 
     /**
-     * Read the config file and set 'canonical' and 'notfound'
+     * Read the config file and set 'canonical' and 'notfound'.
      *
      * @return string
      */
@@ -44,7 +44,7 @@ class YamlHelper extends \Codeception\Module
         $config = $this->readYaml('app/config/config.yml');
 
         $config['canonical'] = 'example.org';
-        $config['notfound']  = 'resources/not-found';
+        $config['notfound'] = 'resources/not-found';
         $config['changelog'] = ['enabled' => true];
 
         return $this->getYamlString($config, 5);
@@ -131,6 +131,11 @@ class YamlHelper extends \Codeception\Module
         ];
 
         $permissions['contenttypes'] = [
+            'homepage'     => [
+                'create'           => ['editor'],
+                'edit'             => ['editor'],
+                'publish'          => ['editor'],
+            ],
             'pages'     => [
                 'create'           => ['editor'],
                 'edit'             => ['editor', 'author'],
@@ -152,7 +157,7 @@ class YamlHelper extends \Codeception\Module
     }
 
     /**
-     * Add a 'Resources' Contenttype
+     * Add a 'Resources' Contenttype.
      *
      * ```
      * resources:
@@ -224,7 +229,7 @@ class YamlHelper extends \Codeception\Module
     }
 
     /**
-     * Read the menu file and add a menu for the Showcase listing
+     * Read the menu file and add a menu for the Showcase listing.
      *
      * @return string
      */
@@ -263,16 +268,17 @@ class YamlHelper extends \Codeception\Module
 
     public function getUpdatedTheme()
     {
-        $theme = $this->readYaml('theme/base-2016/theme.yml');
+        $theme = $this->readYaml('theme/base-2018/theme.yml');
 
         /**
          * Disabled as currently unsupported due to problems in test due to
          * |first filter in base-2016:
+         *
          * @see https://github.com/bolt/bolt/blob/v3.2.16/theme/base-2016/partials/_sub_fields.twig#L104
          */
         unset($theme['templatefields']['extrafields.twig']);
 
-        $theme['templatefields']['page.twig'] =   [
+        $theme['templatefields']['page.twig'] = [
             'text'        => ['type' => 'text'],
             'html'        => ['type' => 'html'],
             'textarea'    => ['type' => 'textarea'],
@@ -303,7 +309,7 @@ class YamlHelper extends \Codeception\Module
                 'type'  => 'integer',
                 'index' => true,
             ],
-            'float' => ['type' => 'float'],
+            'float'      => ['type' => 'float'],
             'select_map' => [
                 'type'   => 'select',
                 'values' => [
@@ -340,6 +346,7 @@ class YamlHelper extends \Codeception\Module
             /**
              * Disabled as currently unsupported due to problems in extension
              * fields, and in test due to |first filter in base-2016:
+             *
              * @see https://github.com/bolt/bolt/blob/v3.2.16/theme/base-2016/partials/_sub_fields.twig#L104
              */
             //'repeater' => [
@@ -360,10 +367,11 @@ class YamlHelper extends \Codeception\Module
     }
 
     /**
-     * Get the YAML in a string
+     * Get the YAML in a string.
      *
      * @param array   $input  The PHP value
-     * @param integer $inline The level where you switch to inline YAML
+     * @param int $inline The level where you switch to inline YAML
+     * @param mixed   $depth
      *
      * @return string
      */

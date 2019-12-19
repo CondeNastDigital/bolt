@@ -2,10 +2,12 @@
 
 namespace Bolt;
 
-use Bolt\Response\BoltResponse;
+use Bolt\Common\Deprecated;
+use Bolt\Response\TemplateResponse;
 use Silex;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Twig\Error\LoaderError;
+use Twig\Loader\ExistsLoaderInterface;
 
 /**
  * Wrapper around Twig's render() function. Handles the following responsibilities:.
@@ -16,14 +18,14 @@ use Symfony\Component\HttpFoundation\Response;
  * - Fetches pages or template (partials) from cache
  *
  * @author Bob den Otter, bob@twokings.nl
+ *
+ * @deprecated Since 3.3, will be removed in 4.0.
  */
 class Render
 {
-    public $app;
-    /** @var boolean */
-    public $safe;
-    /** @var string */
-    public $twigKey;
+    private $app;
+    /** @var bool */
+    private $safe;
 
     /**
      * Set up the object.
@@ -33,63 +35,81 @@ class Render
      */
     public function __construct(Silex\Application $app, $safe = false)
     {
+        Deprecated::method(3.3);
+
         $this->app = $app;
         $this->safe = $safe;
-        if ($safe) {
-            $this->twigKey = 'safe_twig';
-        } else {
-            $this->twigKey = 'twig';
-        }
+    }
+
+    public function __get($property)
+    {
+        Deprecated::method(3.3);
+
+        return $this->$property;
+    }
+
+    public function __set($property, $value)
+    {
+        Deprecated::method(3.3);
+
+        $this->$property = $value;
     }
 
     /**
      * Render a template, possibly store it in cache. Or, if applicable, return the cached result.
      *
-     * @param string $template the template name
-     * @param array  $vars     array of context variables
-     * @param array  $globals  array of global variables
+     * @param string|string[] $templateName Template name(s)
+     * @param array           $context      Context variables
+     * @param array           $globals      Global variables
      *
-     * @return \Bolt\Response\BoltResponse
+     * @return TemplateResponse
+     *
+     * @deprecated Since 3.3, will be removed in 4.0.
      */
-    public function render($template, $vars = [], $globals = [])
+    public function render($templateName, $context = [], $globals = [])
     {
-        $response = BoltResponse::create(
-            $this->app[$this->twigKey]->loadTemplate($template),
-            $vars,
-            $globals
-        );
-        $response->setStopwatch($this->app['stopwatch']);
+        Deprecated::method(3.3);
+
+        $template = $this->app['twig']->resolveTemplate($templateName);
+
+        foreach ($globals as $name => $value) {
+            $this->app['twig']->addGlobal($name, $value);
+        }
+
+        $html = twig_include($this->app['twig'], $context, $template, [], true, false, $this->safe);
+
+        $response = new TemplateResponse($template->getTemplateName(), $context, $html);
 
         return $response;
     }
 
     /**
+     * @deprecated Since 3.3, will be removed in 4.0.
+     *
      * Check if the template exists.
      *
-     * @internal
-     *
-     * @param string $template The name of the template.
+     * @param string $template the name of the template
      *
      * @return bool
      */
     public function hasTemplate($template)
     {
-        /** @var \Twig_Environment $env */
-        $env = $this->app[$this->twigKey];
-        $loader = $env->getLoader();
+        Deprecated::method(3.3);
+
+        $loader = $this->app['twig']->getLoader();
 
         /*
          * Twig_ExistsLoaderInterface is getting merged into
          * Twig_LoaderInterface in Twig 2.0. Check for this
          * instead once we are there, and remove getSource() check.
          */
-        if ($loader instanceof \Twig_ExistsLoaderInterface) {
+        if ($loader instanceof ExistsLoaderInterface) {
             return $loader->exists($template);
         }
 
         try {
             $loader->getSource($template);
-        } catch (\Twig_Error_Loader $e) {
+        } catch (LoaderError $e) {
             return false;
         }
 
@@ -97,30 +117,16 @@ class Render
     }
 
     /**
-     * Post-process the rendered HTML: insert the snippets, and stuff.
-     *
-     * @param Request  $request
-     * @param Response $response
-     */
-    public function postProcess(Request $request, Response $response)
-    {
-        /** @var \Bolt\Asset\QueueInterface $queue */
-        if (!$this->app['request_stack']->getCurrentRequest()->isXmlHttpRequest()) {
-            foreach ($this->app['asset.queues'] as $queue) {
-                $queue->process($request, $response);
-            }
-        }
-    }
-
-    /**
      * Retrieve a fully cached page from cache.
      *
      * @deprecated Deprecated since 3.1, to be removed in 4.0. @see \Silex\HttpCache
      *
-     * @return \Symfony\Component\HttpFoundation\Response|boolean
+     * @return \Symfony\Component\HttpFoundation\Response|bool
      */
     public function fetchCachedRequest()
     {
+        Deprecated::method(3.3);
+
         $response = false;
         if ($this->checkCacheConditions('request', true)) {
             $key = md5($this->app['request']->getPathInfo() . $this->app['request']->getQueryString());
@@ -156,6 +162,8 @@ class Render
      */
     public function cacheRequest(Response $response)
     {
+        Deprecated::method(3.3);
+
         if ($this->checkCacheConditions('request')) {
             $html = $response->getContent();
 
@@ -171,15 +179,17 @@ class Render
      *
      * @deprecated Deprecated since 3.1, to be removed in 4.0. @see \Silex\HttpCache
      *
-     * @return integer
+     * @return int
      */
     public function cacheDuration()
     {
+        Deprecated::method(3.3);
+
         // in minutes.
         $duration = $this->app['config']->get('general/caching/duration', 10);
 
         // in seconds.
-        return intval($duration) * 60;
+        return (int) $duration * 60;
     }
 
     /**
@@ -194,6 +204,8 @@ class Render
      */
     public function checkCacheConditions($type = 'template', $checkoverride = false)
     {
+        Deprecated::method(3.3);
+
         // Do not cache in "safe" mode: we don't want to accidentally bleed
         // sensitive data from a previous unsafe run.
         if ($this->safe) {

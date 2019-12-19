@@ -97,7 +97,7 @@ final class RequirePackage extends BaseAction
             // Installation failed, reverting JSON to its original content
             $jsonFile->dump($composerBackup);
 
-            $msg = sprintf('%s recieved an error from Composer: %s in %s::%s', __METHOD__, $e->getMessage(), $e->getFile(), $e->getLine());
+            $msg = sprintf('%s received an error from Composer: %s in %s::%s', __METHOD__, $e->getMessage(), $e->getFile(), $e->getLine());
             $this->app['logger.system']->critical($msg, ['event' => 'exception', 'exception' => $e]);
             throw new PackageManagerException($e->getMessage(), $e->getCode(), $e);
         }
@@ -108,7 +108,7 @@ final class RequirePackage extends BaseAction
      *
      * @param JsonFile $jsonFile
      * @param array    $package
-     * @param boolean  $isPostInstall
+     * @param bool     $isPostInstall
      */
     private function updateComposerJson(JsonFile $jsonFile, array $package, $isPostInstall)
     {
@@ -140,8 +140,8 @@ final class RequirePackage extends BaseAction
      * @param array    $new
      * @param string   $requireKey
      * @param string   $removeKey
-     * @param boolean  $sortPackages
-     * @param boolean  $isPostInstall
+     * @param bool     $sortPackages
+     * @param bool     $isPostInstall
      *
      * @return bool
      */

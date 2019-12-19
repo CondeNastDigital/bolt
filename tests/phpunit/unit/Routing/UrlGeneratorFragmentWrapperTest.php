@@ -24,7 +24,7 @@ class UrlGeneratorFragmentWrapperTest extends BoltUnitTest
         $parent = new UrlGenerator($collection, new RequestContext());
         $generator = new UrlGeneratorFragmentWrapper($parent);
 
-        $this->assertInstanceOf('\Symfony\Component\Routing\Generator\UrlGeneratorInterface', $generator);
+        $this->assertInstanceOf(UrlGeneratorInterface::class, $generator);
 
         return $generator;
     }
@@ -35,6 +35,21 @@ class UrlGeneratorFragmentWrapperTest extends BoltUnitTest
      * @param UrlGeneratorInterface $generator
      */
     public function testUrlGenerationWithFragment($generator)
+    {
+        $path = $generator->generate('foo', ['_fragment' => 'bolt']);
+        $this->assertSame('/foo/bar#bolt', $path);
+        $path = $generator->generate('foo', ['hello' => 'world', '_fragment' => 'bolt']);
+        $this->assertSame('/foo/bar?hello=world#bolt', $path);
+    }
+
+    /**
+     * @deprecated To be removed in v4 with related change in \Bolt\Routing\UrlGeneratorFragmentWrapper::generate
+     *
+     * @depends testUrlGeneratorInterface
+     *
+     * @param UrlGeneratorInterface $generator
+     */
+    public function testUrlGenerationWithFragmentLegacy($generator)
     {
         $path = $generator->generate('foo', ['#' => 'bolt']);
         $this->assertSame('/foo/bar#bolt', $path);

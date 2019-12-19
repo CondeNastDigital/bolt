@@ -1,11 +1,11 @@
 <?php
+
 namespace Bolt\Tests\Nut;
 
+use Bolt\Composer\PackageManager;
 use Bolt\Nut\Extensions;
 use Bolt\Tests\BoltUnitTest;
 use Composer\Package\CompletePackage;
-use Symfony\Component\Console\Helper\HelperSet;
-use Symfony\Component\Console\Helper\TableHelper;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
@@ -23,15 +23,18 @@ class ExtensionsTest extends BoltUnitTest
         $testPackage->setDescription('An extension');
         $testPackage->setType('bolt-extension');
 
-        $runner = $this->getMock("Bolt\Composer\PackageManager", ['showPackage'], [$app]);
+        $runner = $this->getMockBuilder(PackageManager::class)
+            ->setMethods(['showPackage'])
+            ->setConstructorArgs([$app])
+            ->getMock()
+        ;
         $runner->expects($this->any())
             ->method('showPackage')
             ->will($this->returnValue(['test' => ['package' => $testPackage]]));
 
-        $app['extend.manager'] = $runner;
+        $this->setService('extend.manager', $runner);
 
         $command = new Extensions($app);
-        $command->setHelperSet(new HelperSet([new TableHelper()]));
         $tester = new CommandTester($command);
 
         $tester->execute([]);

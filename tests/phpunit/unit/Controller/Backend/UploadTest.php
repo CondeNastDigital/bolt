@@ -1,6 +1,8 @@
 <?php
+
 namespace Bolt\Tests\Controller\Backend;
 
+use Bolt\Common\Json;
 use Bolt\Tests\Controller\ControllerUnitTest;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
@@ -12,7 +14,6 @@ use Symfony\Component\HttpFoundation\Response;
  * @author Ross Riley <riley.ross@gmail.com>
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  **/
-
 class UploadTest extends ControllerUnitTest
 {
     public function setup()
@@ -43,7 +44,7 @@ class UploadTest extends ControllerUnitTest
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
 
         // We haven't posted a file so an empty resultset should be returned
-        $content = json_decode($response->getContent());
+        $content = Json::parse($response->getContent());
         $this->assertEquals(0, count($content));
     }
 
@@ -54,7 +55,7 @@ class UploadTest extends ControllerUnitTest
         $response = $this->controller()->uploadNamespace($request, 'files');
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
 
-        $content = json_decode($response->getContent());
+        $content = Json::parse($response->getContent());
         $this->assertEquals(1, count($content));
     }
 
@@ -80,10 +81,10 @@ class UploadTest extends ControllerUnitTest
         $response = $this->controller()->uploadNamespace($this->getRequest(), 'files');
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
 
-        $content = json_decode($response->getContent());
+        $content = Json::parse($response->getContent());
         $file = $content[0];
-        $this->assertAttributeNotEmpty('error', $file);
-        $this->assertRegExp('/extension/i', $file->error);
+        $this->assertArrayHasKey('error', $file);
+        $this->assertRegExp('/extension/i', $file['error']);
     }
 
     public function testHandlerParsing()
@@ -109,6 +110,10 @@ class UploadTest extends ControllerUnitTest
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
     }
 
+    /**
+     * @expectedException \Bolt\Filesystem\Exception\FileNotFoundException
+     * @expectedExceptionMessage File not found at path: logo.png
+     */
     public function testMultipleHandlerParsing()
     {
         $this->getApp()->flush();
@@ -129,7 +134,6 @@ class UploadTest extends ControllerUnitTest
         ));
 
         // Not properly implemented as yet, this will need to be revisited on implementation
-        $this->setExpectedException('Bolt\Filesystem\Exception\FileNotFoundException', 'File not found at path: logo.png');
         $this->controller()->uploadNamespace($this->getRequest(), 'files');
     }
 
@@ -171,29 +175,6 @@ class UploadTest extends ControllerUnitTest
 
         return $this->getRequest();
     }
-
-//     protected function getApp($boot = true)
-//     {
-//         $bolt = parent::getApp();
-
-//         return $this->authApp($bolt);
-//     }
-
-//     protected function authApp(Application $bolt)
-//     {
-//         $users = $this->getMock('Bolt\Users', ['isValidSession', 'isAllowed'], [$bolt]);
-//         $users->expects($this->any())
-//             ->method('isValidSession')
-//             ->will($this->returnValue(true));
-
-//         $users->expects($this->any())
-//             ->method('isAllowed')
-//             ->will($this->returnValue(true));
-
-//         $bolt['users'] = $users;
-
-//         return $bolt;
-//     }
 
     /**
      * @return \Bolt\Controller\Backend\Upload

@@ -6,12 +6,12 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Nut command to run all available PHPUnit tests
+ * Nut command to run all available PHPUnit tests.
  */
 class TestRunner extends BaseCommand
 {
     /**
-     * @see \Symfony\Component\Console\Command\Command::configure()
+     * {@inheritdoc}
      */
     protected function configure()
     {
@@ -22,10 +22,11 @@ class TestRunner extends BaseCommand
     }
 
     /**
-     * @see \Symfony\Component\Console\Command\Command::execute()
+     * {@inheritdoc}
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        $this->io->title('Running PHPUnit Tests');
         $executable = null;
         if (is_file(dirname(dirname(__DIR__)) . '/vendor/bin/phpunit')) {
             // development install
@@ -44,10 +45,13 @@ class TestRunner extends BaseCommand
             }
         }
 
-        if (is_null($executable)) {
-            $output->writeln('No PHPUnit test runner found in the vendor dir or your path');
-        } else {
-            $output->write(system($executable));
+        if ($executable === null) {
+            $this->io->error('No PHPUnit test runner found in the vendor dir or your path');
+
+            return 1;
         }
+        $result = system($executable);
+
+        return $result ? 1 : 0;
     }
 }

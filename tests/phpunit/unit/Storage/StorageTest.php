@@ -1,10 +1,13 @@
 <?php
+
 namespace Bolt\Tests\Storage;
 
 use Bolt\Events\StorageEvents;
+use Bolt\Legacy;
 use Bolt\Legacy\Content;
 use Bolt\Legacy\Storage;
 use Bolt\Tests\BoltUnitTest;
+use Bolt\Tests\Mocks\ImageApiMock;
 use Bolt\Tests\Mocks\LoripsumMock;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\Request;
@@ -27,13 +30,16 @@ class StorageTest extends BoltUnitTest
      * against this, as PHPUnit keeps the mock in the $this->mockObjects private
      * property array and any further calls to the 'Pages' repo will (currently)
      * fail as the Application object is torn down at the end of the test/class.
+     *
+     * @expectedException \Exception
+     * @expectedExceptionMessage Failing does not extend \Bolt\Legacy\Content.
      */
     public function testGetContentObject()
     {
         $app = $this->getApp();
         $storage = new Storage($app);
         $content = $storage->getContentObject('pages');
-        $this->assertInstanceOf('Bolt\Legacy\Content', $content);
+        $this->assertInstanceOf(Legacy\Content::class, $content);
 
         // Fake it until we make it… to the end of the test suite.
         $contentType = $app['config']->get('contenttypes/pages');
@@ -46,35 +52,47 @@ class StorageTest extends BoltUnitTest
 
         $fields = $app['config']->get('contenttypes/fakes/fields');
 
-        $mock = $this->getMock('Bolt\Legacy\Content', [], [$app], 'Fakes');
+        $mock = $this->getMockBuilder(Content::class)
+            ->setMethods([])
+            ->setConstructorArgs([$app])
+            ->setMockClassName('Fakes')
+            ->getMock()
+        ;
         $content = $storage->getContentObject(['class' => 'Fakes', 'fields' => $fields]);
         $this->assertInstanceOf('Fakes', $content);
-        $this->assertInstanceOf('Bolt\Legacy\Content', $content);
+        $this->assertInstanceOf(Legacy\Content::class, $content);
 
         // Test that a class not instanceof Bolt\Legacy\Content fails
-        $mock = $this->getMock('stdClass', null, [], 'Failing');
-        $this->setExpectedException('Exception', 'Failing does not extend \Bolt\Legacy\Content.');
-        $content = $storage->getContentObject(['class' => 'Failing', 'fields' => $fields]);
+        $mock = $this->getMockBuilder(\stdClass::class)
+            ->setMethods(null)
+            ->setConstructorArgs([])
+            ->setMockClassName('Failing')
+            ->getMock()
+        ;
+        $storage->getContentObject(['class' => 'Failing', 'fields' => $fields]);
     }
 
     public function testPreFill()
     {
+        $this->resetDb();
         $app = $this->getApp();
         $this->addDefaultUser($app);
-        $prefillMock = new LoripsumMock();
-        $app['prefill'] = $prefillMock;
+        $this->setService('prefill', new LoripsumMock());
+        $this->setService('prefill.image', new ImageApiMock());
 
-        $app['config']->set('general/changelog/enabled', true);
         $storage = new Storage($app);
         $output = $storage->prefill(['showcases']);
         $this->assertRegExp('#Added#', $output);
-        $this->assertRegExp('#Done#', $output);
 
-        $output = $storage->prefill();
+        $output = $storage->prefill(['showcases']);
         $this->assertRegExp('#Skipped#', $output);
     }
 
-    public function testSaveContent()
+    /**
+     * @expectedException \Bolt\Exception\StorageException
+     * @expectedExceptionMessage Contenttype is required for saveContent
+     */
+    public function testSaveContentMissingContentType()
     {
         $app = $this->getApp();
         $app['request'] = Request::create('/');
@@ -82,19 +100,25 @@ class StorageTest extends BoltUnitTest
 
         // Test missing contenttype handled
         $content = new Content($app);
-        $this->setExpectedException('Bolt\Exception\StorageException', 'Contenttype is required for saveContent');
-        $this->assertFalse($storage->saveContent($content));
+        $storage->saveContent($content);
+    }
+
+    public function testSaveContentPrePostDispatchers()
+    {
+        $app = $this->getApp();
+        $app['request'] = Request::create('/');
+        $storage = new Storage($app);
 
         // Test dispatcher is called pre-save and post-save
-        $content = $storage->getContent('showcases/1');
+        $content = $storage->getEmptyContent('showcases');
 
         $presave = 0;
         $postsave = 0;
         $listener = function () use (&$presave) {
-            $presave++;
+            ++$presave;
         };
         $listener2 = function () use (&$postsave) {
-            $postsave++;
+            ++$postsave;
         };
         $app['dispatcher']->addListener(StorageEvents::PRE_SAVE, $listener);
         $app['dispatcher']->addListener(StorageEvents::POST_SAVE, $listener2);
@@ -103,22 +127,49 @@ class StorageTest extends BoltUnitTest
         $this->assertEquals(1, $postsave);
     }
 
-    public function testDeleteContent()
+    public function testSaveContent()
+    {
+        $app = $this->getApp();
+        $app['request'] = Request::create('/');
+        $storage = new Storage($app);
+
+        $content = $storage->getEmptyContent('showcases');
+        $content->setValues([
+            'title'  => 'koala',
+            'slug'   => 'Kenny',
+            'status' => 'published',
+        ]);
+
+        $result = $storage->saveContent($content);
+        $stored = $storage->getContent('showcase/' . $result);
+
+        $this->assertInstanceOf(Content::class, $stored);
+    }
+
+    /**
+     * @expectedException \Bolt\Exception\StorageException
+     * @expectedExceptionMessage Contenttype is required for deleteContent
+     */
+    public function testDeleteContentBadParameters()
     {
         $app = $this->getApp();
         $app['request'] = Request::create('/');
         $storage = new Storage($app);
 
         // Test delete fails on missing params
-        $this->setExpectedException('Bolt\Exception\StorageException', 'Contenttype is required for deleteContent');
         $this->assertFalse($storage->deleteContent('', 999));
+    }
 
-        $content = $storage->getContent('showcases/1');
+    public function testDeleteContent()
+    {
+        $app = $this->getApp();
+        $app['request'] = Request::create('/');
+        $storage = new Storage($app);
 
         // Test the delete events are triggered
         $delete = 0;
         $listener = function () use (&$delete) {
-            $delete++;
+            ++$delete;
         };
         $app['dispatcher']->addListener(StorageEvents::PRE_DELETE, $listener);
         $app['dispatcher']->addListener(StorageEvents::POST_DELETE, $listener);
@@ -153,7 +204,7 @@ class StorageTest extends BoltUnitTest
         $app = $this->getApp();
         $storage = new Storage($app);
         $showcase = $storage->getEmptyContent('showcase');
-        $this->assertInstanceOf('Bolt\Legacy\Content', $showcase);
+        $this->assertInstanceOf(Legacy\Content::class, $showcase);
         $this->assertEquals('showcases', $showcase->contenttype['slug']);
     }
 
@@ -183,34 +234,6 @@ class StorageTest extends BoltUnitTest
         $this->assertEquals(0, $result['no_of_results']);
     }
 
-    public function testSearchAllContentTypes()
-    {
-        $app = $this->getApp();
-        $app['request'] = Request::create('/');
-        $storage = new Storage($app);
-        $results = $storage->searchAllContentTypes(['title' => 'lorem']);
-    }
-
-    public function testSearchContentType()
-    {
-    }
-
-    public function testGetContentByTaxonomy()
-    {
-    }
-
-    public function testPublishTimedRecords()
-    {
-    }
-
-    public function testDepublishExpiredRecords()
-    {
-    }
-
-    public function testGetContent()
-    {
-    }
-
     public function testGetContentSortOrderFromContentType()
     {
         $app = $this->getApp();
@@ -218,11 +241,11 @@ class StorageTest extends BoltUnitTest
         $db = $this->getDbMockBuilder($app['db'])
             ->setMethods(['fetchAll'])
             ->getMock();
-        $app['db'] = $db;
+        $this->setService('db', $db);
         $db->expects($this->any())
             ->method('fetchAll')
             ->willReturn([]);
-        $storage = new StorageMock($app);
+        $storage = new Mock\StorageMock($app);
 
         // Test sorting is pulled from contenttype when not specified
         $app['config']->set('contenttypes/entries/sort', '-id');
@@ -237,11 +260,11 @@ class StorageTest extends BoltUnitTest
         $db = $this->getDbMockBuilder($app['db'])
             ->setMethods(['fetchAll'])
             ->getMock();
-        $app['db'] = $db;
+        $this->setService('db', $db);
         $db->expects($this->any())
             ->method('fetchAll')
             ->willReturn([]);
-        $storage = new StorageMock($app);
+        $storage = new Mock\StorageMock($app);
 
         // Test returnsingle will set limit to 1
         $storage->getContent('entries', ['returnsingle' => true]);
@@ -255,8 +278,10 @@ class StorageTest extends BoltUnitTest
     /**
      * The legacy getContentType method should be able to find contenttypes by key, slugified key, slug, slugified slug,
      * singular slug, slugified singular slug, singular name and name.
-
+     *
      * @dataProvider contentTypeProvider
+     *
+     * @param array $contentType
      */
     public function testGetContentType($contentType)
     {
@@ -313,7 +338,7 @@ class StorageTest extends BoltUnitTest
     }
 
     /**
-     * Seed some dummy content types for testing the contenttype query methods
+     * Seed some dummy content types for testing the ContentType query methods.
      */
     public function contentTypeProvider()
     {
@@ -324,8 +349,8 @@ class StorageTest extends BoltUnitTest
                     'slug'          => 'foo_bars',
                     'singular_slug' => 'foo_bar',
                     'name'          => 'FooBars',
-                    'singular_name' => 'Foo Bar'
-                ]
+                    'singular_name' => 'Foo Bar',
+                ],
             ],
             [
                 [
@@ -333,9 +358,9 @@ class StorageTest extends BoltUnitTest
                     'slug'          => 'things',
                     'singular_slug' => 'thing',
                     'name'          => 'Somethings',
-                    'singular_name' => 'Something'
-                ]
-            ]
+                    'singular_name' => 'Something',
+                ],
+            ],
         ];
     }
 
@@ -345,22 +370,5 @@ class StorageTest extends BoltUnitTest
             ->setConstructorArgs([$db->getParams(), $db->getDriver(), $db->getConfiguration(), $db->getEventManager()])
             ->enableOriginalConstructor()
         ;
-    }
-}
-
-class StorageMock extends Storage
-{
-    public $queries = [];
-
-    protected function tableExists($name)
-    {
-        return true;
-    }
-
-    protected function executeGetContentQueries($decoded)
-    {
-        $this->queries[] = $decoded;
-
-        return parent::executeGetContentQueries($decoded);
     }
 }

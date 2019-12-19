@@ -2,10 +2,12 @@
 
 namespace Bolt\Storage\Database\Schema\Table;
 
+use Bolt\Common\Deprecated;
+
 class ContentType extends BaseTable
 {
     /** @var array Mapping of field type to column type function */
-    protected $typeMap =  [
+    protected $typeMap = [
         // Boolean
         'checkbox'       => 'columnBoolean',
         // Date
@@ -35,6 +37,7 @@ class ContentType extends BaseTable
         'geolocation'    => 'columnJson',
         'image'          => 'columnJson',
         'imagelist'      => 'columnJson',
+        'embed'          => 'columnJson',
         'selectmultiple' => 'columnJson',
         'templatefields' => 'columnJson',
         'video'          => 'columnJson',
@@ -52,9 +55,8 @@ class ContentType extends BaseTable
         $this->table->addColumn('slug',           'string',     ['length' => 128]);
         $this->table->addColumn('datecreated',    'datetime',   []);
         $this->table->addColumn('datechanged',    'datetime',   []);
-        $this->table->addColumn('datepublish',    'datetime',   ['notnull' => false, 'default' => null]);
-        $this->table->addColumn('datedepublish',  'datetime',   ['notnull' => false, 'default' => null]);
-        $this->table->addColumn('username',       'string',     ['length' => 32, 'default' => '', 'notnull' => false]); // We need to keep this around for backward compatibility. For now.
+        $this->table->addColumn('datepublish',    'datetime',   ['notnull' => false]);
+        $this->table->addColumn('datedepublish',  'datetime',   ['notnull' => false]);
         $this->table->addColumn('ownerid',        'integer',    ['notnull' => false]);
         $this->table->addColumn('status',         'string',     ['length' => 32]);
         // @codingStandardsIgnoreEnd
@@ -89,7 +91,7 @@ class ContentType extends BaseTable
      *
      * @param string $type
      *
-     * @return boolean
+     * @return bool
      */
     public function isKnownType($type)
     {
@@ -99,9 +101,9 @@ class ContentType extends BaseTable
     /**
      * Add the contenttype's specific fields.
      *
-     * @param string  $fieldName
-     * @param string  $type
-     * @param boolean $addIndex
+     * @param string $fieldName
+     * @param string $type
+     * @param bool   $addIndex
      */
     public function addCustomFields($fieldName, $type, $addIndex)
     {
@@ -153,6 +155,8 @@ class ContentType extends BaseTable
      */
     private function columnDecimal($fieldName)
     {
+        Deprecated::warn('The "decimal" field type');
+
         $this->table->addColumn($fieldName, 'decimal', ['precision' => '18', 'scale' => '9', 'default' => 0]);
     }
 
@@ -183,11 +187,7 @@ class ContentType extends BaseTable
      */
     private function columnJson($fieldName)
     {
-        if ($this->platform->getName() === 'sqlite') {
-            $this->table->addColumn($fieldName, 'json_array', ['default' => '[]']);
-        } else {
-            $this->table->addColumn($fieldName, 'json_array', ['notnull' => false]);
-        }
+        $this->table->addColumn($fieldName, 'json', ['notnull' => false]);
     }
 
     /**
@@ -197,11 +197,11 @@ class ContentType extends BaseTable
      */
     private function columnStringNormal($fieldName)
     {
-        $this->table->addColumn($fieldName, 'string', ['length' => 256, 'default' => '', 'notnull' => false]);
+        $this->table->addColumn($fieldName, 'string', ['length' => 256, 'notnull' => false]);
     }
 
     /**
-     * Add a column for a 123 character string, not null, with an empty string default.
+     * Add a column for a 128 character string, not null, with an empty string default.
      *
      * @param string $fieldName
      */
@@ -209,8 +209,8 @@ class ContentType extends BaseTable
     {
         // Only additional slug fields will be added. If it's the
         // default slug, skip it instead.
-        if ($fieldName != 'slug') {
-            $this->table->addColumn($fieldName, 'string', ['length' => 128, 'notnull' => false, 'default' => '']);
+        if ($fieldName !== 'slug') {
+            $this->table->addColumn($fieldName, 'string', ['length' => 128, 'notnull' => false]);
         }
     }
 
@@ -221,6 +221,6 @@ class ContentType extends BaseTable
      */
     private function columnText($fieldName)
     {
-        $this->table->addColumn($fieldName, 'text', ['default' => $this->getTextDefault(), 'notnull' => false]);
+        $this->table->addColumn($fieldName, 'text', ['notnull' => false]);
     }
 }

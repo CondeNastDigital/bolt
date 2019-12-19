@@ -26,6 +26,12 @@
         return $('.extend-bolt-container').find(selector);
     }
 
+    function stripHTML(string) {
+        var tempElement = $(string);
+        var result = tempElement.find('h1, h2, h3, p').text() || tempElement.text();
+        return result.trim().replace(/ +/g, " ").replace(/\s+\n/g, "\n");
+    }
+
     function formatErrorLog(data) {
         var errObj = '',
             html = '',
@@ -34,12 +40,25 @@
         try {
             errObj = $.parseJSON(data.responseText);
         } catch(err) {
-            $('.modal').modal('hide');
-            bootbox.alert('<p>An unknown error occurred. This was the error message:</p>\n\n' +
-                '<pre>' + err.message + '</pre>');
+            // Do nothing, JSON parse error is handled below.
         }
 
-        if (errObj.error.type === 'Bolt\\Exception\\PackageManagerException') {
+        if (typeof errObj.error === 'undefined') {
+            msg = 'This was the received response:\n\n' +
+                '<textarea>' + stripHTML(data.responseText) + '</textarea>\n\n' +
+                'Inspect the console output in the browser\'s Debug Inspector for more details.';
+
+            html = bolt.data(
+                'extend.packages.error',
+                {
+                    '%ERROR_TYPE%': 'Unknown Error',
+                    '%ERROR_MESSAGE%': msg,
+                    '%ERROR_LOCATION%': ''
+                }
+            );
+            /* eslint no-console: ["error", { allow: ["error"] }] */
+            console.error(data);
+        } else if (errObj.error.type === 'Bolt\\Exception\\PackageManagerException') {
             // Clean up Composer messages.
             msg = errObj.error.message.replace(/(<http)/g, '<a href="http').replace(/(\w+>)/g, '">this link<\/a>');
 
@@ -64,15 +83,12 @@
                 }
             );
         } else {
-            // Sanitize PHP error file paths.
-            var file = errObj.error.file.replace(new RegExp(bolt.data('extend.rootpath'), 'g'), '');
-
             html = bolt.data(
                 'extend.packages.error',
                 {
                     '%ERROR_TYPE%': 'PHP Error',
                     '%ERROR_MESSAGE%': errObj.error.message,
-                    '%ERROR_LOCATION%': 'File: ' + file + '::' + errObj.error.line
+                    '%ERROR_LOCATION%': 'File: ' + errObj.error.file + '::' + errObj.error.line
                 }
             );
         }

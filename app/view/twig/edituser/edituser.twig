@@ -39,7 +39,7 @@
                 </p>
             {% endif %}
 
-            <form method="post" class="form-horizontal" autocomplete="off">
+            {{ form_start(context.form, {'attr': {'autocomplete': 'off'}}) }}
                 {# Google Chrome, Firefox, MS Edge all require this trick to prevent password fields from auto-filling.
                    @see http://stackoverflow.com/questions/15738259/disabling-chrome-autofill #}
                 <input type="text" style="display:none;" />
@@ -47,8 +47,7 @@
 
                 {{ form_widget(context.form) }}
 
-                <input type="submit" value="{{ __('page.edit-users.button.save') }}" name="submit" class="btn btn-primary">
-            </form>
+            {{ form_end(context.form) }}
 
             {{ widgets('edituser_bottom', 'backend') }}
 
@@ -60,18 +59,19 @@
 
     </div>
 
-    <div class="progress" id="progress-wrapper">
+    <div class="progress complexity-progress" id="progress-wrapper">
         <div id="complexity-bar" class="progress-bar progress-bar-success" role="progressbar" style="width: 0;"></div>
     </div>
 
     <script type="text/javascript">
         $(function() {
+            var passwordElements = '#user_edit_password_first, #user_profile_password_first';
             // Attach and detach the progressbar.
-            var el = $('#progress-wrapper').detach()
-            $('#form_password').parent().append(el);
+            var el = $('#progress-wrapper').detach();
+            $(passwordElements).parent().append(el);
 
             // Initialize complexify, to indicate password strength.
-            $('#form_password').complexify({'strengthScaleFactor': 0.6, 'minimumChars': 6}, function (valid, complexity) {
+            $(passwordElements).complexify({'strengthScaleFactor': 0.6, 'minimumChars': 6}, function (valid, complexity) {
                 var progressBar = $('#complexity-bar');
                 progressBar.toggleClass('progress-bar-danger', (complexity < 40 ));
                 progressBar.toggleClass('progress-bar-warning', (complexity < 50 ));

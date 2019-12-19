@@ -2,10 +2,12 @@
 
 namespace Bolt\Storage\Query;
 
+use Bolt\Storage\Entity\Content;
 use Bolt\Storage\EntityManager;
 use Bolt\Storage\Query\Directive\GetQueryDirective;
 use Bolt\Storage\Query\Directive\HydrateDirective;
 use Bolt\Storage\Query\Directive\LimitDirective;
+use Bolt\Storage\Query\Directive\OffsetDirective;
 use Bolt\Storage\Query\Directive\OrderDirective;
 use Bolt\Storage\Query\Directive\PagingDirective;
 use Bolt\Storage\Query\Directive\PrintQueryDirective;
@@ -48,6 +50,8 @@ class ContentQueryParser
     protected $handlers = [];
     /** @var QueryInterface[] */
     protected $services = [];
+    /** @var QueryScopeInterface */
+    protected $scope;
 
     /**
      * Constructor.
@@ -83,10 +87,12 @@ class ContentQueryParser
         $this->addDirectiveHandler('hydrate', new HydrateDirective());
         $this->addDirectiveHandler('limit', new LimitDirective());
         $this->addDirectiveHandler('order', new OrderDirective());
+        $this->addDirectiveHandler('page', new OffsetDirective());
         $this->addDirectiveHandler('paging', new PagingDirective());
         $this->addDirectiveHandler('printquery', new PrintQueryDirective());
         $this->addDirectiveHandler('returnsingle', new ReturnSingleDirective());
     }
+
     /**
      * Sets the input query.
      *
@@ -102,7 +108,7 @@ class ContentQueryParser
      *
      * @param array $params
      */
-    public function setParameters($params)
+    public function setParameters(array $params)
     {
         $this->params = $params;
     }
@@ -213,18 +219,32 @@ class ContentQueryParser
     public function runDirectives(QueryInterface $query, array $skipDirective = [])
     {
         foreach ($this->directives as $key => $value) {
-            if (! in_array($key, $skipDirective)) {
-                if ($this->hasDirectiveHandler($key)) {
-                    if (is_callable($this->getDirectiveHandler($key))) {
-                        call_user_func_array($this->getDirectiveHandler($key), [$query, $value]);
-                    }
-                }
+            if (in_array($key, $skipDirective)) {
+                continue;
+            }
+            if (!$this->hasDirectiveHandler($key)) {
+                continue;
+            }
+            if (is_callable($this->getDirectiveHandler($key))) {
+                call_user_func($this->getDirectiveHandler($key), $query, $value, $this->directives);
             }
         }
     }
 
+    public function setScope(QueryScopeInterface $scope)
+    {
+        $this->scope = $scope;
+    }
+
+    public function runScopes(QueryInterface $query)
+    {
+        if ($this->scope !== null) {
+            $this->scope->onQueryExecute($query);
+        }
+    }
+
     /**
-     * Gets the object EntityManager
+     * Gets the object EntityManager.
      *
      * @return EntityManager
      */
@@ -268,18 +288,22 @@ class ContentQueryParser
      *
      * @param string $key
      *
-     * @return string
+     * @return string|null
      */
     public function getDirective($key)
     {
-        return $this->directives[$key];
+        if (array_key_exists($key, $this->directives)) {
+            return $this->directives[$key];
+        }
+
+        return null;
     }
 
     /**
      * Sets a directive for the named key.
      *
-     * @param string $key
-     * @param mixed  $value
+     * @param string      $key
+     * @param string|bool $value
      */
     public function setDirective($key, $value)
     {
@@ -407,13 +431,13 @@ class ContentQueryParser
     /**
      * Runs the query and fetches the results.
      *
-     * @return QueryResultset
+     * @return QueryResultset|Content|null
      */
     public function fetch()
     {
         $this->parse();
 
-        return call_user_func_array($this->handlers[$this->getOperation()], [$this]);
+        return call_user_func($this->handlers[$this->getOperation()], $this);
     }
 
     /**

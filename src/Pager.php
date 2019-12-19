@@ -1,10 +1,11 @@
 <?php
+
 namespace Bolt;
 
 use Silex;
 
 /**
- * Class Pager
+ * Class Pager.
  *
  * @author Rix Beck <rix@neologik.hu>
  *

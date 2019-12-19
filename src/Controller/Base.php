@@ -1,7 +1,11 @@
 <?php
+
 namespace Bolt\Controller;
 
 use Bolt\AccessControl\Token\Token;
+use Bolt\Common\Deprecated;
+use Bolt\Response\TemplateResponse;
+use Bolt\Response\TemplateView;
 use Bolt\Routing\DefaultControllerClassAwareInterface;
 use Bolt\Storage\Entity;
 use Bolt\Storage\Repository;
@@ -51,9 +55,9 @@ abstract class Base implements ControllerProviderInterface
     /**
      * Shortcut to abort the current request by sending a proper HTTP error.
      *
-     * @param integer $statusCode The HTTP status code
-     * @param string  $message    The status message
-     * @param array   $headers    An array of HTTP headers
+     * @param int    $statusCode The HTTP status code
+     * @param string $message    The status message
+     * @param array  $headers    An array of HTTP headers
      *
      * @throws HttpExceptionInterface
      */
@@ -63,17 +67,82 @@ abstract class Base implements ControllerProviderInterface
     }
 
     /**
-     * Renders a template
+     * Renders a template.
      *
-     * @param string $template  the template name
-     * @param array  $variables array of context variables
-     * @param array  $globals   array of global variables
+     * @param string|string[] $template Template name(s)
+     * @param array           $context  Context variables
+     * @param array           $globals  Global variables
      *
-     * @return \Bolt\Response\BoltResponse
+     * @return TemplateResponse|TemplateView
      */
-    protected function render($template, array $variables = [], array $globals = [])
+    protected function render($template, array $context = [], array $globals = [])
     {
-        return $this->app['render']->render($template, $variables, $globals);
+        $twig = $this->app['twig'];
+
+        $template = $twig->resolveTemplate($template);
+
+        if ($this->getOption('general/compatibility/twig_globals', true)) {
+            foreach ($globals as $name => $value) {
+                $twig->addGlobal($name, $value);
+            }
+        }
+        $context += $globals;
+
+        $this->addResolvedRoute($context, $template->getTemplateName());
+
+        if ($this->getOption('general/compatibility/template_view', false)) {
+            return new TemplateView($template->getTemplateName(), $context);
+        }
+        Deprecated::warn(
+            'Returning a TemplateResponse from Bolt\Controller\Base::render',
+            3.3,
+            'Be sure no Response methods are used from return value and then set "compatibility/template_view"' .
+            ' to true in config.yml. This changes render() to return a TemplateView instead.'
+        );
+
+        $content = $template->render($context);
+        $response = new TemplateResponse($template->getTemplateName(), $context, $content);
+
+        return $response;
+    }
+
+    /**
+     * Update the route attributes to change the canonical URL generated.
+     *
+     * @param array  $context
+     * @param string $template
+     */
+    private function addResolvedRoute(array $context, $template)
+    {
+        if (!isset($context['record'])) {
+            return;
+        }
+
+        $content = $context['record'];
+        $request = $this->app['request_stack']->getCurrentRequest();
+
+        $homepage = $this->getOption('theme/homepage') ?: $this->getOption('general/homepage');
+        $uriID = $content->contenttype['singular_slug'] . '/' . $content->get('id');
+        $uriSlug = $content->contenttype['singular_slug'] . '/' . $content->get('slug');
+
+        if (($uriID === $homepage || $uriSlug === $homepage) && ($template === $this->getOption('general/homepage_template'))) {
+            $request->attributes->add(['_route' => 'homepage', '_route_params' => []]);
+
+            return;
+        }
+
+        // In case we're previewing a record, this will override the `_route`, but keep the original
+        // one, used to see if we need to disable the XSS protection header.
+        // See PR https://github.com/bolt/bolt/pull/7458
+        list($routeName, $routeParams) = $content->getRouteNameAndParams();
+        if ($routeName) {
+            /** @deprecated since 3.4 to be removed in 4.0 */
+            $request->attributes->add([
+                '_route'          => $routeName,
+                '_route_params'   => $routeParams,
+                '_internal_route' => $request->attributes->get('_route'),
+            ]);
+        }
     }
 
     /**
@@ -119,7 +188,7 @@ abstract class Base implements ControllerProviderInterface
     }
 
     /**
-     * Shortcut for {@see UrlGeneratorInterface::generate}
+     * Shortcut for {@see UrlGeneratorInterface::generate}.
      *
      * @param string $name          The name of the route
      * @param array  $params        An array of parameters
@@ -165,7 +234,7 @@ abstract class Base implements ControllerProviderInterface
     /**
      * Returns the Entity Manager.
      *
-     * @return \Bolt\Storage\EntityManager
+     * @return \Bolt\Storage\EntityManager|\Bolt\Legacy\Storage
      */
     protected function storage()
     {
@@ -183,7 +252,7 @@ abstract class Base implements ControllerProviderInterface
     }
 
     /**
-     * Gets the flash logger
+     * Gets the flash logger.
      *
      * @return \Bolt\Logger\FlashLoggerInterface
      */
@@ -205,15 +274,14 @@ abstract class Base implements ControllerProviderInterface
     /**
      * Validates CSRF token and throws HttpException if not.
      *
-     * @param string|null $value The token value or null to use "bolt_csrf_token" parameter from request.
-     * @param string      $id    The token ID.
+     * @param string|null $value the token value or null to use "bolt_csrf_token" parameter from request
+     * @param string      $id    the token ID
      *
      * @throws HttpExceptionInterface
      */
     protected function validateCsrfToken($value = null, $id = 'bolt')
     {
         if (!$this->isCsrfTokenValid($value, $id)) {
-            //$this->app['logger.flash']->warning('The security token was incorrect. Please try again.');
             $this->abort(Response::HTTP_BAD_REQUEST, Trans::__('general.phrase.something-went-wrong'));
         }
     }
@@ -221,8 +289,8 @@ abstract class Base implements ControllerProviderInterface
     /**
      * Check if csrf token is valid.
      *
-     * @param string|null $value The token value or null to use "bolt_csrf_token" parameter from request.
-     * @param string      $id    The token ID.
+     * @param string|null $value the token value or null to use "bolt_csrf_token" parameter from request
+     * @param string      $id    the token ID
      *
      * @return bool
      */
@@ -266,7 +334,7 @@ abstract class Base implements ControllerProviderInterface
     /**
      * Check to see if the user table exists and has records.
      *
-     * @return boolean
+     * @return bool
      */
     protected function hasUsers()
     {
@@ -285,7 +353,7 @@ abstract class Base implements ControllerProviderInterface
     /**
      * Return current user or user by ID.
      *
-     * @param integer|string|null $userId
+     * @param int|string|null $userId
      *
      * @return Entity\Users|false
      */
@@ -300,20 +368,20 @@ abstract class Base implements ControllerProviderInterface
             return false;
         }
         /** @var Repository\UsersRepository $repo */
-        $repo = $this->storage()->getRepository('Bolt\Storage\Entity\Users');
+        $repo = $this->storage()->getRepository(Entity\Users::class);
 
         return $repo->getUser($userId);
     }
 
     /**
-     * Shortcut for {@see \Bolt\AccessControl\Permissions::isAllowed}
+     * Shortcut for {@see \Bolt\AccessControl\Permissions::isAllowed}.
      *
-     * @param string       $what
-     * @param mixed        $user        The user to check permissions against.
-     * @param string|null  $contenttype
-     * @param integer|null $contentid
+     * @param string      $what
+     * @param mixed       $user        the user to check permissions against
+     * @param string|null $contenttype
+     * @param int|null    $contentid
      *
-     * @return boolean
+     * @return bool
      */
     protected function isAllowed($what, $user = null, $contenttype = null, $contentid = null)
     {
@@ -338,20 +406,26 @@ abstract class Base implements ControllerProviderInterface
     }
 
     /**
-     * Shortcut for {@see \Bolt\Legacy\Storage::getContent()}
+     * Shortcut for {@see \Bolt\Legacy\Storage::getContent()}.
      *
-     * @param string $textquery
+     * @param string $textQuery
      * @param array  $parameters
      * @param array  $pager
-     * @param array  $whereparameters
+     * @param array  $whereParameters
      *
      * @return \Bolt\Legacy\Content|\Bolt\Legacy\Content[]
      *
      * @see \Bolt\Legacy\Storage::getContent()
      */
-    protected function getContent($textquery, $parameters = [], &$pager = [], $whereparameters = [])
+    protected function getContent($textQuery, $parameters = [], &$pager = [], $whereParameters = [])
     {
-        return $this->storage()->getContent($textquery, $parameters, $pager, $whereparameters);
+        $isLegacy = $this->getOption('general/compatibility/setcontent_legacy', true);
+        if ($isLegacy) {
+            return $this->storage()->getContent($textQuery, $parameters, $pager, $whereParameters);
+        }
+        $params = array_merge($parameters, $whereParameters);
+
+        return  $this->app['query']->getContent($textQuery, $params);
     }
 
     /**
@@ -359,7 +433,7 @@ abstract class Base implements ControllerProviderInterface
      *
      * @param string $slug
      *
-     * @return boolean|array
+     * @return bool|array
      */
     protected function getContentType($slug)
     {
@@ -372,7 +446,7 @@ abstract class Base implements ControllerProviderInterface
      * @param string             $contentTypeSlug
      * @param array|Entity\Users $user
      *
-     * @return boolean[]
+     * @return bool[]
      */
     protected function getContentTypeUserPermissions($contentTypeSlug, $user = null)
     {
@@ -389,7 +463,7 @@ abstract class Base implements ControllerProviderInterface
      * @param string $path
      * @param mixed  $default
      *
-     * @return string|integer|array|null
+     * @return string|int|array|null
      */
     protected function getOption($path, $default = null)
     {

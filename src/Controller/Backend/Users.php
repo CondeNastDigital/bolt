@@ -1,24 +1,20 @@
 <?php
+
 namespace Bolt\Controller\Backend;
 
 use Bolt\AccessControl\Permissions;
 use Bolt\Events\AccessControlEvent;
+use Bolt\Form\FormType;
+use Bolt\Helpers\ListMutator;
 use Bolt\Storage\Entity;
 use Bolt\Translation\Translator as Trans;
 use Silex\ControllerCollection;
-use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
-use Symfony\Component\Form\Extension\Core\Type\DateTimeType;
-use Symfony\Component\Form\Extension\Core\Type\FormType;
-use Symfony\Component\Form\Extension\Core\Type\HiddenType;
-use Symfony\Component\Form\Extension\Core\Type\PasswordType;
-use Symfony\Component\Form\Extension\Core\Type\TextType;
-use Symfony\Component\Form\Form;
-use Symfony\Component\Form\FormBuilder;
-use Symfony\Component\Form\FormError;
-use Symfony\Component\Form\FormEvent;
-use Symfony\Component\Form\FormEvents;
+use Swift_Message as Message;
+use Swift_RfcComplianceException as RfcComplianceException;
+use Swift_TransportException as TransportException;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Requirements\RequirementCollection;
 
 /**
  * Backend controller for user maintenance routes.
@@ -55,7 +51,7 @@ class Users extends BackendBase
     /**
      * All users admin page.
      *
-     * @return \Bolt\Response\BoltResponse
+     * @return \Bolt\Response\TemplateResponse
      */
     public function admin()
     {
@@ -82,34 +78,61 @@ class Users extends BackendBase
      * User edit route.
      *
      * @param Request $request The Symfony Request
-     * @param integer $id      The user ID
+     * @param int     $id      The user ID
      *
-     * @return \Bolt\Response\BoltResponse|\Symfony\Component\HttpFoundation\RedirectResponse
+     * @return \Bolt\Response\TemplateResponse|\Symfony\Component\HttpFoundation\RedirectResponse
      */
     public function edit(Request $request, $id)
     {
-        if (!$userEntity = $this->getEditableUser($id)) {
+        $currentUser = $this->getUser();
+        $userEntity = $this->getUserEntity($id);
+        if ($userEntity === false) {
             return $this->redirectToRoute('users');
         }
+        /** @var Permissions $permissions */
+        $permissions = $this->app['permissions'];
+        $availableRoles = array_flip(array_map(
+            function ($role) {
+                return $role['label'];
+            },
+            $permissions->getDefinedRoles()
+        ));
+        $mutableRoles = $permissions->getManipulatableRoles($currentUser->toArray());
 
-        // Get the base form
-        $form = $this->getUserForm($userEntity, true);
-
-        // Get the extra editable fields
-        $form = $this->getUserEditFields($form, $id);
-
-        // Set the validation
-        $form = $this->setUserFormValidation($form, true);
+        $formOptions = [
+            'password' => [
+                'required' => !$userEntity->getId()
+            ],
+            'roles'    => [
+                'choices' => $availableRoles,
+                'mutable' => $mutableRoles,
+            ],
+        ];
 
         // Generate the form
-        $form = $form->getForm();
+        $form = $this->createFormBuilder(FormType\UserEditType::class, $userEntity, $formOptions)
+            ->getForm()
+            ->handleRequest($request)
+        ;
 
-        $currentUser = $this->getUser();
+        if ($form->isSubmitted() && $form->isValid()) {
+            /** @var \Bolt\Form\FormType\UserData $data */
+            $data = $form->getData();
+            $roleMutator = new ListMutator($availableRoles, $mutableRoles);
+            $data->applyToEntity($userEntity, $roleMutator);
 
-        // Check if the form was POST-ed, and valid. If so, store the user.
-        if ($request->isMethod('POST')) {
-            $userEntity = $this->validateUserForm($request, $form, false);
-            if ($userEntity !== false && $userEntity->getId() == $currentUser->getId() && $userEntity->getUsername() !== $currentUser->getUsername()) {
+            $saved = $this->getRepository(Entity\Users::class)->save($userEntity);
+            if ($saved) {
+                $this->flashes()->success(Trans::__('page.edit-users.message.user-saved', ['%user%' => $userEntity->getDisplayname()]));
+                $this->app['logger.system']->info(
+                    Trans::__('page.edit-users.log.user-updated', ['%user%' => $userEntity->getDisplayname()]),
+                    ['event' => 'security']
+                );
+            } else {
+                $this->flashes()->error(Trans::__('page.edit-users.message.saving-user', ['%user%' => $userEntity->getDisplayname()]));
+            }
+
+            if ($userEntity !== false && $userEntity->getId() === $currentUser->getId() && $userEntity->getUsername() !== $currentUser->getUsername()) {
                 // If the current user changed their own login name, the session
                 // is effectively invalidated. If so, we must redirect to the
                 // login page with a flash message.
@@ -122,21 +145,11 @@ class Users extends BackendBase
             }
         }
 
-        /** @var \Symfony\Component\Form\FormView|\Symfony\Component\Form\FormView[] $formView */
-        $formView = $form->createView();
-
-        $manipulatableRoles = $this->app['permissions']->getManipulatableRoles($currentUser->toArray());
-        foreach ($formView['roles'] as $role) {
-            if (!in_array($role->vars['value'], $manipulatableRoles)) {
-                $role->vars['attr']['disabled'] = 'disabled';
-            }
-        }
-
         $context = [
-            'kind'        => empty($id) ? 'create' : 'edit',
-            'form'        => $formView,
+            'kind'        => $id ? 'edit' : 'create',
+            'form'        => $form->createView(),
             'note'        => '',
-            'displayname' => $userEntity['displayname'],
+            'displayname' => $userEntity->getDisplayname(),
         ];
 
         return $this->render('@bolt/edituser/edituser.twig', $context);
@@ -147,7 +160,7 @@ class Users extends BackendBase
      *
      * @param Request $request The Symfony Request
      *
-     * @return \Bolt\Response\BoltResponse|\Symfony\Component\HttpFoundation\RedirectResponse
+     * @return \Bolt\Response\TemplateResponse|\Symfony\Component\HttpFoundation\RedirectResponse
      */
     public function first(Request $request)
     {
@@ -155,9 +168,6 @@ class Users extends BackendBase
         if ($this->app['schema']->hasUserTable() && $this->users()->hasUsers()) {
             return $this->redirectToRoute('dashboard');
         }
-
-        // Get and empty user
-        $userEntity = new Entity\Users();
 
         // Add a note, if we're setting up the first user using SQLite.
         $dbdriver = $this->getOption('general/database/driver');
@@ -170,28 +180,59 @@ class Users extends BackendBase
         // If we get here, chances are we don't have the tables set up, yet.
         $this->app['schema']->update();
 
+        // Get an new entity object
+        $userEntity = $this->getUserEntity();
+        $userEntity->setEnabled(true);
         // Grant 'root' to first user by default
         $userEntity->setRoles([Permissions::ROLE_ROOT]);
 
-        // Get the form
-        $form = $this->getUserForm($userEntity, true);
+        // Generate the form
+        $form = $this->createFormBuilder(FormType\UserNewType::class, $userEntity)
+            ->getForm()
+            ->handleRequest($request)
+        ;
 
-        // Set the validation
-        $form = $this->setUserFormValidation($form, true);
+        if ($form->isSubmitted() && $form->isValid()) {
+            /** @var \Bolt\Form\FormType\UserData $data */
+            $data = $form->getData();
+            $data->applyToEntity($userEntity);
+            $saved = $this->getRepository(Entity\Users::class)->save($userEntity);
+            if ($saved) {
+                $this->app['logger.system']->info(
+                    Trans::__('page.edit-users.log.user-added', ['%user%' => $userEntity->getDisplayname()]),
+                    ['event' => 'security']
+                );
+                $this->notifyUserSetupEmail($request, $userEntity->getDisplayname(), $userEntity->getEmail());
 
-        /** @var \Symfony\Component\Form\Form */
-        $form = $form->getForm();
+                $event = new AccessControlEvent($request);
+                $login = $this->login()->login($userEntity->getUsername(), $form->get('password')->getData(), $event);
+                $token = $this->session()->get('authentication');
+                if ($login && $token) {
+                    $this->flashes()->clear();
+                    $this->flashes()->success(Trans::__('general.bolt-welcome-new-site', ['%USER%' => $userEntity->getDisplayname()]));
 
-        // Check if the form was POST-ed, and valid. If so, store the user.
-        if ($request->isMethod('POST') && $response = $this->firstPost($request, $form)) {
-            return $response;
+                    /** @var RedirectResponse $response */
+                    $response = $this->setAuthenticationCookie($request, $this->redirectToRoute('dashboard'), (string) $token);
+
+                    return $response;
+                }
+                if (!$token) {
+                    $this->flashes()->error(Trans::__('general.phrase.error-session-data-login'));
+                } else {
+                    $this->flashes()->error(Trans::__('general.phrase.something-went-wrong-after-first-user'));
+                }
+            }
         }
 
+        /** @var RequirementCollection $requirements */
+        $requirements = $this->app['requirements'];
         $context = [
+            'required'    => $requirements->getFailedRequirements() ?: null,
+            'recommended' => $requirements->getFailedRecommendations() ?: null,
             'kind'        => 'create',
             'form'        => $form->createView(),
             'note'        => $note,
-            'displayname' => $userEntity['displayname'],
+            'displayname' => $userEntity->getDisplayname(),
             'sitename'    => $this->getOption('general/sitename'),
         ];
 
@@ -201,8 +242,8 @@ class Users extends BackendBase
     /**
      * Perform modification actions on users.
      *
-     * @param string  $action The action
-     * @param integer $id     The user ID
+     * @param string $action The action
+     * @param int    $id     The user ID
      *
      * @return \Symfony\Component\HttpFoundation\RedirectResponse
      */
@@ -277,44 +318,41 @@ class Users extends BackendBase
      *
      * @param Request $request The Symfony Request
      *
-     * @return \Bolt\Response\BoltResponse|\Symfony\Component\HttpFoundation\RedirectResponse
+     * @return \Bolt\Response\TemplateResponse|\Symfony\Component\HttpFoundation\RedirectResponse
      */
     public function profile(Request $request)
     {
-        $user = $this->getUser();
+        $userEntity = $this->getUser();
+        if ($userEntity === false) {
+            return $this->redirectToRoute('users');
+        }
 
-        // Get the form
-        $form = $this->getUserForm($user, false);
+        // Generate the form
+        $form = $this->createFormBuilder(FormType\UserProfileType::class, $userEntity)
+            ->getForm()
+            ->handleRequest($request)
+        ;
 
-        // Set the validation
-        $form = $this->setUserFormValidation($form, false);
+        if ($form->isSubmitted() && $form->isValid()) {
+            /** @var \Bolt\Form\FormType\UserData $data */
+            $data = $form->getData();
+            $data->applyToEntity($userEntity);
 
-        /** @var \Symfony\Component\Form\Form */
-        $form = $form->getForm();
-
-        // Check if the form was POST-ed, and valid. If so, store the user.
-        if ($request->isMethod('POST')) {
-            $form->submit($request->get($form->getName()));
-
-            if ($form->isValid()) {
-                $this->app['logger.system']->info(Trans::__('page.edit-users.log.user-updated', ['%user%' => $user->getDisplayname()]), ['event' => 'security']);
-
-                $user = new Entity\Users($form->getData());
-                if ($this->getRepository('Bolt\Storage\Entity\Users')->save($user)) {
-                    $this->flashes()->success(Trans::__('page.edit-users.message.user-saved', ['%user%' => $user->getDisplayname()]));
-                } else {
-                    $this->flashes()->error(Trans::__('page.edit-users.message.saving-user', ['%user%' => $user->getDisplayname()]));
-                }
-
-                return $this->redirectToRoute('profile');
+            $this->app['logger.system']->info(Trans::__('page.edit-users.log.user-updated', ['%user%' => $userEntity->getDisplayname()]), ['event' => 'security']);
+            if ($this->getRepository(Entity\Users::class)->save($userEntity)) {
+                $this->flashes()->success(Trans::__('page.edit-users.message.user-saved', ['%user%' => $userEntity->getDisplayname()]));
+            } else {
+                $this->flashes()->error(Trans::__('page.edit-users.message.saving-user', ['%user%' => $userEntity->getDisplayname()]));
             }
+
+            return $this->redirectToRoute('profile');
         }
 
         $context = [
             'kind'        => 'profile',
             'form'        => $form->createView(),
             'note'        => '',
-            'displayname' => $user->getDisplayname(),
+            'displayname' => $userEntity->getDisplayname(),
         ];
 
         return $this->render('@bolt/edituser/edituser.twig', $context);
@@ -323,7 +361,7 @@ class Users extends BackendBase
     /**
      * Route to view the configured user roles.
      *
-     * @return \Bolt\Response\BoltResponse
+     * @return \Bolt\Response\TemplateResponse
      */
     public function viewRoles()
     {
@@ -333,7 +371,7 @@ class Users extends BackendBase
         foreach ($contenttypes as $contenttype) {
             foreach (array_keys($permissions) as $permission) {
                 $effectivePermissions[$contenttype['slug']][$permission] =
-                $this->app['permissions']->getRolesByContentTypePermission($permission, $contenttype['slug']);
+                    $this->app['permissions']->getRolesByContentTypePermission($permission, $contenttype['slug']);
             }
         }
         $globalPermissions = $this->app['permissions']->getGlobalRoles();
@@ -347,127 +385,13 @@ class Users extends BackendBase
     }
 
     /**
-     * Handle a first user creation POST.
+     * Get the user we want to edit, or a new entity object if null.
      *
-     * @param Request $request
-     * @param Form    $form
-     *
-     * @return \Symfony\Component\HttpFoundation\RedirectResponse|false
-     */
-    private function firstPost(Request $request, Form $form)
-    {
-        if (!$userEntity = $this->validateUserForm($request, $form, true)) {
-            return false;
-        }
-
-        $event = new AccessControlEvent($request);
-        $login = $this->login()->login($userEntity->getUsername(), $form->get('password')->getData(), $event);
-        $token = $this->session()->get('authentication');
-        if ($login && $token) {
-            $this->flashes()->clear();
-            $this->flashes()->success(Trans::__('general.bolt-welcome-new-site', ['%USER%' => $userEntity->getDisplayname()]));
-
-            $response = $this->setAuthenticationCookie($this->redirectToRoute('dashboard'), (string) $token);
-
-            return $response;
-        }
-
-        if (!$token) {
-            $this->flashes()->error(Trans::__('general.phrase.error-session-data-login'));
-        } else {
-            $this->flashes()->error(Trans::__('general.phrase.something-went-wrong-after-first-user'));
-        }
-
-        return false;
-    }
-
-    /**
-     * Create a user form with the form builder.
-     *
-     * @param Entity\Users $user
-     * @param boolean      $addusername
-     *
-     * @return \Symfony\Component\Form\FormBuilder
-     */
-    private function getUserForm(Entity\Users $user, $addusername = false)
-    {
-        // Start building the form
-        $form = $this->createFormBuilder(FormType::class, $user);
-
-        // Username goes first
-        if ($addusername) {
-            $form->add(
-                'username',
-                TextType::class,
-                [
-                    'constraints' => [new Assert\NotBlank(), new Assert\Length(['min' => 2, 'max' => 32])],
-                    'label'       => Trans::__('page.edit-users.label.username'),
-                    'attr'        => [
-                        'placeholder' => Trans::__('page.edit-users.placeholder.username'),
-                    ],
-                ]
-            );
-        }
-
-        // Add the other fields. Regarding the autocomplete on the passwords,
-        // see: https://bugs.chromium.org/p/chromium/issues/detail?id=468153#c150
-        $form
-            ->add('id', HiddenType::class)
-            ->add(
-                'password',
-                PasswordType::class,
-                [
-                    'required' => false,
-                    'label'    => Trans::__('page.edit-users.label.password'),
-                    'attr'     => [
-                        'placeholder'  => Trans::__('page.edit-users.placeholder.password'),
-                        'autocomplete' => 'new-password',
-                    ],
-                ]
-            )
-            ->add(
-                'password_confirmation',
-                PasswordType::class,
-                [
-                    'required' => false,
-                    'label'    => Trans::__('page.edit-users.label.password-confirm'),
-                    'attr'     => [
-                        'placeholder'  => Trans::__('page.edit-users.placeholder.password-confirm'),
-                        'autocomplete' => 'new-password',
-                    ],
-                ]
-            )
-            ->add(
-                'email',
-                TextType::class,
-                [
-                    'constraints' => new Assert\Email(),
-                    'label'       => Trans::__('page.edit-users.label.email'),
-                    'attr'        => ['placeholder' => Trans::__('page.edit-users.placeholder.email')],
-                ]
-            )
-            ->add(
-                'displayname',
-                TextType::class,
-                [
-                    'constraints' => [new Assert\NotBlank(), new Assert\Length(['min' => 2, 'max' => 32])],
-                    'label'       => Trans::__('page.edit-users.label.display-name'),
-                    'attr'        => ['placeholder' => Trans::__('page.edit-users.placeholder.displayname')],
-                ]
-            )
-        ;
-
-        return $form;
-    }
-
-    /**
-     * Get the user we want to edit (if any).
-     *
-     * @param integer $id
+     * @param int $id
      *
      * @return Entity\Users|false
      */
-    private function getEditableUser($id)
+    private function getUserEntity($id = null)
     {
         if (empty($id)) {
             return new Entity\Users();
@@ -489,207 +413,6 @@ class Users extends BackendBase
     }
 
     /**
-     * Get the editable fields for the user form.
-     *
-     * @param FormBuilder $form
-     * @param integer     $id
-     *
-     * @return \Symfony\Component\Form\FormBuilder
-     */
-    private function getUserEditFields(FormBuilder $form, $id)
-    {
-        $enabledoptions = [
-            1 => Trans::__('page.edit-users.activated.yes'),
-            0 => Trans::__('page.edit-users.activated.no'),
-        ];
-
-        $roles = array_map(
-            function ($role) {
-                return $role['label'];
-            },
-            $this->app['permissions']->getDefinedRoles()
-        );
-
-        // New users and the current users don't need to disable themselves
-        $currentUser = $this->getUser();
-        if ($currentUser->getId() != $id) {
-            $form->add(
-                'enabled',
-                ChoiceType::class,
-                [
-                    'choices'     => $enabledoptions,
-                    'expanded'    => false,
-                    'constraints' => new Assert\Choice(array_keys($enabledoptions)),
-                    'label'       => Trans::__('page.edit-users.label.user-enabled'),
-                ]
-            );
-        }
-
-        $form
-            ->add(
-                'roles',
-                ChoiceType::class,
-                [
-                    'choices'  => $roles,
-                    'expanded' => true,
-                    'multiple' => true,
-                    'label'    => Trans::__('page.edit-users.label.assigned-roles'),
-                ]
-            )
-            ->add(
-                'lastseen',
-                DateTimeType::class,
-                [
-                    'widget'   => 'single_text',
-                    'format'   => 'yyyy-MM-dd HH:mm:ss',
-                    'disabled' => true,
-                    'label'    => Trans::__('page.edit-users.label.last-seen'),
-                ]
-            )
-            ->add(
-                'lastip',
-                TextType::class,
-                [
-                    'disabled' => true,
-                    'label'    => Trans::__('page.edit-users.label.last-ip'),
-                ]
-            );
-
-        return $form;
-    }
-
-    /**
-     * Validate the user form.
-     *
-     * Use a custom validator to check:
-     *   * Passwords are identical
-     *   * Username is unique
-     *   * Email is unique
-     *   * Displaynames are unique
-     *
-     * @param FormBuilder $form
-     * @param boolean     $addusername
-     *
-     * @return \Symfony\Component\Form\FormBuilder
-     */
-    private function setUserFormValidation(FormBuilder $form, $addusername = false)
-    {
-        $users = $this->users();
-        $form->addEventListener(
-            FormEvents::POST_SUBMIT,
-            function (FormEvent $event) use ($addusername, $users) {
-                $form = $event->getForm();
-                $id = $form['id']->getData();
-                $pass1 = $form['password']->getData();
-                $pass2 = $form['password_confirmation']->getData();
-
-                // If adding a new user (empty $id) or if the password is not empty (indicating we want to change it),
-                // then make sure it's at least 6 characters long.
-                if ((empty($id) || !empty($pass1)) && strlen($pass1) < 6) {
-                    $error = new FormError(Trans::__('page.edit-users.error.password-short'));
-                    $form['password']->addError($error);
-                }
-
-                // Passwords must be identical.
-                if ($pass1 != $pass2) {
-                    $form['password_confirmation']->addError(new FormError(Trans::__('page.edit-users.error.password-mismatch')));
-                }
-
-                if ($addusername) {
-                    // Password must be different from username
-                    $username = strtolower($form['username']->getData());
-                    if (!empty($username) && strtolower($pass1) === $username) {
-                        $form['password']->addError(new FormError(Trans::__('page.edit-users.error.password-different-username')));
-                    }
-
-                    // Password must not be contained in the display name
-                    $displayname = strtolower($form['displayname']->getData());
-                    if (!empty($displayname) && strrpos($displayname, strtolower($pass1)) !== false) {
-                        $form['password']->addError(new FormError(Trans::__('page.edit-users.error.password-different-displayname')));
-                    }
-
-                    // Usernames must be unique.
-                    if (!$users->checkAvailability('username', $form['username']->getData(), $id)) {
-                        $form['username']->addError(new FormError(Trans::__('page.edit-users.error.username-used')));
-                    }
-                }
-
-                // Email addresses must be unique.
-                if (!$users->checkAvailability('email', $form['email']->getData(), $id)) {
-                    $form['email']->addError(new FormError(Trans::__('page.edit-users.error.email-used')));
-                }
-
-                // Displaynames must be unique.
-                if (!$users->checkAvailability('displayname', $form['displayname']->getData(), $id)) {
-                    $form['displayname']->addError(new FormError(Trans::__('page.edit-users.error.displayname-used')));
-                }
-            }
-        );
-
-        return $form;
-    }
-
-    /**
-     * Handle a POST from user edit or first user creation.
-     *
-     * @param Request $request
-     * @param Form    $form      A Symfony form
-     * @param boolean $firstUser If this is a first user set up
-     *
-     * @return Entity\Users|false
-     */
-    private function validateUserForm(Request $request, Form $form, $firstUser = false)
-    {
-        $form->submit($request->get($form->getName()));
-        if (!$form->isValid()) {
-            return false;
-        }
-
-        $userEntity = new Entity\Users($form->getData());
-        $userEntity->setUsername($this->app['slugify']->slugify($userEntity->getUsername()));
-
-        if ($firstUser) {
-            $userEntity->setEnabled(true);
-        } else {
-            $userEntity->setRoles($this->users()->filterManipulatableRoles($userEntity->getId(), $userEntity->getRoles()));
-        }
-
-        $saved = $this->getRepository('Bolt\Storage\Entity\Users')->save($userEntity);
-        if ($saved) {
-            $this->flashes()->success(Trans::__('page.edit-users.message.user-saved', ['%user%' => $userEntity->getDisplayname()]));
-            $this->notifyUserSave($request, $userEntity->getDisplayname(), $userEntity->getEmail(), $firstUser);
-        } else {
-            $this->flashes()->error(Trans::__('page.edit-users.message.saving-user', ['%user%' => $userEntity->getDisplayname()]));
-        }
-
-        return $userEntity;
-    }
-
-    /**
-     * Notify of save event.
-     *
-     * @param Request $request
-     * @param string  $displayName
-     * @param string  $email
-     * @param boolean $firstuser
-     */
-    private function notifyUserSave(Request $request, $displayName, $email, $firstuser)
-    {
-        if (!$firstuser) {
-            $this->app['logger.system']->info(
-                Trans::__('page.edit-users.log.user-updated', ['%user%' => $displayName]),
-                ['event' => 'security']
-            );
-        } else {
-            $this->app['logger.system']->info(
-                Trans::__('page.edit-users.log.user-added', ['%user%' => $displayName]),
-                ['event' => 'security']
-            );
-            $this->notifyUserSetupEmail($request, $displayName, $email);
-        }
-    }
-
-    /**
      * Send a welcome email to test mail settings.
      *
      * @param Request $request
@@ -698,35 +421,45 @@ class Users extends BackendBase
      */
     private function notifyUserSetupEmail(Request $request, $displayName, $email)
     {
-        // Create a welcome email
-        $mailhtml = $this->render(
-            '@bolt/email/firstuser.twig',
-            ['sitename' => $this->getOption('general/sitename')]
-        )->getContent();
+        $logger = $this->app['logger.system'];
+        $mailer = $this->app['mailer'];
+        $transport = $this->app['swiftmailer.spooltransport'];
 
+        // Create a welcome email
+        $mailHtml = $this->app['twig']->render(
+            '@bolt/email/firstuser.twig',
+            ['context' => ['sitename' => $this->getOption('general/sitename')]]
+        );
+
+        $name = $this->getOption('general/mailoptions/senderName', $this->getOption('general/sitename'));
+        $from = ['bolt@' . $request->getHost() => $name];
+        $email = $this->getOption('general/mailoptions/senderMail', $email);
         try {
-            // Send a welcome email
-            $name = $this->getOption('general/mailoptions/senderName', $this->getOption('general/sitename'));
-            $from = ['bolt@' . $request->getHost() => $name];
-            $email = $this->getOption('general/mailoptions/senderMail', $email);
-            $message = $this->app['mailer']
+            /** @var Message $message */
+            $message = $mailer
                 ->createMessage('message')
                 ->setSubject(Trans::__('general.bolt-new-site-set-up'))
                 ->setFrom($from)
                 ->setReplyTo($from)
                 ->setTo([$email   => $displayName])
-                ->setBody(strip_tags($mailhtml))
-                ->addPart($mailhtml, 'text/html');
-
-            $failedRecipients = [];
-
-            $this->app['mailer']->send($message, $failedRecipients);
-
-            // Try and send immediately
-            $this->app['swiftmailer.spooltransport']->getSpool()->flushQueue($this->app['swiftmailer.transport']);
-        } catch (\Exception $e) {
+                ->setBody($mailHtml, 'text/html')
+                ->addPart(preg_replace('/^[\t ]+|[\t ]+$/m', '', strip_tags($mailHtml)), 'text/plain')
+                ->setPriority(Message::PRIORITY_HIGH);
+        } catch (RfcComplianceException $e) {
             // Sending message failed. What else can we do, send via snailmail?
-            $this->app['logger.system']->error("The 'mailoptions' need to be set in app/config/config.yml", ['event' => 'config']);
+            $logger->critical("The email address set in 'mailoptions/senderMail' is not a valid email address.", ['event' => 'exception', 'exception' => $e]);
+
+            return;
+        }
+
+        try {
+            // Try and send immediately
+            $failedRecipients = [];
+            $mailer->send($message, $failedRecipients);
+            $transport->getSpool()->flushQueue($this->app['swiftmailer.transport']);
+        } catch (TransportException $e) {
+            // Sending message failed. What else can we do, send via snailmail?
+            $logger->error("The 'mailoptions' need to be set in app/config/config.yml", ['event' => 'config']);
         }
     }
 }

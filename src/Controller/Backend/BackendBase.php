@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Controller\Backend;
 
 use Bolt\Controller\Base;
@@ -6,6 +7,7 @@ use Bolt\Controller\Zone;
 use Bolt\Events\AccessControlEvent;
 use Bolt\Events\AccessControlEvents;
 use Bolt\Storage\Entity;
+use Bolt\Storage\Query\QueryResultset;
 use Bolt\Storage\Repository\UsersRepository;
 use Bolt\Translation\Translator as Trans;
 use Doctrine\DBAL\Exception\TableNotFoundException;
@@ -35,13 +37,13 @@ abstract class BackendBase extends Base
     /**
      * {@inheritdoc}
      */
-    protected function render($template, array $variables = [], array $globals = [])
+    protected function render($template, array $context = [], array $globals = [])
     {
-        if (!isset($variables['context'])) {
-            $variables = ['context' => $variables];
+        if (!isset($context['context'])) {
+            $context = ['context' => $context];
         }
 
-        return parent::render($template, $variables, $globals);
+        return parent::render($template, $context, $globals);
     }
 
     /**
@@ -104,7 +106,7 @@ abstract class BackendBase extends Base
             // Don't redirect on ajaxy requests (eg. when Saving a record), but send an error
             // message with a `500` status code instead.
             if ($request->isXmlHttpRequest()) {
-                $response = ['error' => ['message' => Trans::__('general.phrase.redirect-detected')] ];
+                $response = ['error' => ['message' => Trans::__('general.phrase.redirect-detected')]];
 
                 return new JsonResponse($response, 500);
             }
@@ -132,6 +134,27 @@ abstract class BackendBase extends Base
     }
 
     /**
+     * Temporary override for back-end.
+     *
+     * @internal For core use only, to be removed soon!
+     *
+     * @param string $textQuery
+     * @param array  $parameters
+     * @param array  $pager
+     * @param array  $whereParameters
+     *
+     * @return QueryResultset
+     *
+     * @see \Bolt\Storage\Query\Query::getContent()
+     */
+    protected function getContent($textQuery, $parameters = [], &$pager = [], $whereParameters = [])
+    {
+        $query = $this->app['query'];
+
+        return $query->getContent($textQuery, $parameters);
+    }
+
+    /**
      * Temporary hack to get the permission name associated with the route.
      *
      * @internal
@@ -152,12 +175,13 @@ abstract class BackendBase extends Base
     /**
      * Set the authentication cookie in the response.
      *
+     * @param Request  $request
      * @param Response $response
      * @param string   $token
      *
      * @return Response
      */
-    protected function setAuthenticationCookie(Response $response, $token)
+    protected function setAuthenticationCookie(Request $request, Response $response, $token)
     {
         $response->setVary('Cookies', false)->setMaxAge(0)->setPrivate();
         $response->headers->setCookie(
@@ -165,7 +189,7 @@ abstract class BackendBase extends Base
                 $this->app['token.authentication.name'],
                 $token,
                 time() + $this->getOption('general/cookies_lifetime'),
-                $this->resources()->getUrl('root'),
+                $request->getBasePath(),
                 $this->getOption('general/cookies_domain'),
                 $this->getOption('general/enforce_ssl'),
                 true

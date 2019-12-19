@@ -1,8 +1,9 @@
 <?php
+
 namespace Bolt\Tests\Storage;
 
-use Bolt\Storage\Repository;
 use Bolt\Tests\BoltUnitTest;
+use PHPUnit\Framework\Assert;
 
 /**
  * Class to test src/Storage/Repository.
@@ -21,7 +22,7 @@ class RepositoryTest extends BoltUnitTest
         $em = $app['storage'];
         $repo = $em->getRepository($entityName);
 
-        $this->assertSame($em, \PHPUnit_Framework_Assert::readAttribute($repo, 'em'));
+        $this->assertSame($em, Assert::readAttribute($repo, 'em'));
     }
 
     public function testGetTableName()
@@ -66,7 +67,7 @@ class RepositoryTest extends BoltUnitTest
         $repo = $em->getRepository($entityName);
         $result = $repo->findAll();
 
-        $this->assertTrue(is_array($result));
+        $this->assertInternalType('array', $result);
         foreach ($result as $obj) {
             $this->assertInstanceOf($entityName, $obj);
         }
@@ -81,7 +82,7 @@ class RepositoryTest extends BoltUnitTest
         $repo = $em->getRepository($entityName);
         $result = $repo->findBy(['id' => 1]);
 
-        $this->assertTrue(is_array($result));
+        $this->assertInternalType('array', $result);
         $this->assertInstanceOf($entityName, $result[0]);
     }
 
@@ -177,9 +178,10 @@ class RepositoryTest extends BoltUnitTest
     {
         $this->eventCount[$event] = 0;
         $phpunit = $this;
+        $count = 0;
         $app['dispatcher']->addListener($event, function () use ($count, $phpunit, $event) {
-           $count ++;
-           $phpunit->eventCount[$event] = $count;
+            ++$count;
+            $phpunit->eventCount[$event] = $count;
         });
     }
 }

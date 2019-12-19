@@ -7,53 +7,33 @@
 #          process and your PR so that it will eventually be necessary to
 #          re-map your translations.
 
-#   0 Unused messages
-#  51 Legacy untranslated messages
-# 260 Untranslated messages
-#  41 Legacy translation messages
-# 271 Translation messages
+#   3 Unused messages
+#  25 Legacy untranslated messages
+# 308 Untranslated messages
+#  16 Legacy translation messages
+# 262 Translation messages
+
+#--- Unused messages ----------------------------------------------------------
+
+"general.phrase.duplicate-set": # "Duplicate Set"
+"contenttypes.generic.no-proper-type": "コンテンツタイプ '%contenttype' の中で、フィールド '%field%' は 'type: %type%'を持ちますが、これは適切なフィールドタイプではありません。contentstypes.ymlを編集し、修正してください。"
+"users.your-password": "パスワード"
 
 #--- Legacy untranslated messages ---------------------------------------------
 
 "(none)": #
-"Add a brief, optional comment to describe what's changed.": #
+"Added records to the ContentType <tt>%CONTENTYPE%</tt> titled": #
 "An error occured while updating `%TABLE%`. The error is %ERROR%": #
-"Are you sure you want to delete %FILENAME%?": #
-"Are you sure you want to do this for %NUMBER% records?": #
-"Are you sure you want to do this for 1 record?": #
-"Are you sure you want to remove these files?": #
-"Are you sure you want to remove these images?": #
-"Are you sure you want to remove this file?": #
-"Are you sure you want to remove this image?": #
-"Are you sure you wish to delete this record? There is no undo.": #
-"Choose an entry": #
-"Client error: %errormessage%": #
 "Dependencies": #
 "Detected Bolt version change to <b>%VERSION%</b>, and the cache has been cleared. Please <a href=\"%URI%\">check the database</a>, if you haven't done so already.": #
 "Do you really want to delete %FOLDERNAME%?": #
 "Error reading extensions/composer.json file: %ERROR%": #
 "Expand sidebar": #
-"Extend": #
-"Extension package %NAME% base class '%CLASS%' does not implement \\\\Bolt\\\\Extension\\\\ExtensionInterface and has been skipped.": #
-"Extension package %NAME% has an invalid class '%CLASS%' and has been skipped.": #
-"Extension server returned an error: %errormessage%": #
 "Finding packages that require this one…": #
-"Floatfield": # "Float field"
-"Generic failure while testing connection to extension server: %errormessage%": #
-"Group": #
-"Groups": #
-"Integerfield": # "Integer field"
 "Invalid menu path (%PATH%) set in menu.yml. Does not match any configured contenttypes or routes.": # "Invalid menu path (%PATH%) set in menu.yml. Does not match any configured ContentTypes or routes."
 "Invalid menu path (%PATH%) set in menu.yml. Probably should be a link: instead!": #
-"Link": #
-"Menu item property \"add\" is deprecated. Use \"#\" under \"param\" instead.": #
-"Multiselect": # "Multi-select"
-"Repeater": #
-"Selectentry": # "Select entry"
-"Selectfield": # "Select field"
-"Slug": #
-"Testing connection to extension server failed: %errormessage%": #
-"The database needs to be updated/repaired. Go to 'Configuration' > '<a href=\"%link%\">Check Database</a>' to do this now.": #
+"Menu": #
+"Search": #
 "The field %field% has been changed to \"%newValue%\"": #
 "Try logging in with your ftp-client and make the file readable. Else try to go <a>back</a> to the last page.": #
 "Unable to create directory: %DIR%": #
@@ -65,16 +45,29 @@
 "Unable to rename file: %FILE%": #
 "Unfortunately, no content could be found. Try another page, or go to the <a href=\"%paths_root%\">homepage</a>.": #
 "View (saved version) on site": #
-"filtered by <em>'%filter%'</em>": #
+"field.embed.provider_name": #
 
 #--- Untranslated messages ----------------------------------------------------
 
+contenttypes.generic.consecutive-underscores: # "In the ContentType for '%contenttype%', the field '%field%' has consecutive underscores, which is not supported. Please edit contenttypes.yml and use a single underscore."
 contenttypes.generic.group.ungrouped: # "Ungrouped"
 contenttypes.generic.invalid-hyphen: # "In the ContentType for '%contenttype%', you have used a hyphen in the definition which is not supported. Please edit contenttypes.yml and remove the hyphen or alternatively replace with an underscore."
 contenttypes.generic.invalid-relation: # "In the ContentType for '%contenttype%', the relation '%relation%' is defined, which is not a valid ContentType. Please edit contenttypes.yml, and correct this."
 contenttypes.generic.recent-changes-one: # "Recent changes to this %contenttype%"
 
-contenttypes.record.comment-add-colon: #
+contenttypes.record.comment-add-colon: # "Add a comment:"
+
+field.block.label.add-new: # "Add new..."
+field.block.label.add-set: # "Add new %label% set"
+
+field.embed.height: # "Height"
+field.embed.label.preview: # "Preview"
+field.embed.label.size: # "Size"
+field.embed.label.url: # "URL of content to embed"
+field.embed.matched-embed: # "Matched Embed"
+field.embed.pixel: # "pixel"
+field.embed.placeholder.url: # "URL of content on Facebook, Twitter, Soundcloud or other media website"
+field.embed.width: # "Width"
 
 field.geolocation.label.address-lookup: # "Address lookup"
 field.geolocation.label.marker-placement: # "Marker placement"
@@ -82,6 +75,13 @@ field.geolocation.label.snap: # "Snap to nearest address"
 field.geolocation.placeholder.address: # "Street, ZIP code, city or other location"
 
 field.image.label.alt: # "Alt"
+
+field.repeater.collapse: # "Collapse this set"
+field.repeater.collapse-all: # "Collapse all"
+field.repeater.delete-set: # "Delete Set"
+field.repeater.expand: # "Expand this set"
+field.repeater.expand-all: # "Expand all"
+field.repeater.label.add-set: # "Add new %label% set"
 
 field.slug.button.generate: # "Generate from:"
 field.slug.button.lock: # "Lock"
@@ -113,6 +113,9 @@ general.phrase.access-denied-self-action: # "You cannot '%s' yourself."
 general.phrase.add-selected: # "Add Selected"
 general.phrase.author: # "Author"
 general.phrase.by: # "by"
+general.phrase.changelog-not-enabled: # "The changelog is not enabled. If you enable it, any changes made to the content in all ContentTypes will be logged on this page, for reference. See the section <code>changelog:</code> in your <code>config.yml</code> to change this setting."
+general.phrase.changelog-note: # "Note: The database table will continue to grow as the editors keep adding content. If you enable this functionality in a production environment the table may end up taking up a lot of space."
+general.phrase.changelog-what-changed: # "Add a brief, optional comment to describe what's changed."
 general.phrase.clashing-relation: # "In the ContentType for '%contenttype%', both a field and a relation are named '%relation%' which will prevent the relation from working. Please edit contenttypes.yml, and correct this."
 general.phrase.clear-cache-complete: # "Cleared cache."
 general.phrase.clear-change-log: # "Clear Change Log"
@@ -120,29 +123,37 @@ general.phrase.clear-system-log: # "Clear System Log"
 general.phrase.close-editor: # "Close editor"
 general.phrase.collapse-sidebar: # "Collapse sidebar"
 general.phrase.configuration-main: # "Main configuration"
+general.phrase.confirm-delete-file: # "Are you sure you want to delete %FILENAME%?"
+general.phrase.confirm-record-multiple: # "Are you sure you want to do this for %NUMBER% records?"
+general.phrase.confirm-record-single: # "Are you sure you want to do this for 1 record?"
+general.phrase.confirm-remove-file: # "Are you sure you want to remove this file?"
+general.phrase.confirm-remove-files: # "Are you sure you want to remove these files?"
+general.phrase.confirm-remove-image: # "Are you sure you want to remove this image?"
+general.phrase.confirm-remove-images: # "Are you sure you want to remove these images?"
+general.phrase.confirm-remove-record: # "Are you sure you wish to delete this record? There is no undo."
+general.phrase.database-check: # "Check Database"
+general.phrase.database-update-required-post: # "to do this now."
+general.phrase.database-update-required-pre: # "The database needs to be updated/repaired. Go to 'Configuration'"
 general.phrase.delete: # "Delete"
-general.phrase.delete-set: # "Delete Set"
 general.phrase.depublish: # "Depublish"
 general.phrase.depublish-date-past: # "Depublish date is in the past. Change the status if you want to depublish now."
 general.phrase.depublish-explanation: # "If set, the record will be automatically depublished on the given date."
 general.phrase.details: # "Details"
-general.phrase.directory-not-found-writable: # "The folder '%s' could not be found, or is not readable."
-general.phrase.duplicate-set: # "Duplicate Set"
 general.phrase.edit-role-permissions: # "Edit Roles and Permissions"
 general.phrase.error-cache-clear: # "Failed to clear cache. You should delete it manually."
-general.phrase.error-local-extension-set-up-incomplete: # "Local extension set up incomplete. Please run 'Install all packages' on the Extensions page."
 general.phrase.error-login-invalid-parameters: # "Invalid login parameters."
 general.phrase.error-mail-options-not-set: # "The email configuration setting 'mailoptions' hasn't been set. Bolt may be unable to send password reset."
 general.phrase.error-send-password-request: # "Failed to send password request. Please check the email settings."
 general.phrase.error-session-data-login: # "Unable to retrieve login session data. Please check your system's PHP session settings."
-general.phrase.extras: # "Extras"
+general.phrase.extensions-overview: # "Extensions Overview"
 general.phrase.field-fieldname: # "Field “%FIELD_NAME%”:"
 general.phrase.file-not-exist: # "The file '%s' doesn't exist."
 general.phrase.file-not-readable: # "The file '%s' is not readable."
 general.phrase.file-upload-failed: # "Files could not be uploaded."
-general.phrase.filtering: # "Filtering"
+general.phrase.filtered-by: # "filtered by"
 general.phrase.find: # "Find"
 general.phrase.floating-point-required-bang: # "Has to be a floating point number!"
+general.phrase.folder: # "Folder"
 general.phrase.hints-colon: # "Hints:"
 general.phrase.id: # "Id"
 general.phrase.invalid-taxonomy-slug: # "In the taxonomy '%taxonomy%' the slug for option '%option%' contains a slash. Please edit taxonomy.yml, and correct this."
@@ -160,7 +171,6 @@ general.phrase.no-content-found: # "No content found."
 general.phrase.no-files-in-list: # "No files in the list, yet."
 general.phrase.no-images-in-list: # "No images in the list, yet."
 general.phrase.no-preview: # "No Preview"
-general.phrase.no-relations-found-bang: # "No relations found!"
 general.phrase.no-title: # "no title …"
 general.phrase.no-undo: # "There is no undo!"
 general.phrase.not-installed-yet: # "Not yet installed."
@@ -197,13 +207,14 @@ general.phrase.template-detail: # "Detail template"
 general.phrase.thumbnail: # "Thumbnail"
 general.phrase.time-format-24-12: # "Time in 24h/12h format"
 general.phrase.toggle-all: # "Check/Uncheck all"
+general.phrase.upload-drop-here: # "Drop files in the file manager to upload them or use the button below."
 general.phrase.upload-file-to-directory: # "Upload a file to this folder"
 general.phrase.upload-not-allowed: # "Upload not allowed"
+general.phrase.upload-progress: # "Current uploads"
 general.phrase.users-none-create-first-extended: # "There are no users present in the system. Please create the first user, which will be granted root privileges."
 general.phrase.users-permissions: # "Users & Permissions"
 general.phrase.value-maximum-variable: # "The value must not be greater than “%MAXVAL%”!"
 general.phrase.value-minimum-variable: # "The value has to be at least “%MINVAL%”!"
-general.phrase.view-related: # "View related content"
 general.phrase.view-roles: # "View Roles"
 general.phrase.warning: # "Warning"
 general.phrase.warning-template: # "This template adds new fields. Save, then refresh to see these changes."
@@ -219,23 +230,30 @@ logs.system-log: # "System Log"
 logs.system-log.cleared: # "The system log has been cleared."
 logs.system-log.trimmed: # "The system log has been trimmed."
 
+menu.configuration.checks: # "Set-up checks"
+
 nut.greeting: # "Welcome to Bolt!"
 
 nut.version: # "version"
 
-page.checks.run-all: # "Run all checks"
-page.checks.run-directory-checks: # "Run directory checks"
-page.checks.run-email-checks: # "Run email checks"
-page.checks.run-php-ext-checks: # "Run PHP extension checks"
+page.checks.php-pass: # "All PHP configuration checks pass!"
+page.checks.php-problem: # "PHP configuration check found problems!"
+page.checks.show-all: # "Show all checks"
+page.checks.show-failed: # "Show only failed checks"
+page.checks.system-pass: # "All system configuration checks pass!"
+page.checks.system-problem: # "System configuration check found problems!"
 
 page.edit-file.note-related: # "Note, this file has related files:"
 
 page.edit-users.activated.no: # "no"
 page.edit-users.activated.yes: # "yes"
 page.edit-users.button.save: # "Save user"
+page.edit-users.error.email-invalid: # "This email address is not valid."
 page.edit-users.error.email-used: # "This email address is already in use. Choose another email address."
 page.edit-users.error.password-different-displayname: # "Password must not be a part of the display name."
+page.edit-users.error.password-different-email: # "Password must not match the email address."
 page.edit-users.error.password-different-username: # "Password must not match the username."
+page.edit-users.error.password-long: # "This value is too long. It should have 128 characters or less."
 page.edit-users.error.password-short: # "This value is too short. It should have 6 characters or more."
 page.edit-users.error.username-used: # "This username is already in use. Choose another username."
 page.edit-users.label.assigned-roles: # "Assigned roles"
@@ -279,8 +297,15 @@ page.extend.button.show-all-versions: # "Show all versions"
 page.extend.button.update-all: # "Run all Updates"
 page.extend.button.update-check: # "Run update check"
 page.extend.button.update-package: # "Update Package"
+page.extend.error-class-implement: # "Extension package %NAME% base class '%CLASS%' does not implement %TARGET% and has been skipped."
+page.extend.error-class-invalid: # "Extension package %NAME% has an invalid class '%CLASS%' and has been skipped."
 page.extend.error-composer-json-not-readable: # "The Bolt extensions composer.json isn't readable."
 page.extend.error-composer-json-not-writable: # "The Bolt extensions composer.json isn't writable."
+page.extend.error-message-client: # "Client error: %errormessage%"
+page.extend.error-message-connection: # "Testing connection to extension server failed: %errormessage%"
+page.extend.error-message-generic: # "Generic failure while testing connection to extension server: %errormessage%"
+page.extend.error-message-server: # "Extension server returned an error: %errormessage%"
+page.extend.headline.bundled: # "Bundled Extensions"
 page.extend.headline.currently-installed: # "Your Currently Installed Extensions"
 page.extend.headline.install-new-extension: # "Install a new Extension"
 page.extend.headline.installation-complete: # "Installation complete"
@@ -290,7 +315,9 @@ page.extend.headline.stable-versions: # "Stable versions"
 page.extend.headline.test-versions: # "Unstable test versions"
 page.extend.headline.theme-installation-complete: # "Theme installation complete"
 page.extend.headline.updates: # "Updates"
+page.extend.listheader.class: # "Class"
 page.extend.listheader.extension: # "Extension"
+page.extend.listheader.name: # "Name"
 page.extend.listheader.status: # "Status"
 page.extend.listheader.version: # "Version"
 page.extend.message.add-extension-with-form: # "Add a new extension using the form below."
@@ -338,13 +365,19 @@ page.extend.theme.generation.failure: # "We were unable to generate the theme. I
 page.extend.theme.generation.missing.name: # "No theme name found. Theme is not generated."
 page.extend.theme.generation.success: # "Theme successfully generated. You can now edit it directly from your theme folder."
 
-page.file-management.label.create-file: # "Create File"
-page.file-management.message.create-file: # "Please enter a new file name!"
+page.file-management.actions-for-files: # "Actions for files"
+page.file-management.label.create-file: # "Create file"
+page.file-management.message.create-file: # "Please enter the new file name"
 page.file-management.message.save-failed-invalid-form: # "File '%s' could not be saved, because the form wasn't valid."
 page.file-management.message.upload-not-writable: # "Unable to write to upload destination. Check permissions on %TARGET%"
 
 page.login.cookies-required: # "Note: Cookies are required to log on to Bolt. Please allow cookies."
+page.login.placeholder.username: # "Your username"
 page.login.title: # "Sign in to Bolt"
+
+page.prefill.connection-timeout: # "Timeout attempting connection to the 'Lorem Ipsum' generator. Unable to add dummy content."
+page.prefill.database-update-required: # "Table not found for ContentType %CONTENTTYPE%, a database update is probably required."
+page.prefill.skipped-singleton: # "Skipped singleton <code>%key%</code> (already has a record)"
 
 panel.latest-activity.by: # "by"
 panel.latest-activity.change: # "Latest changes"
@@ -361,41 +394,16 @@ panel.user-actions.button.add: # "Add a new user"
 "(no group)": "（グループなし）"
 "Add some sample <a href='%url%' class='btn btn-default'>Records with Loripsum text</a>": "サンプルを追加<a href='%url%' class='btn btn-default'>ダミーテキスト（Loripsum）のレコード</a>"
 "Added to <tt>%key%</tt> '%title%'": "<tt>%key%</tt> '%title%' に追加しました"
-"Are you sure you want to delete %username%?": "本当に '%username%' を"
-"Body": "本文"
-"Categories": "カテゴリ"
-"Category": "カテゴリ"
-"Content": "コンテンツ"
 "Current (saved) status:": "現在の（保存された）ステータス："
-"Date": "日付"
-"Datetime": "日時"
 "Everybody": "みなさん"
 "Excerpt": "概要"
-"File": "ファイル"
 "File '%file%' could not be uploaded (wrong/disallowed file type). Make sure the file extension is one of the following:": "ファイル '%file%' をアップロードできませんでした（間違っている/許可されていない ファイルの種類）。 ファイルの拡張子が以下に含まれるかご確認ください:"
-"Filelist": "ファイルリスト"
-"Geolocation": "位置情報"
-"Html": "HTML"
-"Image": "画像"
-"Imagelist": "画像リスト"
-"Markdown": "マークダウン"
-"Select a page": "ページを選択"
-"Select zero or more pages": "0以上のページを選択"
-"Skipped <tt>%key%</tt> (already has records)": "<tt>%key%</tt>をスキップしました (すでにレコードが存在します)"
-"Skipped <tt>%key%</tt> (not checked)": " <tt>%key%</tt> をスキップしました（チェックされません）"
-"Tag": "タグ"
-"Tags": "タグ"
-"Teaser": "要約"
-"Template": "テンプレート"
-"Textarea": "テキストエリア"
 "The identifier and slug for '%taxonomytype%' are the not the same ('%slug%' vs. '%taxonomytype%'). Please edit taxonomy.yml, and make them match to prevent inconsistencies between database storage and your templates.": "'%taxonomytype%' の識別名とスラッグが同じではありません('%slug%' vs. '%taxonomytype%')。taxonomy.xml を編集して、２つを一致させ、データベースとテンプレートの不整合を解消してください。"
 "The settings for roles and permissions are stored in <code>%permissions%</code>.": "ロールとパーミッションの設定は<code>%permissions%</code>に保存されています。"
 "The slug '%slug%' is used in more than one contenttype. Please edit contenttypes.yml, and make them distinct.": "スラッグ '%slug%' は２つ以上のコンテンツで利用されています。contenttypes.ymlを編集して、別々のスラッグにしてください。"
 "The translations file '%s' can't be created. You will have to use your own editor to make modifications to this file.": "翻訳ファイル '%s' を作成できません。エディタを使ってあなたの手でこのファイルを修正してください。"
-"This is a checkbox": "これはチェックボックスです"
 "This website is <a href='%url%' target='_blank' title='Sophisticated, lightweight & simple CMS'>Built with Bolt</a>.": "このWebサイトは<a href='%url%' target='_blank' title='洗練された軽量でシンプルなCMS'>Bolt</a>を利用して制作されています。"
 "Title": "タイトル"
-"Video": "動画"
 "You've been logged on successfully.": "正常にログインしました。"
 
 #--- Translation messages -----------------------------------------------------
@@ -415,7 +423,6 @@ contenttypes.generic.invalid-field: "%contenttype% の %field% を設定でき�
 contenttypes.generic.last-modified: "最近更新された %contenttypes%"
 contenttypes.generic.new: "新しい '%contenttype%'"
 contenttypes.generic.no-latest: "最新の '%contenttype%'はありません"
-contenttypes.generic.no-proper-type: "コンテンツタイプ '%contenttype' の中で、フィールド '%field%' は 'type: %type%'を持ちますが、これは適切なフィールドタイプではありません。contentstypes.ymlを編集し、修正してください。"
 contenttypes.generic.no-recent: "最近の %contenttype% はありません"
 contenttypes.generic.none-available: "利用可能な '%contenttypes%' はありません。"
 contenttypes.generic.not-existing: "お探しの %contenttype% は見つかりません。削除されたか存在していない可能性があります。"
@@ -465,7 +472,6 @@ general.bolt-tagline: "洗練された、軽量でシンプルなCMS"
 general.bolt-third-party-libraries: "以下はBoltが利用するサードパーティのライブラリです。"
 
 general.phrase.access-denied-logged-out: "ログアウトしました。"
-general.phrase.access-denied-privilege-edit-record: "そのレコードを編集する権限がありません。"
 general.phrase.access-denied-privilege-view-page: "そのページを閲覧する権限がありません。"
 general.phrase.action-plural: "操作"
 general.phrase.author-colon: "著書："
@@ -478,10 +484,11 @@ general.phrase.check-database: "データベースをチェック"
 general.phrase.choose-record-link-to: "リンクしたいレコードを選んでください："
 general.phrase.clear-cache: "キャッシュをクリア"
 general.phrase.clear-cache-again: "もう一度キャッシュをクリア"
-general.phrase.clear-filter: "フィルタをクリア"
 general.phrase.clear-filter-sort: "並び替え/フィルタをクリア"
 general.phrase.code-colon: "コード："
 general.phrase.configuration: "全般設定"
+general.phrase.confirm-delete-user: "本当に '%username%' を"
+general.phrase.content: "コンテンツ"
 general.phrase.content-type-permissions: "コンテンツタイプのパーミッション"
 general.phrase.content-types: "コンテンツタイプ"
 general.phrase.create-user-first: "最初のユーザを作成"
@@ -499,7 +506,6 @@ general.phrase.delete-user-name: "%username% を削除"
 general.phrase.depublication-date-colon: "公開停止日時："
 general.phrase.deselect-all: "全てを選択解除"
 general.phrase.disable-user-name: "%username% を無効化"
-general.phrase.done-bang: "完了！"
 general.phrase.draft: "下書き"
 general.phrase.duplicate-file-name: "%filename% を複製"
 general.phrase.edit: "編集"
@@ -519,6 +525,7 @@ general.phrase.folders: "フォルダ"
 general.phrase.full-list-ellipsis: "全てのリスト…"
 general.phrase.general.phrase.uploaded-files: "アップロードされたファイル"
 general.phrase.global-permissions: "グローバル パーミッション"
+general.phrase.image: "画像"
 general.phrase.info: "情報"
 general.phrase.ip.address: "IPアドレス"
 general.phrase.last-edited-on-colon: "最終更新日："
@@ -550,10 +557,7 @@ general.phrase.overview: "一覧"
 general.phrase.overview-for: "一覧"
 general.phrase.owner-colon: "所有者："
 general.phrase.pager-showing-from-to-of: "%page_for%を表示 %from%～%to%件目 / 全 %count% 件"
-general.phrase.path: "パス"
-general.phrase.path-colon: "パス："
 general.phrase.permalink: "パーマリンク"
-general.phrase.permissions: "パーミッション"
 general.phrase.please-logon: "ログオンしてください。"
 general.phrase.please-provide-username: "ユーザー名を入力してください"
 general.phrase.preview: "プレビュー"
@@ -619,7 +623,6 @@ general.phrase.view-on-site: "サイト上で表示"
 general.phrase.view-site: "サイトを表示"
 general.phrase.written-by-on: "投稿者： <em>%name%</em> 投稿日時： %date%"
 
-generic.noscript.headline: "JavaScriptが無効"
 generic.noscript.message: "お使いのブラウザの設定でJavaScriptが現在無効になっています。Boltのほとんどの機能はJavaScriptなしでも動作しますが、大きく使い勝手が向上するため、ブラウザのJavaScriptを有効にすることをおすすめします。"
 
 logs.change-log: "変更ログ"
@@ -629,7 +632,6 @@ logs.change-log.not-found: "リクエストされた変更ログのエントリ�
 menu.configuration.routing: "ルーティング設定"
 
 page.ckeditor-browse-server.files: "ファイル"
-page.ckeditor-browse-server.folders: "フォルダ"
 page.ckeditor-browse-server.modified: "修正された"
 page.ckeditor-browse-server.size: "ファイルサイズ"
 page.ckeditor-browse-server.title: "ファイル"
@@ -645,7 +647,6 @@ page.edit-file.confirm-revert: "本当に元に戻しますか？　保存して
 page.edit-file.title.edit: "ファイルを編集"
 page.edit-file.title.view: "ファイルを表示"
 
-page.edit-locale.button.save: "保存"
 page.edit-locale.title.edit: "ファイルを編集"
 page.edit-locale.title.view: "ファイルを表示"
 
@@ -663,8 +664,6 @@ page.file-management.label.create-folder: "フォルダを作成"
 page.file-management.message.access-denied: "このフォルダへのアップロードは許可されていません。"
 page.file-management.message.create-folder: "新しいフォルダ名を入力してください"
 page.file-management.message.file-not-readable: "ファイルが読み取り可能ではありません！"
-page.file-management.message.files-in: "%s の中のファイル"
-page.file-management.message.folder-access-denied: "フォルダのパーミッションが不適切です"
 page.file-management.message.folder-not-found: "フォルダ '%s' は見つからないかもしくは読み取り可能ではありません。"
 page.file-management.message.save-failed-colon: "ファイル '%s' を保存できませんでした："
 page.file-management.message.save-failed-unknown: "何らかの理由でファイル '%s' を保存できませんでした。"
@@ -683,6 +682,8 @@ page.login.password-reset-link-sent: "パスワードリセット用のリンク
 page.login.password-show: "表示"
 page.login.placeholder.password: "ユーザー名"
 
+page.prefill.skipped-existing: "<code>%key%</code>をスキップしました (すでにレコードが存在します)"
+
 panel.latest-activity.button.more: "ほかの操作"
 panel.latest-activity.logged-in: "ログイン"
 panel.latest-activity.logged-out: "ログアウト"
@@ -697,5 +698,3 @@ permissions.roles.label.anonymous: "匿名"
 permissions.roles.label.owner: "所有者"
 
 users.actions-for-users: "ユーザーの操作"
-
-users.your-password: "パスワード"

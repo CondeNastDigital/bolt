@@ -4,11 +4,14 @@ namespace Bolt\Response;
 
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Stopwatch\Stopwatch;
-use Twig_Template as Template;
+use Twig\Error\Error;
+use Twig\Template;
 
 /**
  * BoltResponse uses a renderer and context variables
  * to create the response content.
+ *
+ * @deprecated Deprecated since 3.3, use TemplateResponse instead.
  *
  * @author Ross Riley <riley.ross@gmail.com>
  */
@@ -40,7 +43,7 @@ class BoltResponse extends Response
     }
 
     /**
-     * Factory method for chainability
+     * Factory method for chainability.
      *
      * @param Template $template An object that is able to render a template with context
      * @param array    $context  An array of context variables
@@ -117,7 +120,7 @@ class BoltResponse extends Response
     }
 
     /**
-     * Adds globals to the template
+     * Adds globals to the template.
      *
      * @param array $globals
      */
@@ -129,7 +132,7 @@ class BoltResponse extends Response
     }
 
     /**
-     * Adds a global to the template
+     * Adds a global to the template.
      *
      * @param string $name
      * @param mixed  $value
@@ -178,7 +181,7 @@ class BoltResponse extends Response
     }
 
     /**
-     * Returns whether the response has been compiled
+     * Returns whether the response has been compiled.
      *
      * @return bool
      */
@@ -204,7 +207,7 @@ class BoltResponse extends Response
     }
 
     /**
-     * The __toString method isn't allowed to throw exceptions so we turn them into an error instead
+     * The __toString method isn't allowed to throw exceptions so we turn them into an error instead.
      *
      * @param \Exception $e
      *
@@ -213,7 +216,7 @@ class BoltResponse extends Response
     private function handleException(\Exception $e)
     {
         trigger_error($e->getMessage() . "\n" . $e->getTraceAsString(), E_USER_WARNING);
-        if ($e instanceof \Twig_Error) {
+        if ($e instanceof Error) {
             return '<strong>' . $e->getRawMessage() . '</strong>';
         }
 

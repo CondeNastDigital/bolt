@@ -1,4 +1,5 @@
 <?php
+
 namespace Codeception\Module;
 
 // here you can define custom actions
@@ -11,7 +12,7 @@ class AcceptanceHelper extends \Codeception\Module
     /**
      * Makes sure that WebTester is logged in.
      *
-     * @param array $user An associative array containing keys 'username' and 'password'.
+     * @param array $user an associative array containing keys 'username' and 'password'
      */
     public function loginAs($user)
     {
@@ -21,7 +22,7 @@ class AcceptanceHelper extends \Codeception\Module
     /**
      * Makes sure that WebTester is logged in using email.
      *
-     * @param array $user An associative array containing keys 'username' and 'password'.
+     * @param array $user an associative array containing keys 'username' and 'password'
      */
     public function loginWithEmailAs($user)
     {
@@ -37,9 +38,9 @@ class AcceptanceHelper extends \Codeception\Module
         $web->client->getCookieJar()->clear();
 
         $web->amOnPage('/bolt/login');
-        $web->fillField('username', $usernameOrEmail);
-        $web->fillField('password', $password);
-        $web->click('Log on');
+        $web->fillField(['id' => 'user_login_username'], $usernameOrEmail);
+        $web->fillField(['id' => 'user_login_password'], $password);
+        $web->click(['id' => 'user_login_login']);
     }
 
     /**

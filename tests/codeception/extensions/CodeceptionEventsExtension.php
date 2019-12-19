@@ -1,14 +1,14 @@
 <?php
 
+use Bolt\Bootstrap;
 use Codeception\Event\SuiteEvent;
 use Codeception\Events;
 use Codeception\Util\Fixtures;
 use Symfony\Component\Console\Input\StringInput;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Finder\Finder;
 
 /**
- * Post run clean up
+ * Post run clean up.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
@@ -21,7 +21,7 @@ class CodeceptionEventsExtension extends \Codeception\Extension
     ];
 
     /**
-     * Before suite callback
+     * Before suite callback.
      *
      * @param \Codeception\Event\SuiteEvent $e
      */
@@ -33,7 +33,7 @@ class CodeceptionEventsExtension extends \Codeception\Extension
     }
 
     /**
-     * After suite callback
+     * After suite callback.
      *
      * @param \Codeception\Event\SuiteEvent $e
      */
@@ -59,27 +59,22 @@ class CodeceptionEventsExtension extends \Codeception\Extension
         foreach ($backups as $file => $keep) {
             if (file_exists($file) && !file_exists("$file.codeception-backup")) {
                 if ($keep) {
-                    $this->writeln("Copying $file");
+                    $this->writeVerbose("Copying $file");
                     $fs->copy($file, "$file.codeception-backup");
                 } else {
-                    $this->writeln("Renaming $file");
+                    $this->writeVerbose("Renaming $file");
                     $fs->rename($file, "$file.codeception-backup");
                 }
             } elseif (file_exists($file)) {
                 if (!$keep) {
-                    $this->writeln("Removing $file");
+                    $this->writeVerbose("Removing $file");
                     $fs->remove($file);
                 }
             }
         }
 
-        // Install the local extension
-        $this->writeln('Installing local extension');
-        $fs->mirror(CODECEPTION_DATA . '/extensions/local/bolt/testerevents/', INSTALL_ROOT . '/extensions/local/bolt/testerevents/', null, ['override' => true, 'delete' => true]);
-        $this->nut('extensions:setup');
-
         // Empty the cache
-        $this->nut('cache:clear');
+        $this->nut('cache:clear -q');
     }
 
     /**
@@ -93,7 +88,7 @@ class CodeceptionEventsExtension extends \Codeception\Extension
     private function afterSuiteAcceptance(SuiteEvent $e)
     {
         // Empty the cache
-        $this->nut('cache:clear');
+        $this->nut('cache:clear -q');
 
         $fs = new Filesystem();
         $runDir = INSTALL_ROOT . '/app/cache/codeception-run-' . time() . '/';
@@ -104,45 +99,30 @@ class CodeceptionEventsExtension extends \Codeception\Extension
         $backups = Fixtures::get('backups');
         foreach ($backups as $file => $keep) {
             if ($fs->exists("$file.codeception-backup")) {
-                $this->writeln("Restoring $file");
+                $this->writeVerbose("Restoring $file");
                 $fs->copy($file, $runDir . basename($file));
                 $fs->rename("$file.codeception-backup", $file, true);
             }
         }
 
-        // Events tester local extension
-        if ($fs->exists(INSTALL_ROOT . '/extensions/local/bolt/testerevents/')) {
-            $this->writeln('Removing extensions/local/bolt/testerevents/');
-            $fs->remove(INSTALL_ROOT . '/extensions/local/bolt/testerevents/');
-
-            $finder = new Finder();
-            $finder->files()->in(INSTALL_ROOT . '/extensions/local/bolt/');
-            if ($finder->count() === 0) {
-                $this->writeln('Removing extensions/local/bolt/');
-                $fs->remove(INSTALL_ROOT . '/extensions/local/bolt/');
-            }
-            $finder = new Finder();
-            $finder->files()->in(INSTALL_ROOT . '/extensions/local/');
-            if ($finder->count() === 0) {
-                $this->writeln('Removing extensions/local/');
-                $fs->remove(INSTALL_ROOT . '/extensions/local/');
-                $this->writeln('Uninstalling wikimedia/composer-merge-plugin');
-                $this->nut('extensions:uninstall wikimedia/composer-merge-plugin');
-            }
-        }
         if ($fs->exists(INSTALL_ROOT . '/app/config/extensions/testerevents.bolt.yml')) {
             $fs->remove(INSTALL_ROOT . '/app/config/extensions/testerevents.bolt.yml');
         }
-        $this->nut('extensions:dumpautoload');
     }
 
     private function nut($args)
     {
-        /** @var \Silex\Application $app */
-        $app = require __DIR__ . '/../../../app/bootstrap.php';
+        $app = Bootstrap::run(__DIR__ . '/../../..');
         $nut = $app['nut'];
         $nut->setAutoExit(false);
 
         $nut->run(new StringInput($args));
+    }
+
+    protected function writeVerbose($message)
+    {
+        if ($this->output->isVerbose()) {
+            $this->writeln($message);
+        }
     }
 }

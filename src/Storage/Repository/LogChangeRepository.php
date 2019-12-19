@@ -1,6 +1,8 @@
 <?php
+
 namespace Bolt\Storage\Repository;
 
+use Bolt\Common\Deprecated;
 use Bolt\Storage\Entity;
 use Doctrine\DBAL\Query\QueryBuilder;
 
@@ -48,10 +50,14 @@ class LogChangeRepository extends BaseLogRepository
     /**
      * Get a count of change log entries.
      *
-     * @return integer
+     * @deprecated since 3.3, will be removed in 4.0
+     *
+     * @return int
      */
     public function countChangeLog()
     {
+        Deprecated::method(3.3, 'Use count() instead.');
+
         $query = $this->countChangeLogQuery();
 
         return $this->getCount($query->execute()->fetch());
@@ -59,6 +65,8 @@ class LogChangeRepository extends BaseLogRepository
 
     /**
      * Build the query to get a count of change log entries.
+     *
+     * @deprecated since 3.3, will be removed in 4.0
      *
      * @return QueryBuilder
      */
@@ -100,17 +108,17 @@ class LogChangeRepository extends BaseLogRepository
      */
     public function getChangeLogByContentTypeQuery($contentType, array $options)
     {
-        $tableName = $this->getTableName();
+        $alias = $this->getAlias();
         $contentTableName = $this->em->getRepository($contentType)->getTableName();
 
         $qb = $this->createQueryBuilder();
-        $qb->select("$tableName.*, $tableName.title")
-            ->leftJoin($tableName, $contentTableName, 'content', "content.id = $tableName.contentid");
+        $qb->select("$alias.*, $alias.title")
+            ->leftJoin($alias, $contentTableName, 'content', "content.id = $alias.contentid");
 
         // Set required WHERE
         $this->setWhere($qb, $contentType, $options);
 
-        // Set ORDERBY and LIMIT as requested
+        // Set ORDER BY and LIMIT as requested
         $this->setLimitOrder($qb, $options);
 
         return $qb;
@@ -122,7 +130,7 @@ class LogChangeRepository extends BaseLogRepository
      * @param string $contentType
      * @param array  $options
      *
-     * @return integer|false
+     * @return int|false
      */
     public function countChangeLogByContentType($contentType, array $options)
     {
@@ -135,7 +143,7 @@ class LogChangeRepository extends BaseLogRepository
      * Get a count of change log entries by contenttype.
      *
      * @param string $contentType
-     * @param array $options
+     * @param array  $options
      *
      * @return QueryBuilder
      */
@@ -154,16 +162,16 @@ class LogChangeRepository extends BaseLogRepository
     /**
      * Get one changelog entry from the database.
      *
-     * @param mixed   $contentType ContentType slug
-     * @param integer $contentId   Content record ID
-     * @param integer $id          The content change log ID
-     * @param string  $cmpOp       One of '=', '<', '>'; this parameter is used
-     *                             to select either the ID itself, or the subsequent
-     *                             or preceding entry.
+     * @param mixed  $contentType ContentType slug
+     * @param int    $contentId   Content record ID
+     * @param int    $id          The content change log ID
+     * @param string $cmpOp       one of '=', '<', '>'; this parameter is used
+     *                            to select either the ID itself, or the subsequent
+     *                            or preceding entry
      *
      * @throws \InvalidArgumentException
      *
-     * @return \Bolt\Storage\Entity\LogChange
+     * @return \Bolt\Storage\Entity\LogChange|false
      */
     public function getChangeLogEntry($contentType, $contentId, $id, $cmpOp)
     {
@@ -182,24 +190,24 @@ class LogChangeRepository extends BaseLogRepository
     /**
      * Build query to get one changelog entry from the database.
      *
-     * @param string  $contentType
-     * @param integer $contentId
-     * @param integer $id
-     * @param string  $cmpOp
+     * @param string $contentType
+     * @param int    $contentId
+     * @param int    $id
+     * @param string $cmpOp
      *
      * @return QueryBuilder
      */
     public function getChangeLogEntryQuery($contentType, $contentId, $id, $cmpOp)
     {
-        $tableName = $this->getTableName();
+        $alias = $this->getAlias();
         $contentTypeTableName = $this->em->getRepository($contentType)->getTableName();
 
         // Build base query
         $qb = $this->createQueryBuilder();
-        $qb->select("$tableName.*")
-            ->leftJoin($tableName, $contentTypeTableName, 'content', "content.id = $tableName.contentid")
-            ->where("$tableName.id $cmpOp :logid")
-            ->andWhere("$tableName.contentid = :contentid")
+        $qb->select("$alias.*")
+            ->leftJoin($alias, $contentTypeTableName, 'content', "content.id = $alias.contentid")
+            ->where("$alias.id $cmpOp :logid")
+            ->andWhere("$alias.contentid = :contentid")
             ->andWhere('contenttype = :contenttype')
             ->setParameters([
                 ':logid'       => $id,
@@ -231,13 +239,13 @@ class LogChangeRepository extends BaseLogRepository
     protected function setLimitOrder(QueryBuilder $query, array $options)
     {
         if (isset($options['order'])) {
-            $query->orderBy($options['order'], $options['direction']);
+            $query->orderBy($options['order'], isset($options['direction']) ? $options['direction'] : null);
         }
         if (isset($options['limit'])) {
-            $query->setMaxResults(intval($options['limit']));
+            $query->setMaxResults((int) ($options['limit']));
 
             if (isset($options['offset'])) {
-                $query->setFirstResult(intval($options['offset']));
+                $query->setFirstResult((int) ($options['offset']));
             }
         }
     }

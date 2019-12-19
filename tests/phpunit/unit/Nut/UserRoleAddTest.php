@@ -1,8 +1,10 @@
 <?php
+
 namespace Bolt\Tests\Nut;
 
 use Bolt\Nut\UserRoleAdd;
 use Bolt\Tests\BoltUnitTest;
+use PHPUnit_Framework_MockObject_MockObject as MockObject;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
@@ -15,42 +17,43 @@ class UserRoleAddTest extends BoltUnitTest
     public function testAdd()
     {
         $app = $this->getApp();
-        $app['users'] = $this->getUserMock($app);
+        $this->setService('users', $this->getUserMockWithReturns());
         $command = new UserRoleAdd($app);
         $tester = new CommandTester($command);
 
-        $tester->execute(['username' => 'test', 'role' => 'admin']);
+        $tester->execute(['username' => 'test', 'role' => ['admin']]);
         $result = $tester->getDisplay();
-        $this->assertEquals("User 'test' now has role 'admin'.", trim($result));
+        $this->assertRegExp("/User 'test' now has role 'admin'/", $result);
     }
 
     public function testRoleExists()
     {
         $app = $this->getApp();
-        $app['users'] = $this->getUserMock($app, true);
+        $this->setService('users', $this->getUserMockWithReturns(true));
         $command = new UserRoleAdd($app);
         $tester = new CommandTester($command);
 
-        $tester->execute(['username' => 'test', 'role' => 'admin']);
+        $tester->execute(['username' => 'test', 'role' => ['admin']]);
         $result = $tester->getDisplay();
-        $this->assertRegExp('/already has role/', trim($result));
+        $this->assertRegExp('/already has role/', $result);
     }
 
     public function testRoleFails()
     {
         $app = $this->getApp();
-        $app['users'] = $this->getUserMock($app, false, false);
+        $this->setService('users', $this->getUserMockWithReturns(false, false));
         $command = new UserRoleAdd($app);
         $tester = new CommandTester($command);
 
-        $tester->execute(['username' => 'test', 'role' => 'admin']);
+        $tester->execute(['username' => 'test', 'role' => ['admin']]);
         $result = $tester->getDisplay();
-        $this->assertRegExp('/Could not add role/', trim($result));
+        $this->assertRegExp('/Could not add role/', $result);
     }
 
-    protected function getUserMock($app, $hasRole = false, $addRole = true)
+    protected function getUserMockWithReturns($hasRole = false, $addRole = true)
     {
-        $users = $this->getMock('Bolt\Users', ['hasRole', 'addRole'], [$app]);
+        /** @var MockObject $users */
+        $users = $this->getMockUsers(['hasRole', 'addRole']);
         $users->expects($this->any())
             ->method('hasRole')
             ->will($this->returnValue($hasRole));

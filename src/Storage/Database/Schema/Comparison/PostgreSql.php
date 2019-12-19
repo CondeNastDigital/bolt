@@ -7,6 +7,8 @@ use Doctrine\DBAL\Schema\TableDiff;
 /**
  * Comparison handling for PostgreSQL platforms.
  *
+ * @internal
+ *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
 class PostgreSql extends BaseComparator
@@ -19,10 +21,6 @@ class PostgreSql extends BaseComparator
      */
     protected function setIgnoredChanges()
     {
-        $this->ignoredChanges[] = new IgnoredChange('changedColumns', 'type', 'date', 'date');
-        $this->ignoredChanges[] = new IgnoredChange('changedColumns', 'type', 'datetime', 'datetime');
-        $this->ignoredChanges[] = new IgnoredChange('changedColumns', 'type', 'string', 'json_array');
-        $this->ignoredChanges[] = new IgnoredChange('changedColumns', 'type', 'text', 'json_array');
     }
 
     /**

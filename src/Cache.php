@@ -2,6 +2,7 @@
 
 namespace Bolt;
 
+use Bolt\Common\Deprecated;
 use Bolt\Filesystem\CompositeFilesystemInterface;
 use Bolt\Filesystem\Exception\IOException;
 use Bolt\Filesystem\Handler\DirectoryInterface;
@@ -49,6 +50,8 @@ class Cache extends FilesystemCache
      */
     public function clearCache()
     {
+        Deprecated::method(3.0, 'flushAll');
+
         $this->flushAll();
 
         return [

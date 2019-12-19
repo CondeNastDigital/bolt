@@ -17,8 +17,8 @@
  #}
 {% macro contentlink_by_id(contenttype, title, content_id) %}
     {% spaceless %}
-        <a href="{{ path('editcontent', {'contenttypeslug': contenttype.slug, 'id': content_id}) }}">
-            {{- title|excerpt(70)|default("<em>(" ~ __('general.phrase.no-title') ~ ")</em>")|raw -}}
+        <a href="{{ path('editcontent', { 'contenttypeslug': contenttype.slug, 'id': content_id }) }}">
+            {{- title|striptags[:70]|default("<em>(" ~ __('general.phrase.no-title') ~ ")</em>")|raw -}}
         </a>
     {% endspaceless %}
 {% endmacro %}
@@ -28,7 +28,7 @@
  #}
 {% macro contentlink(contenttype, content) %}
     {% import _self as crosslinks %}
-    {% set title = content.getTitle(true) %}
+    {% set title = content.getTitle() %}
     {{ crosslinks.contentlink_by_id(contenttype, title, content.id) }}
 {% endmacro %}
 
@@ -75,9 +75,9 @@
  # Typepopover.
  #}
 {% macro typepopover(types) %}
-    {% set types = types|default(app.config.get('general/accept_file_types')) %}
+    {% set types = types|default(config.get('general/accept_file_types')) %}
     {% set text = __("field.general.allowed-filetypes") ~ "<code>" ~ types|join("</code>, <code>") ~ "</code>." %}
-    <span class="label label-default info-pop" data-title="" data-html="true" data-content="{{ text }}">
+    <span class="label label-default info-pop" data-title="" data-placement="left"  data-html="true" data-content="{{ text }}">
         <i class="fa fa-info-circle"></i>
         {{ __('general.phrase.types') }}
     </span>
@@ -169,8 +169,6 @@
 {% macro upload_buttons(type, attr_upload, uploadpath, canUpload, multi) %}
     {% from _self import attr %}
 
-    {% set items = stackitems(7, (type == 'image') ?  'image' : 'other,document') %}
-
     <div class="button-wrap fileselectbuttongroup">
 
         {# Button: Upload #}
@@ -194,8 +192,7 @@
             'class': 'btn btn-tertiary btn-sm',
             'data-bolt-widget': {
                 buicBrowser: {
-                    namespace: 'files',
-                    path: uploadpath,
+                    url: path('asyncbrowse', {'namespace': 'files', 'path': uploadpath}),
                     multiselect: multi
                 },
             },
@@ -203,8 +200,10 @@
         } %}
         <button{{ hattr(attr) }}><i class="fa fa-download"></i> {{ __('field.general.select-from-server') }}</button>
 
+        {% set stack = stack(type) %}
+
         {# Button: Select from Stack #}
-        {% if not app.config.get('general/backend/stack/disable', false) and items %}
+        {% if not config.get('general/backend/stack/disable', false) and stack %}
             <div class="btn-group">
                 <button type="button" class="btn btn-tertiary btn-sm dropdown-toggle" data-toggle="dropdown">
                     <i class="fa fa-paperclip"></i>
@@ -212,12 +211,9 @@
                     <span class="caret"></span>
                 </button>
 
-                <ul class="dropdown-menu select-from-stack">
-                    {% for item in items %}
-                        {% set info = item.filesize ~ (item.imagesize|default() ? ', ' ~ item.imagesize ~ ' px' : '') %}
-                        <li>
-                            <a href="#" data-path="{{ item.filepath }}">{{ item.basename }} <small>({{ info }})</small></a>
-                        </li>
+                <ul class="dropdown-menu select-from-stack" {% if type %}data-type="{{ type }}"{% endif %}>
+                    {% for file in stack %}
+                        {% include '@bolt/components/stack/list-item.twig' with {'file': file} only %}
                     {% endfor %}
                 </ul>
             </div>

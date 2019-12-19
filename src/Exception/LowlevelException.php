@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Exception;
 
 use Silex\Application;
@@ -70,7 +71,7 @@ HTML;
      * make sure that it contains valid HTML with proper encoding applied.
      *
      * @param string     $message
-     * @param integer    $code
+     * @param int        $code
      * @param \Exception $previous
      */
     public function __construct($message, $code = null, $previous = null)
@@ -84,15 +85,8 @@ HTML;
         $output = str_replace('%error%', $message, $output);
         $output = str_replace('%info%', $info, $output);
 
-        // TODO: Information disclosure vulnerability. A misconfigured system
-        // will give an attacker detailed information about the state of the
-        // system.
-        // Suggested solution: in the config file, provide a whitelist of hosts
-        // that may access the self-configuration functionality, and only
-        // expose the information to hosts on the whitelist.
-
         // Determine if we're on the command line. If so, don't output HTML.
-        if (php_sapi_name() === 'cli') {
+        if (PHP_SAPI === 'cli') {
             if ($previous instanceof \Exception) {
                 $output .= "\n\nException message:\n" . $previous->getMessage() . "\n\n";
             }
@@ -122,7 +116,7 @@ HTML;
      * Callback for register_shutdown_function() to handle fatal errors.
      *
      * @param \Silex\Application $app
-     * @param boolean            $flush
+     * @param bool               $flush
      */
     public static function catchFatalErrors(Application $app, $flush = true)
     {
@@ -149,12 +143,12 @@ HTML;
             }
 
             // Detect if we're being called from a core, an extension or vendor
-            $isBoltCoreError  = strpos($error['file'], $app['resources']->getPath('rootpath/src'));
-            $isVendorError    = strpos($error['file'], $app['resources']->getPath('rootpath/vendor'));
+            $isBoltCoreError = strpos($error['file'], $app['resources']->getPath('rootpath/src'));
+            $isVendorError = strpos($error['file'], $app['resources']->getPath('rootpath/vendor'));
             $isExtensionError = strpos($error['file'], $app['resources']->getPath('extensions'));
 
             // Assemble error trace
-            $errorblock  = '<code style="display:block; white-space: pre-wrap;">Error: ' . $error['message'] . '</code><br>';
+            $errorblock = '<code style="display:block; white-space: pre-wrap;">Error: ' . $error['message'] . '</code><br>';
             $errorblock .= '<code>File:  ' . $error['file'] . '</code><br>';
             $errorblock .= '<code>Line:  ' . $error['line'] . '</code><br><br>';
 
@@ -179,7 +173,7 @@ HTML;
                     '&nbsp;&nbsp;&nbsp;&nbsp;' . $parts[2] . ': false</code></p>',
                     $html
                 );
-                $message  = '<h4>There is a fatal error in the \'' . $package . '\' extension ' .
+                $message = '<h4>There is a fatal error in the \'' . $package . '\' extension ' .
                     'loaded on your Bolt Installation.<h4>';
                 $message .= $errorblock;
             } else {
@@ -193,7 +187,7 @@ HTML;
             $html = str_replace('%error%', $message, $html);
 
             // Determine if we're on the command line. If so, don't output HTML.
-            if (php_sapi_name() == 'cli') {
+            if (PHP_SAPI == 'cli') {
                 $html = self::cleanHTML($html);
             }
 

@@ -17,7 +17,7 @@ abstract class PagerManagerTestBase extends BoltUnitTest
     protected function createPagerManagerMockBuilder()
     {
         $mockBuilder = $this
-            ->getMockBuilder('Bolt\\Pager\\PagerManager');
+            ->getMockBuilder(PagerManager::class);
 
         return $mockBuilder;
     }
@@ -26,7 +26,7 @@ abstract class PagerManagerTestBase extends BoltUnitTest
     {
         $app = $this->getApp();
         $app['request'] = $request;
-        $app['request_stack'] = new RequestStack();
+        $this->setService('request_stack', new RequestStack());
 
         if ($request) {
             $app['request_stack']->push($request);

@@ -30,7 +30,7 @@ class Html
             $nextChar = mb_substr($str, $newLength, 1);
             $str = mb_substr($str, 0, $newLength);
             if ($nextChar != ' ') {
-                if (false !== ($lastSpace = mb_strrpos($str, ' '))) {
+                if (($lastSpace = mb_strrpos($str, ' ')) !== false) {
                     // Check for to long cutoff
                     if (mb_strlen($str) - $lastSpace >= $cutOffCap) {
                         // Trim the ellipse, as we do not want a space now
@@ -68,7 +68,7 @@ class Html
      *
      * @param string $str
      *
-     * @return boolean
+     * @return bool
      */
     public static function isURL($str)
     {
@@ -113,7 +113,7 @@ class Html
         }
 
         // If we forgot the second element in the array, substitute the first for it.
-        if (empty(strip_tags($providedby[1]))) {
+        if (empty($providedby[1]) || empty(strip_tags($providedby[1]))) {
             $providedby[1] = $providedby[0];
         }
 

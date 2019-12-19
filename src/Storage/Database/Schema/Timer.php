@@ -17,10 +17,9 @@ class Timer
 {
     /** @var FileInterface */
     protected $cacheFile;
-    /** @var boolean */
+    /** @var bool */
     protected $expired;
 
-    const CHECK_TIMESTAMP_FILE = 'dbcheck.ts';
     const CHECK_INTERVAL = 1800;
 
     /**
@@ -36,7 +35,7 @@ class Timer
     /**
      * Check if we have determined that we need to do a database check.
      *
-     * @return boolean
+     * @return bool
      */
     public function isCheckRequired()
     {
@@ -45,7 +44,7 @@ class Timer
         }
 
         if ($this->cacheFile->exists()) {
-            $expiryTimestamp = (integer) $this->cacheFile->read();
+            $expiryTimestamp = (int) $this->cacheFile->read();
         } else {
             $expiryTimestamp = 0;
         }

@@ -11,7 +11,7 @@ use Doctrine\DBAL\Query\QueryBuilder;
  * filtering system used in the SelectQuery class. The main difference is
  * the addition of weighting, which is driven by documented here:.
  *
- *  @link https://docs.bolt.cm/templates/content-search
+ *  @see https://docs.bolt.cm/templates/content-search
  *
  *  The resulting QueryBuilder object is then passed through to the individual
  *  field handlers where they can perform value transformations.
@@ -61,7 +61,7 @@ class SearchQuery extends SelectQuery
     }
 
     /**
-     * Gets the individual elements of the search query as an array
+     * Gets the individual elements of the search query as an array.
      *
      * @return array
      */
@@ -82,11 +82,10 @@ class SearchQuery extends SelectQuery
             $words = preg_split('/[\s\+]+/', $this->search);
 
             return '%' . implode('% && %', $words) . '%';
-        } else {
-            $words = explode(' ', $this->search);
-
-            return '%' . implode('% || %', $words) . '%';
         }
+        $words = explode(' ', $this->search);
+
+        return '%' . implode('% || %', $words) . '%';
     }
 
     /**
@@ -96,16 +95,21 @@ class SearchQuery extends SelectQuery
      */
     protected function processFilters()
     {
+        $params = $this->params;
+
         if (!$this->contentType) {
             throw new QueryParseException('You have attempted to run a search query without specifying a ContentType', 1);
+        }
+
+        if (isset($params['invisible']) && $params['invisible'] === true) {
+            $this->config->enableSearchInvisible(true);
         }
 
         if (!$config = $this->config->getConfig($this->contentType)) {
             throw new QueryParseException('You have attempted to run a search query on an unknown ContentType or one that is not searchable', 1);
         }
 
-        $params = $this->params;
-        unset($params['filter']);
+        unset($params['filter'], $params['invisible']);
 
         foreach ($config as $field => $options) {
             $params[$field] = $this->getSearchParameter();

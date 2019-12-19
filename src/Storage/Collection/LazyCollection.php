@@ -3,34 +3,39 @@
 namespace Bolt\Storage\Collection;
 
 use Bolt\Storage\EntityProxy;
-use Doctrine\Common\Collections\AbstractLazyCollection;
 use Doctrine\Common\Collections\ArrayCollection;
 
 /**
- * LazyCollection Class - Allows a set of references to Entities to be loaded on demand
+ * LazyCollection Class - Allows a set of references to Entities to be loaded on demand.
  *
- * @package Bolt\Storage\Collection
  *
  * @author Ross Riley <riley.ross@gmail.com>
  */
-class LazyCollection extends AbstractLazyCollection
+class LazyCollection extends ArrayCollection
 {
     /**
-     * Allows adding an entity proxy class
+     * Allows adding an entity proxy class.
      *
      * @param EntityProxy $element
      *
-     * @return
+     * @return bool
      */
     public function add($element)
     {
-        $this->initialize();
-
-        return $this->collection->add($element);
+        return parent::add($element);
     }
 
-    protected function doInitialize()
+    /**
+     *  Force loads the proxy objects and returns the real objects
+     */
+    public function serialize()
     {
-        $this->collection = new ArrayCollection();
+        $output = [];
+        foreach ($this as $element) {
+            $proxy = $element->getProxy();
+            $output[] = $proxy->getContenttype() . '/' . $proxy->getSlug();
+        }
+
+        return $output;
     }
 }

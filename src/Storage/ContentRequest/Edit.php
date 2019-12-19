@@ -3,7 +3,6 @@
 namespace Bolt\Storage\ContentRequest;
 
 use Bolt\Config;
-use Bolt\Filesystem\Exception\IOException;
 use Bolt\Filesystem\Manager;
 use Bolt\Form\Resolver;
 use Bolt\Logger\FlashLoggerInterface;
@@ -70,7 +69,8 @@ class Edit
     }
 
     /**
-     * @internal DO NOT USE.
+     * @internal DO NOT USE
+     *
      * @deprecated Temporary and to be removed circa 3.5.
      *
      * @param Query $query
@@ -84,8 +84,8 @@ class Edit
      * Do the edit form for a record.
      *
      * @param Content     $content     A content record
-     * @param ContentType $contentType The contenttype data
-     * @param boolean     $duplicate   If TRUE create a duplicate record
+     * @param ContentType $contentType The ContentType data
+     * @param bool        $duplicate   If TRUE create a duplicate record
      *
      * @return array
      */
@@ -149,21 +149,21 @@ class Edit
             }
         }
 
-        // Test write access for uploadable fields.
-        $contentType['fields'] = $this->setCanUpload($contentType['fields']);
-
         /** @var Content $templateFieldsEntity */
         $templateFieldsEntity = $content->getTemplatefields();
-        $templateFields = null;
+        $templateFields = [];
         if ($templateFieldsEntity instanceof TemplateFields) {
             /** @var ContentType $templateFieldsContentType */
             $templateFieldsContentType = $templateFieldsEntity->getContenttype();
-            $templateFields = $this->setCanUpload($templateFieldsContentType->getFields());
+            $templateFields = $templateFieldsContentType->getFields();
             $templateFieldsContentType['fields'] = $templateFields;
         }
 
         // Temporary choice option resolver. Will be removed with Forms work circa Bolt 3.5.
-        $choiceResolver = new Resolver\Choice($this->em, $this->query);
+        $choiceResolver = new Resolver\Choice($this->query);
+
+        // Intersect the set taxonomies with actually existing ones, because bogus ones are just confusing.
+        $existingTaxonomies = array_intersect(array_keys($this->config->get('taxonomy')), (array) $contentType['taxonomy']);
 
         // Build context for Twig.
         $contextCan = [
@@ -176,13 +176,13 @@ class Edit
             'incoming_relations' => count($incomingNotInverted) > 0,
             'relations'          => isset($contentType['relations']),
             'tabs'               => $contentType['groups'] !== [],
-            'taxonomy'           => isset($contentType['taxonomy']),
-            'templatefields'     => $templateFields !== null,
+            'taxonomy'           => $existingTaxonomies !== [],
+            'templatefields'     => count($templateFields) > 0,
         ];
         $contextValues = [
             'datepublish'        => $this->getPublishingDate($content->getDatepublish(), true),
             'datedepublish'      => $this->getPublishingDate($content->getDatedepublish()),
-            'select_choices'     => $choiceResolver->get($contentType, (array) $templateFields)
+            'select_choices'     => $choiceResolver->get($contentType, (array) $templateFields),
         ];
         $context = [
             'incoming_not_inv' => $incomingNotInverted,
@@ -190,6 +190,7 @@ class Edit
             'content'          => $content,
             'allowed_status'   => $allowedStatuses,
             'contentowner'     => $contentowner,
+            'duplicate'        => $duplicate,
             'fields'           => $this->config->fields->fields(),
             'fieldtemplates'   => $this->getTemplateFieldTemplates($contentType, $content),
             'fieldtypes'       => $this->getUsedFieldtypes($contentType, $content, $contextHas),
@@ -244,64 +245,16 @@ class Edit
     {
         $fields = [];
 
-        // Regex the 'format' for things that look like 'item.foo', and intersect with the actual fields in the contenttype.
+        // Get the field names from the ContentType, including 'status'.
+        $fieldNames = array_merge(array_keys($relationConfig['fields']), ['status']);
+
+        // Regex the 'format' for things that look like 'item.foo', and intersect with the field names.
         if (!empty($relationValues['format'])) {
             preg_match_all('/\bitem\.([a-z0-9_]+)\b/i', $relationValues['format'], $matches);
-            $fields = array_intersect($matches[1], array_keys($relationConfig['fields']));
+            $fields = array_intersect($matches[1], $fieldNames);
         }
 
         return $fields;
-    }
-
-    /**
-     * Determine write access for upload fields, and auto-create the desired directory if it does not exist.
-     *
-     * Note that in cases where an array is passed then true will be set if at least some of the directories can
-     * be written to.
-     *
-     * @param array $fields
-     *
-     * @return array
-     */
-    private function setCanUpload($fields)
-    {
-        $can = false;
-        foreach ($fields as &$values) {
-            if (isset($values['upload'])) {
-                foreach ((array) $values['upload'] as $path) {
-                    $can = $can || $this->checkUploadDirectory($path);
-                }
-                $values['canUpload'] = $can;
-            } else {
-                $values['canUpload'] = true;
-            }
-        }
-
-        return $fields;
-    }
-
-    /**
-     * Check a given upload path to see if it is 'public' or 'private' access, create if required.
-     *
-     * @param $path
-     *
-     * @return boolean
-     */
-    private function checkUploadDirectory($path)
-    {
-        if (strpos('://', $path) === false) {
-            $path = sprintf('files://%s', $path);
-        }
-        if ($this->filesystem->has($path)) {
-            return $this->filesystem->getVisibility($path) === 'public';
-        }
-        try {
-            $this->filesystem->createDir($path);
-
-            return $this->filesystem->getVisibility($path) === 'public';
-        } catch (IOException $e) {
-            return false;
-        }
     }
 
     /**
@@ -353,9 +306,9 @@ class Edit
             return date('Y-m-d H:i:s');
         } elseif ($date === '1900-01-01 00:00:00') {
             return '';
-        } else {
-            return $date;
         }
+
+        return $date;
     }
 
     /**
@@ -386,7 +339,7 @@ class Edit
             $groupIds[$id] = 1;
         };
 
-        foreach ($contentType['groups'] ? $contentType['groups'] : ['ungrouped'] as $group) {
+        foreach ($contentType['groups'] ?: ['ungrouped'] as $group) {
             if ($group === 'ungrouped') {
                 $addGroup($group, Trans::__('contenttypes.generic.group.ungrouped'));
             } elseif ($group !== 'meta' && $group !== 'relations' && $group !== 'taxonomy') {
@@ -449,6 +402,13 @@ class Edit
                 if ($field['type'] === 'repeater') {
                     foreach ($field['fields'] as $rfield) {
                         $fieldtypes[$rfield['type']] = true;
+                    }
+                }
+                if ($field['type'] === 'block') {
+                    foreach ($field['fields'] as $block) {
+                        foreach ($block['fields'] as $rfield) {
+                            $fieldtypes[$rfield['type']] = true;
+                        }
                     }
                 }
             }

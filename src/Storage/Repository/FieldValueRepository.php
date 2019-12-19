@@ -1,18 +1,20 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: ross
- * Date: 08/10/2015
- * Time: 15:29
- */
 
 namespace Bolt\Storage\Repository;
 
+use Bolt\Storage\Entity\Entity;
 use Bolt\Storage\Repository;
 
 class FieldValueRepository extends Repository
 {
-    public function queryExistingFields($id, $contenttype, $field)
+    /**
+     * @param int    $id
+     * @param string $contentType
+     * @param string $field
+     *
+     * @return \Doctrine\DBAL\Query\QueryBuilder
+     */
+    public function queryExistingFields($id, $contentType, $field)
     {
         $query = $this->createQueryBuilder()
             ->select('grouping, id', 'name')
@@ -22,16 +24,23 @@ class FieldValueRepository extends Repository
             ->orderBy('grouping', 'ASC')
             ->setParameters([
                 'id'          => $id,
-                'contenttype' => $contenttype,
+                'contenttype' => $contentType,
                 'name'        => $field,
             ]);
 
         return $query;
     }
 
-    public function getExistingFields($id, $contenttype, $field)
+    /**
+     * @param int    $id
+     * @param string $contentType
+     * @param string $field
+     *
+     * @return Entity[]
+     */
+    public function getExistingFields($id, $contentType, $field)
     {
-        $query = $this->queryExistingFields($id, $contenttype, $field);
+        $query = $this->queryExistingFields($id, $contentType, $field);
         $results = $query->execute()->fetchAll();
 
         $fields = [];

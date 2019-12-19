@@ -2,20 +2,19 @@
 
 namespace Bolt\Storage\Field\Type;
 
+use Bolt\Common\Deprecated;
+use Bolt\Common\Json;
 use Bolt\Storage\CaseTransformTrait;
 use Bolt\Storage\EntityManager;
 use Bolt\Storage\Field\FieldInterface;
 use Bolt\Storage\Field\Sanitiser\SanitiserAwareInterface;
 use Bolt\Storage\Field\Sanitiser\WysiwygAwareInterface;
 use Bolt\Storage\Mapping\ClassMetadata;
-use Bolt\Storage\Query\Filter;
 use Bolt\Storage\Query\QueryInterface;
 use Bolt\Storage\QuerySet;
 use Doctrine\DBAL\Platforms\AbstractPlatform;
-use Doctrine\DBAL\Query\Expression\CompositeExpression;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Doctrine\DBAL\Types\Type;
-use ReflectionProperty;
 
 /**
  * This is an abstract class for a field type that handles
@@ -27,11 +26,20 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
 {
     use CaseTransformTrait;
 
+    /** @var string[] */
     public $mapping;
 
+    /** @var EntityManager */
     protected $em;
+    /** @var AbstractPlatform */
     protected $platform;
 
+    /**
+     * Constructor.
+     *
+     * @param array              $mapping
+     * @param EntityManager|null $em
+     */
     public function __construct(array $mapping = [], EntityManager $em = null)
     {
         $this->mapping = $mapping;
@@ -42,7 +50,7 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
     }
 
     /**
-     * Returns the platform
+     * Returns the platform.
      *
      * @return AbstractPlatform
      */
@@ -52,7 +60,7 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
     }
 
     /**
-     * Sets the current platform to an instance of AbstractPlatform
+     * Sets the current platform to an instance of AbstractPlatform.
      *
      * @param AbstractPlatform $platform
      */
@@ -92,9 +100,9 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
             $value = $this->getSanitiser()->sanitise($value, $isWysiwyg);
         }
 
-        $type = $this->getStorageType();
+        $type = $this->getStorageTypeObject();
 
-        if (null !== $value) {
+        if ($value !== null) {
             $value = $type->convertToDatabaseValue($value, $this->getPlatform());
         } elseif (isset($this->mapping['default'])) {
             $value = $this->mapping['default'];
@@ -110,7 +118,7 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
     public function hydrate($data, $entity)
     {
         $key = $this->mapping['fieldname'];
-        $type = $this->getStorageType();
+        $type = $this->getStorageTypeObject();
         $val = isset($data[$key]) ? $data[$key] : null;
         if ($val !== null) {
             $value = $type->convertToPHPValue($val, $this->getPlatform());
@@ -139,7 +147,7 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
     }
 
     /**
-     * Reads the current value of the field from an entity and returns value
+     * Reads the current value of the field from an entity and returns value.
      *
      * @param $entity
      *
@@ -180,16 +188,34 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
     }
 
     /**
+     * Helper method to bridge compatibility between old and new Field interfaces. Previously a string storage
+     * type was allowed whereas new behaviour is to expect a Type object.
+     *
+     * @return Type
+     */
+    protected function getStorageTypeObject()
+    {
+        $type = $this->getStorageType();
+        if (is_string($type)) {
+            $type = Type::getType($type);
+        }
+
+        return $type;
+    }
+
+    /**
      * @deprecated
      * Here to maintain compatibility with the old interface
      */
     public function getStorageOptions()
     {
+        Deprecated::method();
+
         return [];
     }
 
     /**
-     * Gets the entity attribute name to be used for reading / persisting
+     * Gets the entity attribute name to be used for reading / persisting.
      *
      * @return string
      */
@@ -203,91 +229,28 @@ abstract class FieldTypeBase implements FieldTypeInterface, FieldInterface
     }
 
     /**
-     * Provides a template that is able to render the field
+     * Provides a template that is able to render the field.
      *
      * @deprecated
      */
     public function getTemplate()
     {
+        Deprecated::method();
+
         return '@bolt/editcontent/fields/_' . $this->getName() . '.twig';
     }
 
     /**
      * Check if a value is a JSON string.
      *
-     * @param mixed $value
+     * @param string $value
      *
-     * @return boolean
+     * @return bool
      */
     protected function isJson($value)
     {
-        if (!is_string($value)) {
-            return false;
-        }
-        
-        // This handles an inconsistency in the result from the JSON parser across 5.x and 7.x of PHP
-        if ($value === '') {
-            return false;
-        }
-        
-        json_decode($value);
+        Deprecated::method(3.4, '\Bolt\Common\Json::test');
 
-        return json_last_error() === JSON_ERROR_NONE;
-    }
-
-    protected function normalizeData($data, $field)
-    {
-        $normalized = [];
-
-        foreach ($data as $key => $value) {
-            if (strpos($key, '_') === 0) {
-                if (strpos($key, $field) === 1) {
-                    $path = explode('_', str_replace('_' . $field, '', $key));
-                    $normalized[$path[1]] = $value;
-                }
-            }
-        }
-
-        $compiled = [];
-
-        foreach ($normalized as $key => $value) {
-            if ($value === null) {
-                continue;
-            }
-            foreach (explode(',', $value) as $i => $val) {
-                $compiled[$i][$key] = $val;
-            }
-        };
-        $compiled = array_unique($compiled, SORT_REGULAR);
-
-        return $compiled;
-    }
-
-    /** This method does an in-place modification of a generic contenttype.field query to the format actually used
-     * in the raw sql category. For instance a simple query might say `entries.tags = 'movies'` but now we are in the
-     * context of entries the actual SQL fragment needs to be `tags.slug = 'movies'`. We don't know this until we
-     * drill down to the individual field types so this rewrites the SQL fragment just before the query gets sent.
-     *
-     * Note, reflection is used to achieve this, it is not ideal, but the CompositeExpression shipped with DBAL chooses
-     * to keep the query parts as private and only allow access to the final computed string.
-     *
-     * @param Filter $filter
-     * @param QueryInterface $query
-     * @param $field
-     * @param $column
-     */
-    protected function rewriteQueryFilterParameters(Filter $filter, QueryInterface $query, $field, $column)
-    {
-        $originalExpression = $filter->getExpressionObject();
-
-        $reflected = new ReflectionProperty(CompositeExpression::class, 'parts');
-        $reflected->setAccessible(true);
-        $originalParts = $reflected->getValue($originalExpression);
-        foreach ($originalParts as &$part) {
-            $part = str_replace("_" . $query->getContenttype().".".$field, $field.".".$column, $part);
-        }
-        $reflected->setValue($originalExpression, $originalParts);
-
-        $filter->setExpression($originalExpression);
+        return Json::test($value);
     }
 }

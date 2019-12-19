@@ -2,35 +2,106 @@
 
 namespace Bolt\Twig;
 
-class SetcontentNode extends \Twig_Node
+use Bolt\Common\Deprecated;
+use Bolt\Twig\Extension\BoltExtension;
+use Bolt\Twig\Runtime\BoltRuntime;
+use Twig\Compiler;
+use Twig\Node\Expression\ArrayExpression;
+use Twig\Node\Node;
+
+/**
+ * Twig setcontent node.
+ *
+ * @author Bob den Otter <bob@twokings.nl>
+ * @author Ross Riley <riley.ross@gmail.com>
+ */
+class SetcontentNode extends Node
 {
-    public function __construct($name, $contenttype, \Twig_Node_Expression_Array $arguments, $wherearguments, $lineno, $tag = null)
+    /** @var bool */
+    private $legacy;
+
+    /**
+     * Constructor.
+     *
+     * @param string          $name
+     * @param Node            $contentType
+     * @param ArrayExpression $arguments
+     * @param array           $whereArguments
+     * @param int             $lineNo
+     * @param null            $tag
+     * @param bool            $legacy
+     */
+    public function __construct($name, Node $contentType, ArrayExpression $arguments, array $whereArguments, $lineNo, $tag = null, $legacy = false)
     {
         parent::__construct(
-            ['wherearguments' => $wherearguments],
-            ['name'           => $name, 'contenttype' => $contenttype, 'arguments' => $arguments],
-            $lineno,
+            $whereArguments,
+            ['name' => $name, 'contenttype' => $contentType, 'arguments' => $arguments],
+            $lineNo,
             $tag
         );
+        $this->legacy = $legacy;
     }
 
-    public function compile(\Twig_Compiler $compiler)
+    /**
+     * {@inheritdoc}
+     */
+    public function compile(Compiler $compiler)
     {
         $arguments = $this->getAttribute('arguments');
 
+        if ($this->legacy) {
+            $this->compileLegacy($compiler, $arguments);
+
+            return;
+        }
+
         $compiler
             ->addDebugInfo($this)
-            ->write('$template_storage = $context[\'app\'][\'storage\'];' . "\n")
-            ->write('$context[\'' . $this->getAttribute('name') . '\'] = ')
-            ->write('$template_storage->getContent(')
+            ->write("\$context['")
+            ->raw($this->getAttribute('name'))
+            ->raw("'] = ")
+            ->raw("\$this->env->getRuntime('" . BoltRuntime::class . "')->getQueryEngine()->getContent(")
             ->subcompile($this->getAttribute('contenttype'))
             ->raw(', ')
-            ->subcompile($arguments);
+            ->subcompile($arguments)
+        ;
 
-        if (!is_null($this->getNode('wherearguments'))) {
+        if ($this->hasNode('wherearguments')) {
             $compiler
                 ->raw(', $pager, ')
-                ->subcompile($this->getNode('wherearguments'));
+                ->subcompile($this->getNode('wherearguments'))
+            ;
+        }
+
+        $compiler->raw(" );\n");
+    }
+
+    /**
+     * @param Compiler $compiler
+     * @param Node     $arguments
+     *
+     * @deprecated Deprecated since 3.4, to be removed in 4.0.
+     */
+    private function compileLegacy(Compiler $compiler, Node $arguments)
+    {
+        Deprecated::warn('Calling {{ setcontent }} in legacy storage mode', 3.4, "Set 'compatibility/setcontent_legacy: false' in config.yml");
+
+        $compiler
+            ->addDebugInfo($this)
+            ->write("\$context['")
+            ->raw($this->getAttribute('name'))
+            ->raw("'] = ")
+            ->raw("\$this->env->getExtension('" . BoltExtension::class . "')->getStorage()->getContent(")
+            ->subcompile($this->getAttribute('contenttype'))
+            ->raw(', ')
+            ->subcompile($arguments)
+        ;
+
+        if ($this->hasNode('wherearguments')) {
+            $compiler
+                ->raw(', $pager, ')
+                ->subcompile($this->getNode('wherearguments'))
+            ;
         }
 
         $compiler->raw(" );\n");

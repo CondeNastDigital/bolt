@@ -6,6 +6,7 @@ use Bolt\Logger\FlashLogger;
 use Bolt\Logger\Handler\RecordChangeHandler;
 use Bolt\Logger\Handler\SystemHandler;
 use Bolt\Logger\Manager;
+use Bolt\Storage\Entity;
 use Monolog\Formatter\WildfireFormatter;
 use Monolog\Handler\FirePHPHandler;
 use Monolog\Handler\NullHandler;
@@ -46,7 +47,7 @@ class LoggerServiceProvider implements ServiceProviderInterface
 
         // Firebug
         $app['logger.firebug'] = $app->share(
-            function ($app) {
+            function () {
                 $log = new Logger('logger.firebug');
                 $handler = new FirePHPHandler();
                 $handler->setFormatter(new WildfireFormatter());
@@ -58,7 +59,7 @@ class LoggerServiceProvider implements ServiceProviderInterface
 
         // System log
         $app['logger.flash'] = $app->share(
-            function ($app) {
+            function () {
                 $log = new FlashLogger();
 
                 return $log;
@@ -68,8 +69,8 @@ class LoggerServiceProvider implements ServiceProviderInterface
         // Manager
         $app['logger.manager'] = $app->share(
             function ($app) {
-                $changeRepository = $app['storage']->getRepository('Bolt\Storage\Entity\LogChange');
-                $systemRepository = $app['storage']->getRepository('Bolt\Storage\Entity\LogSystem');
+                $changeRepository = $app['storage']->getRepository(Entity\LogChange::class);
+                $systemRepository = $app['storage']->getRepository(Entity\LogSystem::class);
                 $mgr = new Manager($app, $changeRepository, $systemRepository);
 
                 return $mgr;
@@ -88,7 +89,7 @@ class LoggerServiceProvider implements ServiceProviderInterface
         };
 
         $app['monolog.logfile'] = function ($app) {
-            return $app['resources']->getPath('cache') . '/' . $app['config']->get('general/debuglog/filename');
+            return $app['path_resolver']->resolve('%cache%/' . $app['config']->get('general/debuglog/filename'));
         };
 
         $app['monolog.handler'] = $app->extend(
@@ -102,13 +103,6 @@ class LoggerServiceProvider implements ServiceProviderInterface
                 return $handler;
             }
         );
-
-        // If we're not debugging, just send to /dev/null
-        if (!$app['config']->get('general/debuglog/enabled')) {
-            $app['monolog.handler'] = function () {
-                return new NullHandler();
-            };
-        }
 
         $app['logger.debug'] = function () use ($app) {
             return $app['monolog'];

@@ -2,6 +2,8 @@
 
 namespace Bolt\EventListener;
 
+use Bolt\AccessControl\Token\Token;
+use Bolt\Common\Serialization;
 use Bolt\Events\StorageEvent;
 use Bolt\Events\StorageEvents;
 use Bolt\Filesystem\Exception\FileNotFoundException;
@@ -9,6 +11,7 @@ use Bolt\Filesystem\FilesystemInterface;
 use Bolt\Session\SessionStorage;
 use Bolt\Storage\Entity;
 use Bolt\Storage\EntityManagerInterface;
+use Bolt\Storage\Repository;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
@@ -20,7 +23,7 @@ class AccessControlListener implements EventSubscriberInterface
 {
     /** @var FilesystemInterface */
     protected $filesystem;
-    /** @var SessionStorage*/
+    /** @var SessionStorage */
     protected $sessionStorage;
     /** @var EntityManagerInterface */
     protected $em;
@@ -51,7 +54,7 @@ class AccessControlListener implements EventSubscriberInterface
     {
         /** @var Entity\Users $userEntity */
         $userEntity = $event->getContent();
-        if (!$userEntity instanceof \Bolt\Storage\Entity\Users) {
+        if (!$userEntity instanceof Entity\Users) {
             return;
         }
 
@@ -70,7 +73,7 @@ class AccessControlListener implements EventSubscriberInterface
     {
         /** @var Entity\Users $userEntity */
         $userEntity = $event->getContent();
-        if (!$userEntity instanceof \Bolt\Storage\Entity\Users) {
+        if (!$userEntity instanceof Entity\Users) {
             return;
         }
 
@@ -85,9 +88,9 @@ class AccessControlListener implements EventSubscriberInterface
      */
     private function deleteAuthtokens(Entity\Users $user)
     {
-        /** @var \Bolt\Storage\Repository\AuthtokenRepository $repo */
-        $repo = $this->em->getRepository('Bolt\Storage\Entity\Authtoken');
-        $repo->deleteTokens($user->getUsername());
+        /** @var Repository\AuthtokenRepository $repo */
+        $repo = $this->em->getRepository(Entity\Authtoken::class);
+        $repo->deleteTokens($user->getId());
     }
 
     /**
@@ -106,11 +109,11 @@ class AccessControlListener implements EventSubscriberInterface
 
         /** @var \Bolt\Filesystem\Handler\File $sessionFile */
         foreach ($sessionFiles as $sessionFile) {
-            $data = unserialize($sessionFile->read());
+            $data = Serialization::parse($sessionFile->read());
             if (!isset($data['_sf2_attributes']['authentication'])) {
                 continue;
             }
-            if (!$data['_sf2_attributes']['authentication'] instanceof \Bolt\AccessControl\Token\Token) {
+            if (!$data['_sf2_attributes']['authentication'] instanceof Token) {
                 continue;
             }
             /** @var \Bolt\AccessControl\Token\Token $token */

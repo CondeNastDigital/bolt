@@ -2,6 +2,7 @@
 
 namespace Bolt\Menu;
 
+use Bolt\Common\Deprecated;
 use Bolt\Translation\Translator as Trans;
 use Silex\Application;
 use Symfony\Component\Routing\Exception\MethodNotAllowedException;
@@ -44,7 +45,7 @@ class MenuBuilder
     }
 
     /**
-     * Return a named menu
+     * Return a named menu.
      *
      * @param array $menu
      *
@@ -84,7 +85,7 @@ class MenuBuilder
      */
     private function menuHelper($item)
     {
-        // recurse into submenu's
+        // recurse into submenus
         if (isset($item['submenu']) && is_array($item['submenu'])) {
             $item['submenu'] = $this->menuHelper($item['submenu']);
         }
@@ -99,7 +100,7 @@ class MenuBuilder
     }
 
     /**
-     * Resolve the route to a generated url
+     * Resolve the route to a generated url.
      *
      * @param array $item
      *
@@ -110,10 +111,8 @@ class MenuBuilder
         $param = !empty($item['param']) ? $item['param'] : [];
 
         if (isset($item['add'])) {
-            $this->app['logger.system']->warning(
-                Trans::__('Menu item property "add" is deprecated. Use "#" under "param" instead.'),
-                ['event' => 'deprecated']
-            );
+            Deprecated::warn('Menu item property "add"', null, 'Use "#" under "param" instead.');
+
             $add = $item['add'];
             if (!empty($add) && $add[0] !== '?') {
                 $add = '?' . $add;
@@ -121,7 +120,7 @@ class MenuBuilder
 
             parse_str(parse_url($add, PHP_URL_QUERY), $query);
             $param = array_merge($param, $query);
-            $param['#'] = parse_url($add, PHP_URL_FRAGMENT);
+            $param['_fragment'] = parse_url($add, PHP_URL_FRAGMENT);
         }
 
         return $this->app['url_generator']->generate($item['route'], $param);
@@ -137,7 +136,7 @@ class MenuBuilder
     private function resolvePathToContent(array $item)
     {
         if ($item['path'] === 'homepage') {
-            $item['link'] = $this->app['resources']->getUrl('root');
+            $item['link'] = $this->app['url_generator']->generate('homepage');
 
             return $item;
         }
@@ -157,10 +156,14 @@ class MenuBuilder
         }
 
         // Get a copy of the path minus trailing/leading slash
-        $path = ltrim(rtrim($item['path'], '/'), '/');
+        $path = trim($item['path'], '/');
 
         // Pre-set our link in case the match() throws an exception
-        $item['link'] = $this->app['resources']->getUrl('root') . $path;
+        $basePath = '';
+        if ($request = $this->app['request_stack']->getCurrentRequest()) {
+            $basePath = $request->getBasePath();
+        }
+        $item['link'] = $basePath . '/' . $path;
 
         try {
             // See if we have a 'content/id' or 'content/slug' path

@@ -1,3 +1,4 @@
+/* eslint no-console: ["error", { allow: ["error"] }] */
 /**
  * @param {Object} $    - Global jQuery object
  * @param {Object} bolt - The Bolt module
@@ -103,10 +104,9 @@
          * @param {object} modifications - The modifications to be sent.
          */
         _sendModifyRecordsQuery: function (modifications) {
-            var self = this,
-                url = bolt.conf('paths.async') + 'content/action' + window.location.search;
+            var self = this;
             $.ajax({
-                url: url,
+                url: bolt.conf('contentActionUrl'),
                 type: 'POST',
                 data: {
                     'bolt_csrf_token': self.csrfToken,
@@ -134,8 +134,8 @@
                     */
                 },
                 error: function (jqXHR, textStatus, errorThrown) {
-                    console.log(jqXHR.status + ' (' + errorThrown + '):');
-                    console.log(JSON.parse(jqXHR.responseText));
+                    console.error(jqXHR.status + ' (' + errorThrown + '):');
+                    console.error(JSON.parse(jqXHR.responseText));
                 },
                 dataType: 'html'
             });

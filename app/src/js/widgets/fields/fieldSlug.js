@@ -1,8 +1,9 @@
+/* eslint no-console: ["error", { allow: ["error"] }] */
 /**
  * @param {Object} $    - Global jQuery object
  * @param {Object} bolt - The Bolt module
  */
-(function ($, bolt) {
+(function ($) {
     'use strict';
 
     /**
@@ -236,14 +237,14 @@
 
             self._ui.group.addClass('loading');
 
-            $.get(bolt.conf('paths.async') + 'makeuri', data)
+            $.get(self._ui.data.data('createSlugUrl'), data)
                 .done(function (uri) {
                     if (self._mode === mode.link) {
                         self._ui.data.val(uri);
                     }
                 })
                 .fail(function () {
-                    console.log('failed to get an URI');
+                    console.error('Failed to get URI for ' + self.options.slug + '/' + self.options.contentId);
                 })
                 .always(function () {
                     self._ui.group.removeClass('loading');

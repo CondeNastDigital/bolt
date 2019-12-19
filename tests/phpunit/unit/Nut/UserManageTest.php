@@ -1,13 +1,15 @@
 <?php
+
 namespace Bolt\Tests\Nut;
 
 use Bolt\Nut\UserManage;
+use Bolt\Storage\Entity;
 use Bolt\Storage\Repository\UsersRepository;
 use Bolt\Tests\BoltUnitTest;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
- * Tests for Nut user:manage
+ * Tests for Nut user:manage.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
@@ -17,7 +19,7 @@ class UserManageTest extends BoltUnitTest
     {
         $app = $this->getApp();
         $this->resetDb();
-        $this->addNewUser($app, 'koala', 'Kenny Koala', true);
+        $this->addNewUser($app, 'koala', 'Kenny Koala', 'editor', true);
 
         $command = new UserManage($app);
         $tester = new CommandTester($command);
@@ -29,29 +31,29 @@ class UserManageTest extends BoltUnitTest
             ]
         );
         $result = $tester->getDisplay();
-        $this->assertRegExp('#koala(\s*)\|(\s*)koala@example\.com(\s*)\|(\s*)Kenny Koala(\s*)\|(\s*)\d*(\s*)\|(\s*)true#', $result);
+        $this->assertRegExp('#koala(\s*).*(\s*)koala@example\.com(\s*).*(\s*)Kenny Koala(\s*)editor(\s*)\d*(\s*).*(\s*)true#', $result);
     }
 
     public function testEnable()
     {
         $app = $this->getApp();
         $this->resetDb();
-        $this->addNewUser($app, 'koala', 'Kenny Koala', false);
+        $this->addNewUser($app, 'koala', 'Kenny Koala', 'editor', false);
 
         $command = new UserManage($app);
         $tester = new CommandTester($command);
 
         $tester->execute(
             [
-                'login'  => 'koala',
+                'login'    => 'koala',
                 '--enable' => null,
             ]
         );
         $result = $tester->getDisplay();
-        $this->assertSame('Enabled user: koala', trim($result));
+        $this->assertRegExp('/Enabled user: koala/', $result);
 
         /** @var UsersRepository $repo */
-        $repo = $app['storage']->getRepository('Bolt\Storage\Entity\Users');
+        $repo = $app['storage']->getRepository(Entity\Users::class);
         $userEntity = $repo->getUser('koala');
         $this->assertTrue($userEntity->getEnabled());
     }
@@ -60,23 +62,23 @@ class UserManageTest extends BoltUnitTest
     {
         $app = $this->getApp();
         $this->resetDb();
-        $this->addNewUser($app, 'koala', 'Kenny Koala', true);
+        $this->addNewUser($app, 'koala', 'Kenny Koala', 'editor', true);
 
         $command = new UserManage($app);
-        $tester = new CommandTester($command, ['verbosity' => 256]);
+        $tester = new CommandTester($command);
 
         $tester->execute(
             [
-                'login'  => 'koala',
+                'login'     => 'koala',
                 '--disable' => null,
             ]
         );
 
         $result = $tester->getDisplay();
-        $this->assertSame('Disabled user: koala', trim($result));
+        $this->assertRegExp('/Disabled user: koala/', $result);
 
         /** @var UsersRepository $repo */
-        $repo = $app['storage']->getRepository('Bolt\Storage\Entity\Users');
+        $repo = $app['storage']->getRepository(Entity\Users::class);
         $userEntity = $repo->getUser('koala');
         $this->assertFalse($userEntity->getEnabled());
     }

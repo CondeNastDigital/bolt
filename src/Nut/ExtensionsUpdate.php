@@ -2,17 +2,21 @@
 
 namespace Bolt\Nut;
 
+use Bolt\Composer\Satis\PingService;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Nut command to update extensions
+ * Nut command to update extensions.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
 class ExtensionsUpdate extends BaseCommand
 {
+    /** @var PingService */
+    private $pinger;
+
     /**
      * {@inheritdoc}
      */
@@ -25,29 +29,40 @@ class ExtensionsUpdate extends BaseCommand
         ;
     }
 
+    protected function initialize(InputInterface $input, OutputInterface $output)
+    {
+        parent::initialize($input, $output);
+        $this->pinger = $this->app['extend.ping'];
+    }
+
     /**
      * {@inheritdoc}
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $name = $input->getArgument('name');
+        if (!$this->pinger->ping(true, $output->getVerbosity() >= OutputInterface::VERBOSITY_DEBUG)) {
+            $this->io->error($this->pinger->getMessages()->toArray());
 
+            return 1;
+        }
+
+        $name = $input->getArgument('name');
         if ($name) {
-            $output->write("\n<info>Starting update of {$name}:… </info>");
+            $this->io->title('Updating $name');
             $packages = [$name];
         } else {
-            $output->write("\n<info>Starting update… </info>");
+            $this->io->title('Updating all extensions');
             $packages = [];
         }
         $result = $this->app['extend.manager']->updatePackage($packages);
-
+        $this->io->writeln(sprintf('<comment>%s</comment>', $this->app['extend.action.io']->getOutput()), OutputInterface::OUTPUT_PLAIN);
         if ($result === 0) {
-            $output->writeln('<info>[DONE]</info>');
-            $this->auditLog(__CLASS__, "Update extension $name");
+            $this->io->success("Updated extension $name");
+            $this->auditLog(__CLASS__, "Updated extension $name");
         } else {
-            $output->writeln('<error>[FAILED]</error>');
+            $this->io->error("Unable to update extension $name");
         }
 
-        $output->writeln(sprintf('<comment>%s</comment>', $this->app['extend.action.io']->getOutput()), OutputInterface::OUTPUT_PLAIN);
+        return $result;
     }
 }

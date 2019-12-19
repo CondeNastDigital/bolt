@@ -3,14 +3,14 @@
 use Codeception\Util\Locator;
 
 /**
- * Backend 'admin' tests
+ * Backend 'admin' tests.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
 class BackendAdminCest extends AbstractAcceptanceTest
 {
     /**
-     * Login the admin user
+     * Login the admin user.
      *
      * @param \AcceptanceTester $I
      */
@@ -27,7 +27,7 @@ class BackendAdminCest extends AbstractAcceptanceTest
     }
 
     /**
-     * Create a 'author' user with the 'author' role
+     * Create a 'author' user with the 'author' role.
      *
      * @param \AcceptanceTester $I
      */
@@ -43,25 +43,25 @@ class BackendAdminCest extends AbstractAcceptanceTest
         $I->see('Create a new user account');
 
         // Fill in form
-        $I->fillField('form[username]',              $this->user['author']['username']);
-        $I->fillField('form[password]',              $this->user['author']['password']);
-        $I->fillField('form[password_confirmation]', $this->user['author']['password']);
-        $I->fillField('form[email]',                 $this->user['author']['email']);
-        $I->fillField('form[displayname]',           $this->user['author']['displayname']);
-        $I->selectOption('form[enabled]',            1);
+        $I->fillField('user_edit[username]',         $this->user['author']['username']);
+        $I->fillField('user_edit[password][first]',  $this->user['author']['password']);
+        $I->fillField('user_edit[password][second]', $this->user['author']['password']);
+        $I->fillField('user_edit[email]',            $this->user['author']['email']);
+        $I->fillField('user_edit[displayname]',      $this->user['author']['displayname']);
+        $I->selectOption('user_edit[enabled]',       1);
 
         // Add the "editor" role
-        $I->checkOption('#form_roles_1');
+        $I->checkOption('#user_edit_roles_1');
 
         // Submit
-        $I->click('input[type=submit]');
+        $I->click('#user_edit button[type=submit]');
 
         // Save is successful?
         $I->see("User {$this->user['author']['displayname']} has been saved");
     }
 
     /**
-     * Create a 'editor' user with the 'editor' role
+     * Create a 'editor' user with the 'editor' role.
      *
      * @param \AcceptanceTester $I
      */
@@ -77,25 +77,25 @@ class BackendAdminCest extends AbstractAcceptanceTest
         $I->see('Create a new user account');
 
         // Fill in form
-        $I->fillField('form[username]',              $this->user['editor']['username']);
-        $I->fillField('form[password]',              $this->user['editor']['password']);
-        $I->fillField('form[password_confirmation]', $this->user['editor']['password']);
-        $I->fillField('form[email]',                 $this->user['editor']['email']);
-        $I->fillField('form[displayname]',           $this->user['editor']['displayname']);
-        $I->selectOption('form[enabled]',            1);
+        $I->fillField('user_edit[username]',         $this->user['editor']['username']);
+        $I->fillField('user_edit[password][first]',  $this->user['editor']['password']);
+        $I->fillField('user_edit[password][second]', $this->user['editor']['password']);
+        $I->fillField('user_edit[email]',            $this->user['editor']['email']);
+        $I->fillField('user_edit[displayname]',      $this->user['editor']['displayname']);
+        $I->selectOption('user_edit[enabled]',       1);
 
         // Add the "editor" role
-        $I->checkOption('#form_roles_0');
+        $I->checkOption('#user_edit_roles_0');
 
         // Submit
-        $I->click('input[type=submit]');
+        $I->click('#user_edit button[type=submit]');
 
         // Save is successful?
         $I->see("User {$this->user['editor']['displayname']} has been saved");
     }
 
     /**
-     * Create a 'manager' user with the 'chief-editor' role
+     * Create a 'manager' user with the 'chief-editor' role.
      *
      * @param \AcceptanceTester $I
      */
@@ -111,25 +111,25 @@ class BackendAdminCest extends AbstractAcceptanceTest
         $I->see('Create a new user account');
 
         // Fill in form
-        $I->fillField('form[username]',              $this->user['manager']['username']);
-        $I->fillField('form[password]',              $this->user['manager']['password']);
-        $I->fillField('form[password_confirmation]', $this->user['manager']['password']);
-        $I->fillField('form[email]',                 $this->user['manager']['email']);
-        $I->fillField('form[displayname]',           $this->user['manager']['displayname']);
-        $I->selectOption('form[enabled]',            1);
+        $I->fillField('user_edit[username]',         $this->user['manager']['username']);
+        $I->fillField('user_edit[password][first]',  $this->user['manager']['password']);
+        $I->fillField('user_edit[password][second]', $this->user['manager']['password']);
+        $I->fillField('user_edit[email]',            $this->user['manager']['email']);
+        $I->fillField('user_edit[displayname]',      $this->user['manager']['displayname']);
+        $I->selectOption('user_edit[enabled]',       1);
 
         // Add the "chief-editor" role
-        $I->checkOption('#form_roles_1');
+        $I->checkOption('#user_edit_roles_1');
 
         // Submit
-        $I->click('input[type=submit]');
+        $I->click('#user_edit button[type=submit]');
 
         // Save is successful?
         $I->see("User {$this->user['manager']['displayname']} has been saved");
     }
 
     /**
-     * Create a 'developer' user with the 'developer' role
+     * Create a 'developer' user with the 'developer' role.
      *
      * @param \AcceptanceTester $I
      */
@@ -145,18 +145,18 @@ class BackendAdminCest extends AbstractAcceptanceTest
         $I->see('Create a new user account');
 
         // Fill in form
-        $I->fillField('form[username]',              $this->user['developer']['username']);
-        $I->fillField('form[password]',              $this->user['developer']['password']);
-        $I->fillField('form[password_confirmation]', $this->user['developer']['password']);
-        $I->fillField('form[email]',                 $this->user['developer']['email']);
-        $I->fillField('form[displayname]',           $this->user['developer']['displayname']);
-        $I->selectOption('form[enabled]',            1);
+        $I->fillField('user_edit[username]',         $this->user['developer']['username']);
+        $I->fillField('user_edit[password][first]',  $this->user['developer']['password']);
+        $I->fillField('user_edit[password][second]', $this->user['developer']['password']);
+        $I->fillField('user_edit[email]',            $this->user['developer']['email']);
+        $I->fillField('user_edit[displayname]',      $this->user['developer']['displayname']);
+        $I->selectOption('user_edit[enabled]',       1);
 
         // Add the "developer" role
-        $I->checkOption('#form_roles_3');
+        $I->checkOption('#user_edit_roles_3');
 
         // Submit
-        $I->click('input[type=submit]');
+        $I->click('#user_edit button[type=submit]');
 
         // Save is successful?
         $I->see("User {$this->user['developer']['displayname']} has been saved");
@@ -179,18 +179,18 @@ class BackendAdminCest extends AbstractAcceptanceTest
         $I->see('Create a new user account');
 
         // Fill in form
-        $I->fillField('form[username]',              $this->user['lemmings']['username']);
-        $I->fillField('form[password]',              $this->user['lemmings']['password']);
-        $I->fillField('form[password_confirmation]', $this->user['lemmings']['password']);
-        $I->fillField('form[email]',                 $this->user['lemmings']['email']);
-        $I->fillField('form[displayname]',           $this->user['lemmings']['displayname']);
-        $I->selectOption('form[enabled]',            1);
+        $I->fillField('user_edit[username]',         $this->user['lemmings']['username']);
+        $I->fillField('user_edit[password][first]',  $this->user['lemmings']['password']);
+        $I->fillField('user_edit[password][second]', $this->user['lemmings']['password']);
+        $I->fillField('user_edit[email]',            $this->user['lemmings']['email']);
+        $I->fillField('user_edit[displayname]',      $this->user['lemmings']['displayname']);
+        $I->selectOption('user_edit[enabled]',       1);
 
         // Add the "admin" role
-        $I->checkOption('#form_roles_2');
+        $I->checkOption('#user_edit_roles_2');
 
         // Submit
-        $I->click('input[type=submit]');
+        $I->click('#user_edit button[type=submit]');
 
         // Save is successful?
         $I->see("User {$this->user['lemmings']['displayname']} has been saved");
@@ -213,23 +213,23 @@ class BackendAdminCest extends AbstractAcceptanceTest
         $I->see('Create a new user account');
 
         // Fill in form
-        $I->fillField('form[username]',              'derpaderp');
-        $I->fillField('form[password]',              'DerpADerp');
-        $I->fillField('form[password_confirmation]', 'DerpADerp');
-        $I->fillField('form[email]',                 'derpaderp');
-        $I->fillField('form[displayname]',           'Derpy Derpaderp');
-        $I->selectOption('form[enabled]',            1);
+        $I->fillField('user_edit[username]',         'derpaderp');
+        $I->fillField('user_edit[password][first]',  'DerpADerp');
+        $I->fillField('user_edit[password][second]', 'DerpADerp');
+        $I->fillField('user_edit[email]',            'derpaderp');
+        $I->fillField('user_edit[displayname]',      'Derpy Derpaderp');
+        $I->selectOption('user_edit[enabled]',       1);
 
         // Add the "admin" role
-        $I->checkOption('#form_roles_2');
+        $I->checkOption('#user_edit_roles_2');
 
         // Submit
-        $I->click('input[type=submit]');
+        $I->click('#user_edit button[type=submit]');
 
         // Save is *not* successful?
         $I->see('Password must not match the username.');
         $I->see('Password must not be a part of the display name.');
-        $I->see('This value is not a valid email address.');
+        $I->see('This email address is not valid');
     }
 
     /**
@@ -246,8 +246,8 @@ class BackendAdminCest extends AbstractAcceptanceTest
         $I->amOnPage('/bolt/file/edit/config/config.yml');
 
         $yaml = $I->getUpdatedConfig();
-        $I->fillField('#form_contents', $yaml);
-        $I->click('Save', '#saveeditfile');
+        $I->fillField('#file_edit_contents', $yaml);
+        $I->click('Save', '#file_edit_save');
 
         $I->amOnPage('/bolt/file/edit/config/config.yml');
         $I->see('notfound: resources/not-found');
@@ -262,18 +262,18 @@ class BackendAdminCest extends AbstractAcceptanceTest
      */
     public function editThemeConfigTest(\AcceptanceTester $I)
     {
-        $I->wantTo("edit theme.yml and add TemplateFields configuration");
+        $I->wantTo('edit theme.yml and add TemplateFields configuration');
 
         // Set up the browser
         $this->setLoginCookies($I);
-        $I->amOnPage('/bolt/file/edit/themes/base-2016/theme.yml');
+        $I->amOnPage('/bolt/file/edit/themes/base-2018/theme.yml');
 
         $yaml = $I->getUpdatedTheme();
-        $I->fillField('#form_contents', $yaml);
-        $I->click('Save', '#saveeditfile');
+        $I->fillField('#file_edit_contents', $yaml);
+        $I->click('Save', '#file_edit_save');
 
         $indent = '            ';
-        $I->amOnPage('/bolt/file/edit/themes/base-2016/theme.yml');
+        $I->amOnPage('/bolt/file/edit/themes/base-2018/theme.yml');
         $I->see('page.twig:');
         $I->see("text:\n{$indent}type: text");
         $I->see("html:\n{$indent}type: html");
@@ -298,6 +298,7 @@ class BackendAdminCest extends AbstractAcceptanceTest
         /**
          * Disabled as currently unsupported due to problems in extension
          * fields, and in test due to |first filter in base-2016:
+         *
          * @see https://github.com/bolt/bolt/blob/v3.2.16/theme/base-2016/partials/_sub_fields.twig#L104
          */
         //$I->see("repeater:\n{$indent}type: repeater");
@@ -318,8 +319,8 @@ class BackendAdminCest extends AbstractAcceptanceTest
         $I->amOnPage('/bolt/file/edit/config/contenttypes.yml');
 
         $yaml = $I->getUpdatedContentTypes();
-        $I->fillField('#form_contents', $yaml);
-        $I->click('Save', '#saveeditfile');
+        $I->fillField('#file_edit_contents', $yaml);
+        $I->click('Save', '#file_edit_save');
         $I->amOnPage('/bolt/file/edit/config/contenttypes.yml');
         $I->see('name: Resources');
         $I->see('singular_name: Resource');
@@ -327,7 +328,7 @@ class BackendAdminCest extends AbstractAcceptanceTest
     }
 
     /**
-     * Update the database after creating the Resources ContentType
+     * Update the database after creating the Resources ContentType.
      *
      * @param \AcceptanceTester $I
      */
@@ -355,7 +356,7 @@ class BackendAdminCest extends AbstractAcceptanceTest
     }
 
     /**
-     * Update the database after creating the Resources ContentType
+     * Update the database after creating the Resources ContentType.
      *
      * @param \AcceptanceTester $I
      */
@@ -371,11 +372,11 @@ class BackendAdminCest extends AbstractAcceptanceTest
 
         $body = file_get_contents(CODECEPTION_DATA . '/not-found.body.html');
 
-        $I->fillField('#title', '404');
+        $I->fillField('#title', '404 reasons to cry');
         $I->fillField('#slug',  'not-found');
         $I->fillField('#body',  $body);
 
-        $I->click('Save Resource', '#savecontinuebutton');
+        $I->submitForm('form[name="content_edit"]', ['content_edit' => ['save' => 1]]);
 
         $I->see('Well, this is kind of embarrassing!');
         $I->see('You have what we call in the business, a 404.');
@@ -383,7 +384,7 @@ class BackendAdminCest extends AbstractAcceptanceTest
     }
 
     /**
-     * Check that admin user can view all ContentTypes
+     * Check that admin user can view all ContentTypes.
      *
      * @param \AcceptanceTester $I
      */
@@ -432,15 +433,15 @@ class BackendAdminCest extends AbstractAcceptanceTest
         $I->see('New Showcase');
         $I->click('New Showcase');
 
-        $I->fillField('#title',  'Showcase');
-
-        $I->click('Save Showcase', '#savecontinuebutton');
+        $I->fillField('#title', 'A Strange Drop Bear');
+        $I->submitForm('form[name="content_edit"]', ['content_edit' => ['save' => 1]]);
 
         $I->see('The new Showcase has been saved.');
+        $I->seeLink('A Strange Drop Bear', '/bolt/editcontent/showcases/');
     }
 
     /**
-     * Edit site permissions
+     * Edit site permissions.
      *
      * @param \AcceptanceTester $I
      */
@@ -453,15 +454,15 @@ class BackendAdminCest extends AbstractAcceptanceTest
         $I->amOnPage('/bolt/file/edit/config/permissions.yml');
 
         $yaml = $I->getUpdatedPermissions();
-        $I->fillField('#form_contents', $yaml);
-        $I->click('Save', '#saveeditfile');
+        $I->fillField('#file_edit_contents', $yaml);
+        $I->click('Save', '#file_edit_save');
 
         $I->amOnPage('/bolt/file/edit/config/permissions.yml');
         $I->see('change-ownership: [ ]');
     }
 
     /**
-     * Edit the taxonomy
+     * Edit the taxonomy.
      *
      * @param \AcceptanceTester $I
      */
@@ -474,15 +475,15 @@ class BackendAdminCest extends AbstractAcceptanceTest
         $I->amOnPage('/bolt/file/edit/config/taxonomy.yml');
 
         $yaml = $I->getUpdatedTaxonomy();
-        $I->fillField('#form_contents', $yaml);
-        $I->click('Save', '#saveeditfile');
+        $I->fillField('#file_edit_contents', $yaml);
+        $I->click('Save', '#file_edit_save');
 
         $I->amOnPage('/bolt/file/edit/config/taxonomy.yml');
         $I->see('options: [books, events, fun, life, love, movies, music, news]');
     }
 
     /**
-     * Edit the menu file
+     * Edit the menu file.
      *
      * @param \AcceptanceTester $I
      */
@@ -495,8 +496,8 @@ class BackendAdminCest extends AbstractAcceptanceTest
         $I->amOnPage('/bolt/file/edit/config/menu.yml');
 
         $yaml = $I->getUpdatedMenu();
-        $I->fillField('#form_contents', $yaml);
-        $I->click('Save', '#saveeditfile');
+        $I->fillField('#file_edit_contents', $yaml);
+        $I->click('Save', '#file_edit_save');
 
         $I->amOnPage('/bolt/file/edit/config/menu.yml');
         $I->see('Showcases Listing');
@@ -504,7 +505,7 @@ class BackendAdminCest extends AbstractAcceptanceTest
     }
 
     /**
-     * Edit the routing file
+     * Edit the routing file.
      *
      * @param \AcceptanceTester $I
      */
@@ -517,8 +518,8 @@ class BackendAdminCest extends AbstractAcceptanceTest
         $I->amOnPage('/bolt/file/edit/config/routing.yml');
 
         $yaml = $I->getUpdatedRouting();
-        $I->fillField('#form_contents', $yaml);
-        $I->click('Save', '#saveeditfile');
+        $I->fillField('#file_edit_contents', $yaml);
+        $I->click('Save', '#file_edit_save');
 
         $I->amOnPage('/bolt/file/edit/config/routing.yml');
         $I->see('pagebinding:');
@@ -527,7 +528,7 @@ class BackendAdminCest extends AbstractAcceptanceTest
     }
 
     /**
-     * Check the we can use the system log
+     * Check the we can use the system log.
      *
      * @param \AcceptanceTester $I
      */
@@ -554,7 +555,7 @@ class BackendAdminCest extends AbstractAcceptanceTest
     }
 
     /**
-     * Check the we can use the change log
+     * Check the we can use the change log.
      *
      * @param \AcceptanceTester $I
      */
@@ -586,7 +587,7 @@ class BackendAdminCest extends AbstractAcceptanceTest
     }
 
     /**
-     * Clear the cache
+     * Clear the cache.
      *
      * @param \AcceptanceTester $I
      */
@@ -603,7 +604,7 @@ class BackendAdminCest extends AbstractAcceptanceTest
     }
 
     /**
-     * Logout the admin user
+     * Logout the admin user.
      *
      * @param \AcceptanceTester $I
      */

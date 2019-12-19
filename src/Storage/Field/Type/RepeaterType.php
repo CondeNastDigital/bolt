@@ -1,10 +1,18 @@
 <?php
+
 namespace Bolt\Storage\Field\Type;
 
+use Bolt\Common\Json;
 use Bolt\Exception\FieldConfigurationException;
+use Bolt\Storage\Entity;
 use Bolt\Storage\Field\Collection\RepeatingFieldCollection;
 use Bolt\Storage\Mapping\ClassMetadata;
+use Bolt\Storage\Query\Filter;
+use Bolt\Storage\Query\QueryInterface;
+use Bolt\Storage\Query\QueryParameterParser;
+use Bolt\Storage\Query\SelectQuery;
 use Bolt\Storage\QuerySet;
+use Bolt\Storage\Repository\FieldValueRepository;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Doctrine\DBAL\Types\Type;
 
@@ -17,18 +25,103 @@ use Doctrine\DBAL\Types\Type;
 class RepeaterType extends FieldTypeBase
 {
     /**
-     * For repeating fields, the load method adds extra joins and selects to the query that
-     * fetches the related records from the field and field value tables in the same query as the content fetch.
+     * Repeater fields can allow filters on the value of a sub-field
+     *
+     * For example the following queries:
+     *     'repeatfield', {'repeatstatus=1'}
+     *     'repeatfield', {'repeattitle=%Test%'}.
+     *
+     * Because the search is actually on the join table, we replace the
+     * expression to filter the join side rather than on the main side.
+     *
+     * @param QueryInterface $query
+     * @param ClassMetadata  $metadata
+     *
+     * @return QueryBuilder|null
+     */
+    public function query(QueryInterface $query, ClassMetadata $metadata)
+    {
+        $field = $this->mapping['fieldname'];
+
+        /** @var SelectQuery $query */
+        foreach ($query->getFilters() as $filter) {
+            /** @var Filter $filter */
+            if ($filter->getKey() == $field) {
+                $this->rewriteQueryFilterParameters($filter, $query, $field);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * This method does an in-place modification of a generic ContentType.field
+     * query to the format actually used in the raw SQL. For instance a simple
+     * query might say `entries.repeater = 'title=%Test%'` but now we are in
+     * the context of entries the actual SQL fragment needs to do a sub-select
+     * on the bolt_field_value table and only return the content_ids where this
+     * query matches so this method rewrites the SQL fragment just before the
+     * query gets sent.
+     *
+     * @param Filter      $filter
+     * @param SelectQuery $query
+     * @param string      $field
+     */
+    protected function rewriteQueryFilterParameters(Filter $filter, SelectQuery $query, $field)
+    {
+        $boltName = $query->getContentType();
+
+        $newExpression = $this->em->createExpressionBuilder();
+        $count = 0;
+        foreach ($query->getWhereParametersFor($field) as $paramKey => $paramValue) {
+            $parameterParts = explode('_', $paramKey);
+            array_pop($parameterParts);
+            array_shift($parameterParts);
+            $subkey = join('_', $parameterParts);
+
+            $parser = new QueryParameterParser($newExpression);
+            $parsed = $parser->parseValue($paramValue);
+            $placeholder = $paramKey;
+            $q = $this->em->createQueryBuilder();
+            $q->addSelect('content_id')
+                ->from($this->mapping['tables']['field_value'], 'f')
+                ->andWhere("f.content_id = _$boltName.id")
+                ->andWhere("f.contenttype = '$boltName'")
+                ->andWhere("f.name = '$field'")
+                ->andWhere("f.fieldname = '" . $subkey . "'")
+                ->andWhere(
+                    $q->expr()
+                        ->orX()
+                        ->add(
+                            $q->expr()->{$parsed['operator']}('f.value_text', ':' . $placeholder)
+                        )
+                        ->add(
+                            $q->expr()->{$parsed['operator']}('f.value_string', ':' . $placeholder)
+                        )
+                );
+            $filter->setParameter($placeholder, $parsed['value']);
+            $count++;
+        }
+        $comp = $newExpression->andX($newExpression->in('_' . $boltName . '.id', $q->getSQL()));
+        $filter->setKey('_' . $boltName . '.id');
+        $filter->setExpression($comp);
+    }
+
+    /**
+     * For repeating fields, the load method adds extra joins and selects to
+     * the query that fetches the related records from the field and field
+     * value tables in the same query as the content fetch.
      *
      * @param QueryBuilder  $query
      * @param ClassMetadata $metadata
      *
-     * @return void
+     * @return QueryBuilder|null
      */
     public function load(QueryBuilder $query, ClassMetadata $metadata)
     {
         $field = $this->mapping['fieldname'];
         $boltname = $metadata->getBoltName();
+        $table = $this->mapping['tables']['field_value'];
 
         $from = $query->getQueryPart('from');
 
@@ -38,17 +131,15 @@ class RepeaterType extends FieldTypeBase
             $alias = $from[0]['table'];
         }
 
-        $dummy = 'f_' . $field;
+        $subQuery = '(SELECT ' . $this->getPlatformGroupConcat($query) . " FROM $table f WHERE f.content_id = $alias.id AND f.contenttype='$boltname' AND f.name = '$field') as $field";
+        $query->addSelect($subQuery);
 
-        $query->addSelect($this->getPlatformGroupConcat($field, $query))
-            ->leftJoin(
-                $alias,
-                $this->mapping['tables']['field_value'],
-                $dummy,
-                $dummy . ".content_id = $alias.id AND " . $dummy . ".contenttype='$boltname' AND " . $dummy . ".name = '$field'"
-            );
+        return null;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function persist(QuerySet $queries, $entity)
     {
         $this->normalize($entity);
@@ -63,13 +154,13 @@ class RepeaterType extends FieldTypeBase
         }
 
         $toDelete = $collection->update($proposed);
-        $repo = $this->em->getRepository('Bolt\Storage\Entity\FieldValue');
+        $repo = $this->em->getRepository(Entity\FieldValue::class);
 
         $queries->onResult(
             function ($query, $result, $id) use ($repo, $collection, $toDelete) {
                 foreach ($collection as $entity) {
                     $entity->content_id = $id;
-                    $repo->save($entity, $silenceEvents = true);
+                    $repo->save($entity, true);
                 }
 
                 foreach ($toDelete as $entity) {
@@ -79,8 +170,12 @@ class RepeaterType extends FieldTypeBase
         );
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function hydrate($data, $entity)
     {
+        /** @var string $key */
         $key = $this->mapping['fieldname'];
         $collection = new RepeatingFieldCollection($this->em, $this->mapping);
         $collection->setName($key);
@@ -93,12 +188,12 @@ class RepeaterType extends FieldTypeBase
         }
 
         // This block separately handles JSON content for Templatefields
-        if (isset($data[$key]) && $this->isJson($data[$key])) {
+        if (isset($data[$key]) && Json::test($data[$key])) {
             $originalMapping[$key]['fields'] = $this->mapping['fields'];
             $originalMapping[$key]['type'] = 'repeater';
             $mapping = $this->em->getMapper()->getRepeaterMapping($originalMapping);
 
-            $decoded = json_decode($data[$key], true);
+            $decoded = Json::parse($data[$key]);
             $collection = new RepeatingFieldCollection($this->em, $mapping);
             $collection->setName($key);
 
@@ -120,11 +215,12 @@ class RepeaterType extends FieldTypeBase
             $split = explode('_', $fieldKey);
             $id = array_pop($split);
             $group = array_pop($split);
-            $field = join('_', $split);
+            $field = implode('_', $split);
             $values[$field][$group][] = $id;
         }
 
         if (isset($values[$key]) && count($values[$key])) {
+            ksort($values[$key]);
             foreach ($values[$key] as $group => $refs) {
                 $collection->addFromReferences($refs, $group);
             }
@@ -153,7 +249,7 @@ class RepeaterType extends FieldTypeBase
      * Normalize step ensures that we have correctly hydrated objects at the collection
      * and entity level.
      *
-     * @param $entity
+     * @param object $entity
      */
     public function normalize($entity)
     {
@@ -187,40 +283,39 @@ class RepeaterType extends FieldTypeBase
     }
 
     /**
-     * Get platform specific group_concat token for provided column
+     * Get platform specific group_concat token for provided column.
      *
-     * @param string       $alias
      * @param QueryBuilder $query
      *
      * @return string
      */
-    protected function getPlatformGroupConcat($alias, QueryBuilder $query)
+    protected function getPlatformGroupConcat(QueryBuilder $query)
     {
         $platform = $query->getConnection()->getDatabasePlatform()->getName();
 
-        $field = $this->mapping['fieldname'];
-        $dummy = 'f_' . $field;
-
         switch ($platform) {
             case 'mysql':
-                return "GROUP_CONCAT(DISTINCT CONCAT_WS('_', " . $dummy . '.name, ' . $dummy . '.grouping, ' . $dummy . ".id)) as $alias";
+                return "GROUP_CONCAT(DISTINCT CONCAT_WS('_', f.name, f.grouping, f.id))";
             case 'sqlite':
-                return 'GROUP_CONCAT(DISTINCT ' . $dummy . ".name||'_'||" . $dummy . ".grouping||'_'||" . $dummy . ".id) as $alias";
+                return "GROUP_CONCAT(DISTINCT f.name||'_'||f.grouping||'_'||f.id)";
             case 'postgresql':
-                return 'string_agg(' . $dummy . ".name||'_'||" . $dummy . ".grouping||'_'||" . $dummy . ".id, ',' ORDER BY " . $dummy . ".grouping) as $alias";
+                return "string_agg(concat_ws('_', f.name,f.grouping,f.id), ',' ORDER BY f.grouping)";
         }
+
+        throw new \RuntimeException(sprintf('Configured database platform "%s" is not supported.', $platform));
     }
 
     /**
      * Get existing fields for this record.
      *
-     * @param mixed $entity
+     * @param object $entity
      *
      * @return array
      */
     protected function getExistingFields($entity)
     {
-        $repo = $this->em->getRepository('Bolt\Storage\Entity\FieldValue');
+        /** @var FieldValueRepository $repo */
+        $repo = $this->em->getRepository(Entity\FieldValue::class);
 
         return $repo->getExistingFields($entity->getId(), $entity->getContenttype(), $this->mapping['fieldname']);
     }
@@ -230,7 +325,7 @@ class RepeaterType extends FieldTypeBase
      *
      * @param QuerySet $queries
      * @param array    $changes
-     * @param $entity
+     * @param object   $entity
      */
     protected function addToInsertQuery(QuerySet $queries, $changes, $entity)
     {
@@ -250,7 +345,7 @@ class RepeaterType extends FieldTypeBase
                 function ($query, $result, $id) use ($repo, $fieldValue) {
                     if ($result === 1 && $id) {
                         $fieldValue->setContent_id($id);
-                        $repo->save($fieldValue, $silenceEvents = true);
+                        $repo->save($fieldValue, true);
                     }
                 }
             );
@@ -272,9 +367,8 @@ class RepeaterType extends FieldTypeBase
      *
      * @param QuerySet $queries
      * @param array    $changes
-     * @param $entity
      */
-    protected function addToUpdateQuery(QuerySet $queries, $changes, $entity)
+    protected function addToUpdateQuery(QuerySet $queries, $changes)
     {
         foreach ($changes as $fieldValue) {
             $repo = $this->em->getRepository(get_class($fieldValue));
@@ -288,7 +382,7 @@ class RepeaterType extends FieldTypeBase
             $queries->onResult(
                 function ($query, $result, $id) use ($repo, $fieldValue) {
                     if ($result === 1) {
-                        $repo->save($fieldValue, $silenceEvents = true);
+                        $repo->save($fieldValue, true);
                     }
                 }
             );
@@ -296,11 +390,11 @@ class RepeaterType extends FieldTypeBase
     }
 
     /**
-     * @param $field
+     * @param string $field
      *
      * @throws FieldConfigurationException
      *
-     * @return mixed
+     * @return FieldTypeBase
      */
     protected function getFieldType($field)
     {
@@ -335,6 +429,6 @@ class RepeaterType extends FieldTypeBase
      */
     public function getStorageType()
     {
-        return Type::getType('json_array');
+        return Type::getType('json');
     }
 }

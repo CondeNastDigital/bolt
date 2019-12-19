@@ -2,7 +2,6 @@
 
 namespace Bolt\Storage\ContentRequest;
 
-
 use Bolt\Config;
 use Bolt\Exception\AccessControlException;
 use Bolt\Helpers\Input;
@@ -13,6 +12,8 @@ use Bolt\Storage\EntityManager;
 use Bolt\Translation\Translator as Trans;
 use Bolt\Users;
 use Carbon\Carbon;
+use Cocur\Slugify\Slugify;
+use Cocur\Slugify\SlugifyInterface;
 use Psr\Log\LoggerInterface;
 use RecursiveArrayIterator;
 use RecursiveIteratorIterator;
@@ -44,6 +45,8 @@ class Save
     protected $loggerFlash;
     /** @var UrlGeneratorInterface */
     protected $urlGenerator;
+    /** @var SlugifyInterface */
+    private $slugify;
 
     /**
      * Constructor function.
@@ -55,6 +58,7 @@ class Save
      * @param LoggerInterface       $loggerSystem
      * @param FlashLoggerInterface  $loggerFlash
      * @param UrlGeneratorInterface $urlGenerator
+     * @param SlugifyInterface      $slugify
      */
     public function __construct(
         EntityManager $em,
@@ -63,7 +67,8 @@ class Save
         LoggerInterface $loggerChange,
         LoggerInterface $loggerSystem,
         FlashLoggerInterface $loggerFlash,
-        UrlGeneratorInterface $urlGenerator
+        UrlGeneratorInterface $urlGenerator,
+        SlugifyInterface $slugify = null
     ) {
         $this->em = $em;
         $this->config = $config;
@@ -72,25 +77,26 @@ class Save
         $this->loggerSystem = $loggerSystem;
         $this->loggerFlash = $loggerFlash;
         $this->urlGenerator = $urlGenerator;
+        $this->slugify = $slugify;
     }
 
     /**
      * Do the save for a POSTed record.
      *
-     * @param array   $formValues
-     * @param array   $contenttype  The contenttype data
-     * @param integer $id           The record ID
-     * @param boolean $new          If TRUE this is a new record
-     * @param string  $returnTo
-     * @param string  $editReferrer
+     * @param array  $formValues
+     * @param array  $contentType  The ContentType data
+     * @param int    $id           The record ID
+     * @param bool   $new          If TRUE this is a new record
+     * @param string $returnTo
+     * @param string $editReferrer
      *
      * @throws AccessControlException
      *
      * @return Response
      */
-    public function action(array $formValues, array $contenttype, $id, $new, $returnTo, $editReferrer)
+    public function action(array $formValues, array $contentType, $id, $new, $returnTo, $editReferrer)
     {
-        $contentTypeSlug = $contenttype['slug'];
+        $contentTypeSlug = $contentType['slug'];
         $repo = $this->em->getRepository($contentTypeSlug);
 
         // If we have an ID now, this is an existing record
@@ -99,13 +105,13 @@ class Save
             $oldContent = clone $content;
             $oldStatus = $content['status'];
         } else {
-            $content = $repo->create(['contenttype' => $contentTypeSlug, 'status' => $contenttype['default_status']]);
+            $content = $repo->create(['contenttype' => $contentTypeSlug, 'status' => $contentType['default_status']]);
             $oldContent = null;
             $oldStatus = 'draft';
         }
 
         // Don't allow spoofing the ID.
-        if ($content->getId() !== null && (integer) $id !== $content->getId()) {
+        if ($content->getId() !== null && (int) $id !== $content->getId()) {
             if ($returnTo === 'ajax') {
                 throw new AccessControlException("Don't try to spoof the id!");
             }
@@ -114,14 +120,14 @@ class Save
             return new RedirectResponse($this->generateUrl('dashboard'));
         }
 
-        $this->setPostedValues($content, $formValues, $contenttype);
+        $this->setPostedValues($content, $formValues, $contentType);
         $this->setTransitionStatus($content, $contentTypeSlug, $id, $oldStatus);
 
         // Get the associated record change comment
         $comment = isset($formValues['changelog-comment']) ? $formValues['changelog-comment'] : '';
 
         // Save the record
-        return $this->saveContentRecord($content, $oldContent, $contenttype, $new, $comment, $returnTo, $editReferrer);
+        return $this->saveContentRecord($content, $oldContent, $contentType, $new, $comment, $returnTo, $editReferrer);
     }
 
     /**
@@ -130,12 +136,12 @@ class Save
      * We act as if a status *transition* were requested and fallback to the old
      * status otherwise.
      *
-     * @param Entity\Entity $content
-     * @param string        $contentTypeSlug
-     * @param integer       $id
-     * @param string        $oldStatus
+     * @param Entity\Content $content
+     * @param string         $contentTypeSlug
+     * @param int            $id
+     * @param string         $oldStatus
      */
-    private function setTransitionStatus(Entity\Entity $content, $contentTypeSlug, $id, $oldStatus)
+    private function setTransitionStatus(Entity\Content $content, $contentTypeSlug, $id, $oldStatus)
     {
         $canTransition = $this->users->isContentStatusTransitionAllowed($oldStatus, $content->getStatus(), $contentTypeSlug, $id);
         if (!$canTransition) {
@@ -162,7 +168,7 @@ class Save
         $user = $this->users->getCurrentUser();
         if ($id = $content->getId()) {
             // Owner is set explicitly, is current user is allowed to do this?
-            if (isset($formValues['ownerid']) && (integer) $formValues['ownerid'] !== $content->getOwnerid()) {
+            if (isset($formValues['ownerid']) && (int) $formValues['ownerid'] !== $content->getOwnerid()) {
                 if (!$this->users->isAllowed("contenttype:{$contentType['slug']}:change-ownership:$id")) {
                     throw new AccessControlException('Changing ownership is not allowed.');
                 }
@@ -187,10 +193,22 @@ class Save
         foreach ($formValues as $name => $value) {
             if ($name === 'relation' || $name === 'taxonomy') {
                 continue;
-            } else {
-                $content->set($name, (empty($value) || $this->isEmptyArray($value)) ? null : $value);
             }
+            $content->set($name, (empty($value) || $this->isEmptyArray($value)) ? null : $value);
         }
+        foreach ($contentType['fields'] as $fieldName => $data) {
+            if ($data['type'] !== 'slug' || !isset($formValues[$fieldName])) {
+                continue;
+            }
+            if ($this->slugify !== null) {
+                $snail = $this->slugify->slugify($formValues[$fieldName]);
+            } else {
+                // @deprecated Required for BC overrides
+                $snail = Slugify::create()->slugify($formValues[$fieldName]);
+            }
+            $content->set($fieldName, $snail);
+        }
+
         $this->setPostedRelations($content, $formValues);
         $this->setPostedTaxonomies($content, $formValues);
     }
@@ -230,12 +248,12 @@ class Save
      * @param Entity\Content      $content
      * @param Entity\Content|null $oldContent
      * @param array               $contentType
-     * @param boolean             $new
+     * @param bool                $new
      * @param string              $comment
      * @param string              $returnTo
      * @param string              $editReferrer
      *
-     * @return Response
+     * @return Response|null
      */
     private function saveContentRecord(Entity\Content $content, $oldContent, array $contentType, $new, $comment, $returnTo, $editReferrer)
     {
@@ -253,53 +271,55 @@ class Save
 
         // Log the change
         if ($new) {
-            $this->loggerFlash->success(Trans::__('contenttypes.generic.saved-new', ['%contenttype%' => $contentType['slug']]));
+            $this->loggerFlash->success(Trans::__('contenttypes.generic.saved-new', ['%contenttype%' => $contentType['singular_name']]));
             $this->loggerSystem->info('Created: ' . $content->getTitle(), ['event' => 'content']);
         } else {
-            $this->loggerFlash->success(Trans::__('contenttypes.generic.saved-changes', ['%contenttype%' => $contentType['slug']]));
+            $this->loggerFlash->success(Trans::__('contenttypes.generic.saved-changes', ['%contenttype%' => $contentType['singular_name']]));
             $this->loggerSystem->info('Saved: ' . $content->getTitle(), ['event' => 'content']);
         }
 
-        /*
-         * We now only get a returnto parameter if we are saving a new
-         * record and staying on the same page, i.e. "Save {contenttype}"
-         */
-        if ($returnTo) {
-            if ($returnTo === 'new') {
-                return new RedirectResponse(
-                    $this->generateUrl(
-                        'editcontent',
-                        [
-                            'contenttypeslug' => $contentType['slug'],
-                            'id'              => $id,
-                            '#'               => $returnTo,
-                        ]
-                    )
-                );
-            } elseif ($returnTo === 'saveandnew') {
-                return new RedirectResponse(
-                    $this->generateUrl(
-                        'editcontent',
-                        [
-                            'contenttypeslug' => $contentType['slug'],
-                            '#'               => $returnTo,
-                        ]
-                    )
-                );
-            } elseif ($returnTo === 'ajax') {
-                return $this->createJsonUpdate($content, true);
-            } elseif ($returnTo === 'test') {
-                return $this->createJsonUpdate($content, false);
+        if ($new && ($returnTo === 'save')) {
+            $redirectUri = $this->generateUrl(
+                'editcontent',
+                [
+                    'contenttypeslug' => $contentType['slug'],
+                    'id'              => $id,
+                ]
+            );
+
+            return new RedirectResponse($redirectUri);
+        } elseif ($returnTo === 'ajax') {
+            return $this->createJsonUpdate($content, true);
+        } elseif ($returnTo === 'save_create') {
+            $redirectUri = $this->generateUrl(
+                'editcontent',
+                [
+                    'contenttypeslug' => $contentType['slug'],
+                    '_fragment'       => $returnTo,
+                ]
+            );
+
+            return new RedirectResponse($redirectUri);
+        } elseif ($returnTo === 'save_return') {
+            // No returnto, so we go back to the 'overview' for this contenttype.
+            // check if a pager was set in the referrer - if yes go back there
+            if ($editReferrer) {
+                return new RedirectResponse($editReferrer);
             }
+
+            $redirectUri = $this->generateUrl(
+                'overview',
+                [
+                    'contenttypeslug' => $contentType['slug']
+                ]
+            );
+
+            return new RedirectResponse($redirectUri);
+        } elseif ($returnTo === 'test') {
+            return $this->createJsonUpdate($content, false);
         }
 
-        // No returnto, so we go back to the 'overview' for this contenttype.
-        // check if a pager was set in the referrer - if yes go back there
-        if ($editReferrer) {
-            return new RedirectResponse($editReferrer);
-        } else {
-            return new RedirectResponse($this->generateUrl('overview', ['contenttypeslug' => $contentType['slug']]));
-        }
+        return null;
     }
 
     /**
@@ -325,6 +345,8 @@ class Save
                     $formValues[$key] = [];
                 } elseif ($values['type'] === 'checkbox') {
                     $formValues[$key] = 0;
+                } elseif ($values['type'] === 'repeater' || $values['type'] === 'block') {
+                    $formValues[$key] = [];
                 }
             }
         }
@@ -337,7 +359,7 @@ class Save
      * save events.
      *
      * @param Entity\Content $content
-     * @param boolean        $flush
+     * @param bool           $flush
      *
      * @return JsonResponse
      */
@@ -383,7 +405,7 @@ class Save
      * Add a change log entry to track the change.
      *
      * @param string              $contentType
-     * @param integer             $contentId
+     * @param int                 $contentId
      * @param Entity\Content      $newContent
      * @param Entity\Content|null $oldContent
      * @param string|null         $comment
@@ -406,7 +428,7 @@ class Save
     }
 
     /**
-     * Shortcut for {@see UrlGeneratorInterface::generate}
+     * Shortcut for {@see UrlGeneratorInterface::generate}.
      *
      * @param string $name          The name of the route
      * @param array  $params        An array of parameters

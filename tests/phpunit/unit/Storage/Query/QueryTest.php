@@ -2,6 +2,9 @@
 
 namespace Bolt\Tests\Storage\Query;
 
+use Bolt\Storage\Entity\Content;
+use Bolt\Storage\Query\QueryResultset;
+use Bolt\Storage\Query\QueryScopeInterface;
 use Bolt\Tests\BoltUnitTest;
 
 /**
@@ -18,10 +21,10 @@ class QueryTest extends BoltUnitTest
 
         $results = $app['query']->getContent('pages', ['id' => '<10']);
 
-        $this->assertInstanceOf('Bolt\Storage\Query\QueryResultset', $results);
+        $this->assertInstanceOf(QueryResultset::class, $results);
 
         $results = $app['query']->getContent('pages', ['datepublish' => '>now || !last week', 'datedepublish' => '<1 year ago']);
-        $this->assertInstanceOf('Bolt\Storage\Query\QueryResultset', $results);
+        $this->assertInstanceOf(QueryResultset::class, $results);
     }
 
     public function testGetContentReturnSingle()
@@ -30,6 +33,38 @@ class QueryTest extends BoltUnitTest
         $this->addSomeContent();
 
         $results = $app['query']->getContent('pages', ['id' => '<10', 'returnsingle' => true]);
-        $this->assertEquals(1, count($results));
+        $this->assertInstanceOf(Content::class, $results);
+    }
+
+    public function testGetContentByScope()
+    {
+        $app = $this->getApp();
+        $this->addSomeContent();
+
+        $mockScope = $this->getMockBuilder(QueryScopeInterface::class)
+            ->setMethods(['onQueryExecute'])
+            ->getMock()
+        ;
+        $mockScope->expects($this->once())->method('onQueryExecute');
+
+        $query = $app['query'];
+        $query->addScope('test', $mockScope);
+        $query->getContentByScope('test', 'pages', ['id' => '<10']);
+    }
+
+    public function testGetContentByScopeFiresCorrectly()
+    {
+        $app = $this->getApp();
+        $this->addSomeContent();
+
+        $mockScope = $this->getMockBuilder(QueryScopeInterface::class)
+            ->setMethods(['onQueryExecute'])
+            ->getMock()
+        ;
+        $mockScope->expects($this->never())->method('onQueryExecute');
+
+        $query = $app['query'];
+        $query->addScope('test', $mockScope);
+        $query->getContentByScope('anothertest', 'pages', ['id' => '<10']);
     }
 }

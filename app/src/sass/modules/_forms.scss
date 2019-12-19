@@ -104,7 +104,6 @@ fieldset.checkbox {
         &:hover {
             color: #444;
             background-color: #FFF !important;
-            border-bottom: 0;
         }
 
         @media (max-width: 767px) {
@@ -138,7 +137,7 @@ div.datetime-container {
     }
 }
 
-form .progress {
+form .complexity-progress {
     height: 7px;
     margin: 2px 0 0 0;
 }

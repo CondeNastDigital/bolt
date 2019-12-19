@@ -2,6 +2,7 @@
 
 namespace Bolt\Extension;
 
+use Bolt\Common\Deprecated;
 use Pimple as Container;
 use Symfony\Component\Console\Command\Command;
 
@@ -44,6 +45,8 @@ trait NutTrait
      */
     protected function addConsoleCommand(Command $command)
     {
+        Deprecated::method(3.0, 'registerNutCommands');
+
         $app = $this->getContainer();
         $app['nut.commands.add']($command);
     }

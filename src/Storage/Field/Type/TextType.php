@@ -2,35 +2,26 @@
 
 namespace Bolt\Storage\Field\Type;
 
-use Bolt\Storage\QuerySet;
+use Bolt\Storage\Field\Sanitiser\SanitiserAwareInterface;
+use Bolt\Storage\Field\Sanitiser\SanitiserAwareTrait;
 
 /**
  * This is one of a suite of basic Bolt field transformers that handles
  * the lifecycle of a field from pre-query to persist.
  *
+ * Note: The persist() override was removed, because it was sanitising fields
+ * when not desired. See https://github.com/bolt/bolt/issues/5789 for details.
+ *
+ * Note: After the removal of the persist() method, we can use the
+ * SanitiserAwareTrait again, ensuring editors don't inadvertently insert
+ * javascript in `type: text` fields. Hopefully this will also help a bit in
+ * the never-ending "OMFG, an editor can self-XSS!!1!one!" discussions.
+ *
  * @author Ross Riley <riley.ross@gmail.com>
  */
-class TextType extends FieldTypeBase
+class TextType extends FieldTypeBase implements SanitiserAwareInterface
 {
-    /**
-     * {@inheritdoc}
-     */
-    public function persist(QuerySet $queries, $entity)
-    {
-        $key = $this->mapping['fieldname'];
-        $value = $entity->get($key);
-
-        // Note: The following section is commented out, because it was
-        // sanitising fields when not desired. See #5789, for details.
-
-        // Only sanitize when type is string, and not when the name is one of the Bolt-system ones.
-        // Finally, we skip this if the value is empty-ish, e.g. '' or `null`.
-        // if ($this->mapping['type'] === 'string' && !in_array($key, ['username', 'status']) && !empty($value)) {
-        //     $entity->set($key, $this->getSanitiser()->sanitise($value));
-        // }
-
-        parent::persist($queries, $entity);
-    }
+    use SanitiserAwareTrait;
 
     /**
      * {@inheritdoc}

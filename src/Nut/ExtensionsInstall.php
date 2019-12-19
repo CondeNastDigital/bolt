@@ -2,18 +2,22 @@
 
 namespace Bolt\Nut;
 
+use Bolt\Composer\Satis\PingService;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Nut command to install an extension
+ * Nut command to install an extension.
  *
  * @author Ross Riley <riley.ross@gmail.com>
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
 class ExtensionsInstall extends BaseCommand
 {
+    /** @var PingService */
+    private $pinger;
+
     /**
      * {@inheritdoc}
      */
@@ -28,24 +32,37 @@ class ExtensionsInstall extends BaseCommand
         ;
     }
 
+    protected function initialize(InputInterface $input, OutputInterface $output)
+    {
+        parent::initialize($input, $output);
+        $this->pinger = $this->app['extend.ping'];
+    }
+
     /**
      * {@inheritdoc}
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
+        if (!$this->pinger->ping(true, $output->getVerbosity() >= OutputInterface::VERBOSITY_DEBUG)) {
+            $this->io->error($this->pinger->getMessages()->toArray());
+
+            return 1;
+        }
+
         $name = $input->getArgument('name');
         $version = $input->getArgument('version');
 
-        $output->write("\n<info>Starting install of {$name}:{$version}… </info>");
+        $this->io->title("Installing {$name}:{$version}");
 
         $result = $this->app['extend.manager']->requirePackage(['name' => $name, 'version' => $version]);
+        $this->io->writeln(sprintf('<comment>%s</comment>', $this->app['extend.action.io']->getOutput()));
         if ($result === 0) {
-            $output->write("<info>[DONE]</info>\n");
-            $this->auditLog(__CLASS__, "Installed extension $name");
+            $this->io->success('Installation successful');
+            $this->auditLog(__CLASS__, 'Autoloaders updated');
         } else {
-            $output->write("<error>[FAILED]</error>\n");
+            $this->io->error('Installation failed');
         }
 
-        $output->writeln(sprintf('<comment>%s</comment>', $this->app['extend.action.io']->getOutput()), OutputInterface::OUTPUT_PLAIN);
+        return $result;
     }
 }

@@ -18,7 +18,7 @@ class ResolvedExtension
     protected $innerExtension;
     /** @var bool */
     protected $enabled;
-    /** @var PackageDescriptor */
+    /** @var PackageDescriptor|null */
     protected $descriptor;
 
     /**
@@ -42,7 +42,7 @@ class ResolvedExtension
     }
 
     /**
-     * Returns a unique identifier for the extension, such as: Vendor/Name
+     * Returns a unique identifier for the extension, such as: Vendor/Name.
      *
      * @return string
      */
@@ -62,13 +62,33 @@ class ResolvedExtension
     }
 
     /**
-     * Returns the extension hman friendly name.
+     * Returns the extension vendor.
+     *
+     * @return string
+     */
+    public function getVendor()
+    {
+        return $this->innerExtension->getVendor();
+    }
+
+    /**
+     * Returns the extension human friendly name.
      *
      * @return string
      */
     public function getDisplayName()
     {
         return $this->innerExtension->getDisplayName();
+    }
+
+    /**
+     * Returns the extension class name.
+     *
+     * @return string
+     */
+    public function getClassName()
+    {
+        return get_class($this->innerExtension);
     }
 
     /**
@@ -82,28 +102,9 @@ class ResolvedExtension
     }
 
     /**
-     * Returns the extension's directory path relative to the extension root.
-     *
-     * @return string
-     */
-    public function getRelativePath()
-    {
-        return $this->descriptor->getPath();
-    }
-
-    /**
-     * Return the extension's base URL.
-     *
-     * @return string
-     */
-    public function getUrl()
-    {
-    }
-
-    /**
      * Return the extension's package descriptor.
      *
-     * @return PackageDescriptor
+     * @return PackageDescriptor|null
      */
     public function getDescriptor()
     {
@@ -117,7 +118,7 @@ class ResolvedExtension
      *
      * @return ResolvedExtension
      */
-    public function setDescriptor($descriptor)
+    public function setDescriptor(PackageDescriptor $descriptor = null)
     {
         $this->descriptor = $descriptor;
 
@@ -125,13 +126,23 @@ class ResolvedExtension
     }
 
     /**
-     * Return the extension's install type, either 'composer' or 'local'.
+     * Returns whether the extension is managed by Bolt. This is the opposite of "bundled".
      *
-     * @return string
+     * @return bool
      */
-    public function getInstallType()
+    public function isManaged()
     {
-        return $this->descriptor->getType();
+        return (bool) $this->descriptor;
+    }
+
+    /**
+     * Returns whether the extension is bundled by user. This is the opposite of "managed".
+     *
+     * @return bool
+     */
+    public function isBundled()
+    {
+        return !$this->isManaged();
     }
 
     /**
@@ -165,6 +176,6 @@ class ResolvedExtension
      */
     public function isValid()
     {
-        return $this->descriptor->isValid();
+        return $this->descriptor ? $this->descriptor->isValid() : true;
     }
 }

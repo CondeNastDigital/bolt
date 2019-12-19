@@ -1,12 +1,15 @@
 <?php
+
 namespace Bolt\Tests\Menu;
 
+use Bolt\Legacy\Content;
+use Bolt\Legacy\Storage;
 use Bolt\Menu\MenuBuilder;
 use Bolt\Tests\BoltUnitTest;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Class to test src/Helper/MenuBuilder.
+ * Class to test src/Menu/MenuBuilder.
  *
  * @author Sufijen Bani <bolt@sbani.net>
  */
@@ -183,14 +186,24 @@ class MenuBuilderTest extends BoltUnitTest
 
     /**
      * @dataProvider populateItemFromRecordProvider
+     *
+     * @param array      $expected
+     * @param array|null $content
+     * @param array      $item
+     * @param string     $link
      */
     public function testpopulateItemFromRecord($expected, $content, $item, $link)
     {
         $app = $this->getApp();
         $app['request'] = Request::createFromGlobals();
 
-        if (false !== $content) {
-            $contentMock = $this->getMock('Bolt\Legacy\Content', ['getContent', 'link'], [$app], '', false);
+        $contentMock = null;
+        if ($content !== false) {
+            $contentMock = $this->getMockBuilder(Content::class)
+                ->setMethods(['getContent', 'link'])
+                ->setConstructorArgs([$app])
+                ->getMock()
+            ;
             $contentMock->expects($this->once())
                 ->method('link')
                 ->will($this->returnValue($link));
@@ -200,12 +213,16 @@ class MenuBuilderTest extends BoltUnitTest
             }
         }
 
-        $storage = $this->getMock('Bolt\Storage', ['getContent'], [$app]);
+        $storage = $this->getMockBuilder(Storage::class)
+            ->setMethods(['getContent', 'link'])
+            ->setConstructorArgs([$app])
+            ->getMock()
+        ;
         $storage->expects($this->once())
             ->method('getContent')
             ->will($this->returnValue($contentMock));
 
-        $app['storage'] = $storage;
+        $this->setService('storage', $storage);
 
         $mb = new MenuBuilder($app);
         $method = new \ReflectionMethod(

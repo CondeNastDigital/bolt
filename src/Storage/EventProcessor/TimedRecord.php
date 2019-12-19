@@ -29,7 +29,7 @@ class TimedRecord
 
     /** @var array */
     protected $contentTypeNames;
-    /** @var  EntityManagerInterface */
+    /** @var EntityManagerInterface */
     protected $em;
     /** @var CacheProvider */
     protected $cache;
@@ -37,7 +37,7 @@ class TimedRecord
     protected $dispatcher;
     /** @var LoggerInterface */
     protected $systemLogger;
-    /** @var integer */
+    /** @var int */
     protected $interval;
 
     /**
@@ -48,7 +48,7 @@ class TimedRecord
      * @param CacheProvider            $cache
      * @param EventDispatcherInterface $dispatcher
      * @param LoggerInterface          $systemLogger
-     * @param integer                  $interval
+     * @param int                      $interval
      */
     public function __construct(
         array $contentTypeNames,
@@ -67,7 +67,7 @@ class TimedRecord
     }
 
     /**
-     * Get the timer for publishing timed records
+     * Get the timer for publishing timed records.
      */
     public function isDuePublish()
     {
@@ -75,7 +75,7 @@ class TimedRecord
     }
 
     /**
-     * Get the timer for publishing timed records
+     * Get the timer for publishing timed records.
      */
     public function isDueHold()
     {

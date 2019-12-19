@@ -56,7 +56,7 @@ class SchemaCheck
     /**
      * Check is there are pending hints.
      *
-     * @return boolean
+     * @return bool
      */
     public function hasHints()
     {
@@ -108,7 +108,7 @@ class SchemaCheck
     /**
      * Check is there are pending responses.
      *
-     * @return boolean
+     * @return bool
      */
     public function hasResponses()
     {
@@ -169,7 +169,7 @@ class SchemaCheck
             $hint = sprintf(
                 'The following fields in the `%s` table are not defined in your configuration. You can safely delete them manually if they are no longer needed: `%s`',
                 $tableName,
-                join('`, `', array_keys($diff->removedColumns))
+                implode('`, `', array_keys($diff->removedColumns))
             );
             $this->hints[] = $hint;
         }

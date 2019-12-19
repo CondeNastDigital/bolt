@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Storage\Field\Type;
 
 use Doctrine\DBAL\Types\Type;
@@ -24,6 +25,6 @@ class ImageType extends FieldTypeBase
      */
     public function getStorageType()
     {
-        return Type::getType('json_array');
+        return Type::getType('json');
     }
 }

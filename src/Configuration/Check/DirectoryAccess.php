@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Configuration\Check;
 
 use Symfony\Component\Filesystem\Exception\IOException;
@@ -6,6 +7,8 @@ use Symfony\Component\Filesystem\Filesystem;
 
 /**
  * Checks for writeable directories.
+ *
+ * @deprecated Since 3.4, to be removed in 4.0
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
@@ -38,7 +41,7 @@ class DirectoryAccess extends BaseCheck implements ConfigurationCheckInterface
         $fs = new Filesystem();
 
         foreach ($this->options['directories'] as $directory) {
-            $directory = $this->app['resources']->getPath($directory);
+            $directory = $this->app['path_resolver']->resolve($directory);
 
             try {
                 $tmpfile = $directory . '/.check';

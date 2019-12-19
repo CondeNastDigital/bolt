@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Controller;
 
 use Symfony\Component\HttpFoundation\Request;
@@ -22,7 +23,7 @@ class Zone
      *
      * @param Request $request
      *
-     * @return boolean
+     * @return bool
      */
     public static function isFrontend(Request $request)
     {
@@ -34,7 +35,7 @@ class Zone
      *
      * @param Request $request
      *
-     * @return boolean
+     * @return bool
      */
     public static function isBackend(Request $request)
     {
@@ -46,7 +47,7 @@ class Zone
      *
      * @param Request $request
      *
-     * @return boolean
+     * @return bool
      */
     public static function isAsync(Request $request)
     {
@@ -59,7 +60,7 @@ class Zone
      * @param Request $request
      * @param string  $value
      *
-     * @return boolean
+     * @return bool
      */
     public static function is(Request $request, $value)
     {

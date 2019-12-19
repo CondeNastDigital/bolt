@@ -25,13 +25,21 @@
 
 {% set modifiable = permissions.create or permissions.edit or permissions.delete or permissions.publish or permissions.depublish %}
 
+{% if content.taxonomy.grouped|default() %}
+    {% set orderbycontenttype = content.taxonomy.grouped|keys|first %}
+    {% set showorder = app.config.get('taxonomy')[orderbycontenttype].has_sortorder %}
+{% else %}
+    {% set showorder = false %}
+{% endif %}
+
 {% set prop = {
 extended:       not compact,
 has_groupname:  content.group.name is defined,
 nextgroup:      new_group|default(false),
-unordered:      request('order') == '',
+unordered:      global.request.get('order') == '',
 first:          loop.first,
-last:           loop.last
+last:           loop.last,
+showorder:      showorder
 }%}
 
 {% set local = {
@@ -76,7 +84,7 @@ row_header:     prop.extended and (prop.first or (prop.has_groupname and prop.ne
 {% if local.row_header %}
     {# Deprecated #}
     {% set params = {} %}
-    {% for key, val in app.request.query.all if key != 'order' %}
+    {% for key, val in global.request.query.all if key != 'order' %}
         {% set params = params|merge({(key): val}) %}
     {% endfor %}
     {% set link = '?' ~ params|url_encode ~ (params|length ? '&' : '') ~ 'order=' %}
@@ -112,7 +120,7 @@ row_header:     prop.extended and (prop.first or (prop.has_groupname and prop.ne
             <th class="hidden-xs">{{ buic_listing_slink('id', __('general.phrase.id'))}}</th>
 
             {# COLUMN: Content #}
-            <th style="width:80%">{{ buic_listing_slink(content.TitleColumnName()|first, __('Title') ~ ' / ' ~ __('Excerpt')) }}</th>
+            <th style="width:80%">{{ buic_listing_slink(content.getTitleColumnName(content.contenttype), __('Title') ~ ' / ' ~ __('Excerpt')) }}</th>
 
             {# COLUMN: Thumbnail #}
             <th class="listthumb"></th>
@@ -160,19 +168,21 @@ row_header:     prop.extended and (prop.first or (prop.has_groupname and prop.ne
                         {{ title|raw }}
                     {% endif %}
                 </strong>
-                {{ content.excerpt(excerptlength - title|length, false, filter|default()) }}
+                {{ content|excerpt(excerptlength - title|length, false, filter|default()) }}
             </span>
         </td>
 
         {# COLUMN: Thumbnail #}
         <td class="listthumb">
-            {% if content.getImage is not empty %}
-                {# Hack to add alt attribute #}
-                {#{ content.getImage|popup(thumbsize, thumbsize * 0.75, 'c') }#}
+            {% set listimage = content|first_image %}
+            {% if listimage is not empty %}
+                {% if listimage is iterable and listimage['file'] is not defined %}
+                    {% set listimage = listimage|first %}
+                {% endif %}
                 {% set thumb_height = (thumbsize * 0.75)|round %}
-                {% set thumb_small = content.getImage|thumbnail(thumbsize, thumb_height, 'c') %}
-                {% set thumb_large = content.getImage|thumbnail(1000, 800, 'r') %}
-                {% set thumb_title = __('Image') ~ ': ' ~ content.getImage %}
+                {% set thumb_small = listimage|thumbnail(thumbsize, thumb_height, 'c') %}
+                {% set thumb_large = listimage|thumbnail(1000, 800, 'r') %}
+                {% set thumb_title = __('general.phrase.image') ~ ': ' ~ listimage.title|default(' - ') %}
                 <a href="{{ thumb_large }}" class="magnific" title="{{ thumb_title }}">
                     <img src="{{ thumb_small }}" width="{{ thumbsize }}" height="{{ thumb_height }}" alt="{{ __('general.phrase.thumbnail') }}">
                 </a>
@@ -185,17 +195,19 @@ row_header:     prop.extended and (prop.first or (prop.has_groupname and prop.ne
             {# COLUMN: Meta #}
             <td class="username hidden-sm hidden-xs">
                 <i class="fa fa-user fa-fw"></i>
-                {% if content.user.displayname is defined %}
-                {{ content.user.displayname|excerpt(15) }}
-            {% else %}
-                <s>{{ content.values.ownerid|excerpt(15) }}</s>
+                {% set owner = app.users.user(content.ownerid) %}
+
+                {% if owner %}
+                    {{ owner.displayname[:15] }}
+                {% else %}
+                <s>{{ content.ownerid }}</s>
                 {% endif %}<br>
                 {% if content.status == 'timed' %}
                     <i class="fa fa-clock-o status-timed fa-fw"></i> {{ buic_moment(content.datepublish) }}<br>
                 {% else %}
                     <i class="fa fa-circle status-{{ content.status }} fa-fw"></i> {{ content.datepublish|localedatetime('%x') }}<br>
                 {% endif %}
-                {% if content.sortorder|default() is not empty %}
+                {% if prop.showorder %}
                     <i class="fa fa-align-left fa-fw"></i>
                     <a href="{{ path('editcontent', {'contenttypeslug': content.contenttype.slug, 'id': content.id}) }}#taxonomy" >
                         {{ __('general.phrase.order-colon-sort',{'%sort%': content.sortorder}) }}
@@ -227,19 +239,12 @@ row_header:     prop.extended and (prop.first or (prop.has_groupname and prop.ne
                             </a>
                         </li>
                     {% endif %}
-                    {% if content.relation %}{# i.e. we're viewing this as "related content" on the "edit record" page. #}
-                        <li>
-                            <a href="{{ path('relatedto', {'contenttypeslug': content.contenttype.slug, 'id': content.id}) }}">
-                                <i class="fa fa-link"></i> {{ __('general.phrase.view-related') }}
-                            </a>
-                        </li>
-                    {% endif %}
 
                     {% from _self import actionform %}
                     {% if modifiable %}
                         {% if content.status != 'published' %}
                             {% if permissions.publish %}
-                                <li>{{ macro.actionform(content, 'publish', 'fa-circle status-published', __('contenttypes.generic.publish',{'%contenttype%':content.contenttype.slug})) }}</li>
+                                <li>{{ macro.actionform(content, 'publish', 'fa-circle status-published', __('contenttypes.generic.publish',{'%contenttype%':content.contenttype.singular_name})) }}</li>
                             {% endif %}
                         {% else %}
                             {% if permissions.depublish %}
@@ -250,8 +255,8 @@ row_header:     prop.extended and (prop.first or (prop.has_groupname and prop.ne
                         {% endif %}
                         {% if permissions.create %}
                             <li>
-                                <a href="{{ path('editcontent', {'contenttypeslug': content.contenttype.slug, 'id': content.id, 'duplicate': 1}) }}">
-                                    <i class="fa fa-copy"></i> {{ __('contenttypes.generic.duplicate', {'%contenttype%': content.contenttype.slug}) }}
+                                <a href="{{ path('editcontent', {'contenttypeslug': content.contenttype.slug, 'source': content.id, 'duplicate': 1}) }}">
+                                    <i class="fa fa-copy"></i> {{ __('contenttypes.generic.duplicate', {'%contenttype%': content.contenttype.singular_name}) }}
                                 </a>
                             </li>
                         {% endif %}
@@ -259,7 +264,7 @@ row_header:     prop.extended and (prop.first or (prop.has_groupname and prop.ne
                             <li>
                                 {{ macro.actionform(content, 'delete',
                                 'fa-trash',
-                                __('contenttypes.generic.delete', {'%contenttype%': content.contenttype.slug}),
+                                __('contenttypes.generic.delete', {'%contenttype%': content.contenttype.singular_name}),
                                 "Are you sure you want to delete '" ~ content.getTitle ~ "'?" ) }}
                             </li>
                         {% endif %}
@@ -268,10 +273,11 @@ row_header:     prop.extended and (prop.first or (prop.has_groupname and prop.ne
                     <li>
                         <a class="nolink">
                             {{ __('general.phrase.author-colon') }} <strong><i class="fa fa-user"></i>
-                                {% if content.user.displayname is defined %}
-                                    {{ content.user.displayname|excerpt(15) }}
+                                {% set owner = app.users.user(content.ownerid) %}
+                                {% if owner %}
+                                    {{ owner.displayname[:15] }}
                                 {% else %}
-                                    <s>user {{ content.values.ownerid }}</s>
+                                    <s>user {{ content.ownerid }}</s>
                                 {% endif %}</strong>
                         </a>
                     </li>
@@ -280,7 +286,7 @@ row_header:     prop.extended and (prop.first or (prop.has_groupname and prop.ne
                     </li>
                     <li>
                         <a class="nolink">{{ __('general.phrase.slug-colon') }}
-                            <code title="{{ content.slug }}">{{ content.slug|excerpt(24) }}</code>
+                            <code title="{{ content.slug }}">{{ content.slug[:24] }}</code>
                         </a>
                     </li>
                     <li>
@@ -298,17 +304,24 @@ row_header:     prop.extended and (prop.first or (prop.has_groupname and prop.ne
                             <i class="fa fa-refresh"></i> {{ content.datechanged|date("Y-m-d H:i") }}
                         </a>
                     </li>
-                    {% for taxonomyslug, values in content.taxonomy %}
-                        {% if values|length > 1 %}
+
+                    {% set taxonomytypes = content.taxonomy.grouped|default %}
+                    {% for type, taxonomies in taxonomytypes %}
+                        {% if taxonomies|length > 1 %}
+                            {% set taxlist = [] %}
+                            {% for taxonomy in taxonomies %}
+                                {% set taxlist = taxlist|merge([taxonomy.name]) %}
+                            {% endfor %}
                             <li>
-                                <a class="nolink">{{ config.get('taxonomy')[taxonomyslug].name }}:
-                                    <i class="fa fa-tag"></i> {{ values|join(", ")|excerpt(24) }}
+                                <a class="nolink">{{ app.config.get('taxonomy')[type].name }}:
+                                    <i class="fa fa-tag"></i> {{ taxlist|join(", ")[:24] }}
                                 </a>
                             </li>
                         {% else %}
                             <li>
-                                <a class="nolink">{{ config.get('taxonomy')[taxonomyslug].singular_name }}:
-                                    <i class="fa fa-tag"></i> {{ values|first|excerpt(24) }}
+                                {% set taxonomy = taxonomies|first %}
+                                <a class="nolink">{{ app.config.get('taxonomy')[type].singular_name }}:
+                                    <i class="fa fa-tag"></i> {{ taxonomy.name[:24] }}
                                 </a>
                             </li>
                         {% endif %}

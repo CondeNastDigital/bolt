@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Storage\Repository;
 
 use Bolt\Storage\Repository;
@@ -9,99 +10,102 @@ use Bolt\Storage\Repository;
 class AuthtokenRepository extends Repository
 {
     /**
-     * Fetches an existing token for the given user / ip
+     * Fetches an existing token for the given user / ip.
      *
-     * @param string      $username
+     * @param string      $userId
      * @param string      $ip
-     * @param string|null $useragent
+     * @param string|null $userAgent
      *
-     * @return \Bolt\Storage\Entity\Authtoken
+     * @return \Bolt\Storage\Entity\Authtoken|false
      */
-    public function getUserToken($username, $ip, $useragent = null)
+    public function getUserToken($userId, $ip, $userAgent = null)
     {
-        $query = $this->getUserTokenQuery($username, $ip, $useragent);
+        $query = $this->getUserTokenQuery($userId, $ip, $userAgent);
 
         return $this->findOneWith($query);
     }
 
-    public function getUserTokenQuery($username, $ip, $useragent)
+    public function getUserTokenQuery($userId, $ip, $userAgent)
     {
         $qb = $this->createQueryBuilder();
         $qb->select('*')
-            ->where('username = :username')
+            ->where('user_id = :user_id')
             ->andWhere('ip = :ip')
-            ->setParameter('username', $username)
+            ->setParameter('user_id', $userId)
             ->setParameter('ip', $ip);
 
-        if ($useragent !== null) {
+        if ($userAgent !== null) {
             $qb->andWhere('useragent = :useragent')
-                ->setParameter('useragent', $useragent);
+                ->setParameter('useragent', $userAgent);
         }
 
         return $qb;
     }
 
     /**
-     * Fetches an existing token for the given user / ip
+     * Fetches an existing token for the given user / ip.
      *
      * @param string      $token
-     * @param string      $ip
-     * @param string|null $useragent
+     * @param string|null $ip
+     * @param string|null $userAgent
      *
-     * @return \Bolt\Storage\Entity\Authtoken
+     * @return \Bolt\Storage\Entity\Authtoken|false
      */
-    public function getToken($token, $ip, $useragent = null)
+    public function getToken($token, $ip = null, $userAgent = null)
     {
-        $query = $this->getTokenQuery($token, $ip, $useragent);
+        $query = $this->getTokenQuery($token, $ip, $userAgent);
 
         return $this->findOneWith($query);
     }
 
-    public function getTokenQuery($token, $ip, $useragent)
+    public function getTokenQuery($token, $ip, $userAgent)
     {
         $qb = $this->createQueryBuilder();
         $qb->select('*')
             ->where('token = :token')
-            ->andWhere('ip = :ip')
-            ->setParameter('token', $token)
-            ->setParameter('ip', $ip);
+            ->setParameter('token', $token);
 
-        if ($useragent !== null) {
+        if ($ip !== null) {
+            $qb->andWhere('ip = :ip')
+                ->setParameter('ip', $ip);
+        }
+
+        if ($userAgent !== null) {
             $qb->andWhere('useragent = :useragent')
-                ->setParameter('useragent', $useragent);
+                ->setParameter('useragent', $userAgent);
         }
 
         return $qb;
     }
 
     /**
-     * Deletes all tokens for the given user
+     * Deletes all tokens for the given user.
      *
-     * @param $username
+     * @param int $userId
      *
-     * @return integer
+     * @return int
      */
-    public function deleteTokens($username)
+    public function deleteTokens($userId)
     {
-        $query = $this->deleteTokensQuery($username);
+        $query = $this->deleteTokensQuery($userId);
 
         return $query->execute();
     }
 
-    public function deleteTokensQuery($username)
+    public function deleteTokensQuery($userId)
     {
         $qb = $this->em->createQueryBuilder();
         $qb->delete($this->getTableName())
-            ->where('username = :username')
-            ->setParameter('username', $username);
+            ->where('user_id = :user_id')
+            ->setParameter('user_id', $userId);
 
         return $qb;
     }
 
     /**
-     * Deletes all expired tokens
+     * Deletes all expired tokens.
      *
-     * @return integer
+     * @return int
      */
     public function deleteExpiredTokens()
     {
@@ -121,7 +125,7 @@ class AuthtokenRepository extends Repository
     }
 
     /**
-     * Fetches all active sessions
+     * Fetches all active sessions.
      *
      * @return \Bolt\Storage\Entity\Authtoken[]
      */
@@ -139,16 +143,5 @@ class AuthtokenRepository extends Repository
         $qb->select('*');
 
         return $qb;
-    }
-
-    /**
-     * Creates a query builder instance namespaced to this repository
-     *
-     * @return \Doctrine\DBAL\Query\QueryBuilder
-     */
-    public function createQueryBuilder($alias = null)
-    {
-        return $this->em->createQueryBuilder()
-            ->from($this->getTableName());
     }
 }

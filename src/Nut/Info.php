@@ -6,12 +6,12 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Nut command to output phpinfo()
+ * Nut command to output phpinfo().
  */
 class Info extends BaseCommand
 {
     /**
-     * @see \Symfony\Component\Console\Command\Command::configure()
+     * {@inheritdoc}
      */
     protected function configure()
     {
@@ -22,12 +22,14 @@ class Info extends BaseCommand
     }
 
     /**
-     * @see \Symfony\Component\Console\Command\Command::execute()
+     * {@inheritdoc}
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         ob_start();
         phpinfo();
-        $output->write(ob_get_clean());
+        $this->io->write(ob_get_clean());
+
+        return 0;
     }
 }

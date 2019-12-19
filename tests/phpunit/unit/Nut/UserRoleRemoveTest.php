@@ -1,8 +1,10 @@
 <?php
+
 namespace Bolt\Tests\Nut;
 
 use Bolt\Nut\UserRoleRemove;
 use Bolt\Tests\BoltUnitTest;
+use PHPUnit_Framework_MockObject_MockObject as MockObject;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
@@ -15,43 +17,44 @@ class UserRoleRemoveTest extends BoltUnitTest
     public function testRemove()
     {
         $app = $this->getApp();
-        $app['users'] = $this->getUserMock($app, true, true);
+        $this->setService('users', $this->getUserMockWithReturns(true, true));
         $command = new UserRoleRemove($app);
         $tester = new CommandTester($command);
 
         $tester->execute(['username' => 'test', 'role' => 'admin']);
         $result = $tester->getDisplay();
 
-        $this->assertRegExp('/no longer has role/', trim($result));
+        $this->assertRegExp('/no longer has role/', $result);
     }
 
     public function testRemoveFail()
     {
         $app = $this->getApp();
-        $app['users'] = $this->getUserMock($app, false, true);
+        $this->setService('users', $this->getUserMockWithReturns(false, true));
         $command = new UserRoleRemove($app);
         $tester = new CommandTester($command);
 
         $tester->execute(['username' => 'test', 'role' => 'admin']);
         $result = $tester->getDisplay();
-        $this->assertRegExp('/Could not remove role/', trim($result));
+        $this->assertRegExp('/Could not remove role/', $result);
     }
 
     public function testRemoveNonexisting()
     {
         $app = $this->getApp();
-        $app['users'] = $this->getUserMock($app, true, false);
+        $this->setService('users', $this->getUserMockWithReturns(true, false));
         $command = new UserRoleRemove($app);
         $tester = new CommandTester($command);
 
         $tester->execute(['username' => 'test', 'role' => 'admin']);
         $result = $tester->getDisplay();
-        $this->assertRegExp("/ already doesn't have role/", trim($result));
+        $this->assertRegExp("/ doesn't already have role/", $result);
     }
 
-    protected function getUserMock($app, $remove = false, $has = false)
+    protected function getUserMockWithReturns($remove = false, $has = false)
     {
-        $users = $this->getMock('Bolt\Users', ['hasRole', 'removeRole'], [$app]);
+        /** @var MockObject $users */
+        $users = $this->getMockUsers(['hasRole', 'removeRole']);
         $users->expects($this->any())
             ->method('removeRole')
             ->will($this->returnValue($remove));

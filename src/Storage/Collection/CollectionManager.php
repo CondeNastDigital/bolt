@@ -3,20 +3,23 @@
 namespace Bolt\Storage\Collection;
 
 use Bolt\Storage\EntityManager;
+use Doctrine\Common\Collections\ArrayCollection;
 
 /**
- * Collection Manager class
+ * Collection Manager class.
  *
  * @author Ross Riley <riley.ross@gmail.com>
  */
 class CollectionManager
 {
+    /** @var callable[] */
     public $collections;
+    /** @var EntityManager */
     public $em;
 
     /**
-     * @param $entity
-     * @param $handler
+     * @param string   $entity
+     * @param callable $handler
      */
     public function setHandler($entity, $handler)
     {
@@ -24,7 +27,7 @@ class CollectionManager
     }
 
     /**
-     * Set an instance of EntityManager
+     * Set an instance of EntityManager.
      *
      * @param EntityManager $em
      */
@@ -33,10 +36,19 @@ class CollectionManager
         $this->em = $em;
     }
 
+    /**
+     * @param string $class
+     *
+     * @throws \InvalidArgumentException
+     *
+     * @return ArrayCollection
+     */
     public function create($class)
     {
-        if (isset($this->collections[$class])) {
-            return call_user_func($this->collections[$class]);
+        if (!isset($this->collections[$class])) {
+            throw new \InvalidArgumentException(sprintf('No collection handler exists for %s', $class));
         }
+
+        return call_user_func($this->collections[$class]);
     }
 }

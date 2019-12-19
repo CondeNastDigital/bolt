@@ -2,11 +2,15 @@
 
 namespace Bolt\Helpers;
 
-use Bolt\Legacy\Content;
+use Bolt\Collection\Bag;
+use Bolt\Collection\MutableBag;
+use Bolt\Legacy\Content as LegacyContent;
+use Bolt\Storage\Entity\Content;
+use Parsedown;
 
 class Excerpt
 {
-    /** @var Content|array|string */
+    /** @var Content|LegacyContent|array|string */
     protected $body;
     /** @var string */
     protected $title;
@@ -14,8 +18,8 @@ class Excerpt
     /**
      * Constructor.
      *
-     * @param Content|array|string $body
-     * @param string|null          $title
+     * @param Content|LegacyContent|array|string $body
+     * @param string|null                        $title
      */
     public function __construct($body, $title = null)
     {
@@ -37,10 +41,14 @@ class Excerpt
         $title = null;
         if ($includeTitle && $this->title !== null) {
             $title = Html::trimText(strip_tags($this->title), $length);
-            $length = $length - strlen($title);
+            $length -= strlen($title);
         }
 
         if ($this->body instanceof Content) {
+            $this->body = $this->body->toArray();
+        }
+
+        if ($this->body instanceof LegacyContent) {
             $this->body = $this->body->getValues();
         }
 
@@ -60,6 +68,7 @@ class Excerpt
                 'status',
                 'taxonomy',
                 'templatefields',
+                'sortorder',
             ];
 
             $excerpt = '';
@@ -89,6 +98,40 @@ class Excerpt
         }
 
         return trim($excerpt);
+    }
+
+    /**
+     * @internal
+     *
+     * @param Content   $entity
+     * @param Bag       $contentType
+     * @param int       $length
+     * @param Parsedown $markdown
+     *
+     * @return string
+     */
+    public static function createFromEntity(Content $entity, Bag $contentType, $length, Parsedown $markdown)
+    {
+        $parts = new MutableBag();
+
+        foreach ($contentType->get('fields', []) as $key => $field) {
+            // Skip empty fields, and fields used as 'title'.
+            $fieldValue = $entity->get($key);
+            if (!$fieldValue || $fieldValue === $entity->getTitle()) {
+                continue;
+            }
+            // Add 'text', 'html' and 'textarea' fields.
+            if (in_array($field['type'], ['text', 'html', 'textarea'])) {
+                $parts[] = $fieldValue;
+            }
+            // Add 'markdown' field
+            if ($field['type'] === 'markdown') {
+                $parts[] = $markdown->text($fieldValue);
+            }
+        }
+        $excerpt = new static($parts->join(' '), $entity->getTitle());
+
+        return $excerpt->getExcerpt($length, true, false);
     }
 
     /**
@@ -126,8 +169,8 @@ class Excerpt
      * The only exception is where we have only two matches in which case we just take the
      * first as will be equally distant.
      *
-     * @param array   $locations
-     * @param integer $prevCount
+     * @param array $locations
+     * @param int   $prevCount
      *
      * @return int
      */
@@ -135,14 +178,14 @@ class Excerpt
     {
         // If we only have 1 match we don't actually do the for loop so set to the first
         $startPos = (int) reset($locations);
-        $loccount = count($locations);
+        $locCount = count($locations);
         $smallestDiff = PHP_INT_MAX;
 
         // If we only have 2, skip as it's probably equally relevant
-        if (count($locations) > 2) {
+        if ($locCount > 2) {
             // skip the first as we check 1 behind
-            for ($i = 1; $i < $loccount; $i++) {
-                if ($i === $loccount - 1) { // at the end
+            for ($i = 1; $i < $locCount; ++$i) {
+                if ($i === $locCount - 1) { // at the end
                     $diff = $locations[$i] - $locations[$i - 1];
                 } else {
                     $diff = $locations[$i + 1] - $locations[$i];
@@ -167,9 +210,9 @@ class Excerpt
      *
      * @param string|array $words
      * @param string       $fulltext
-     * @param integer      $relLength
+     * @param int          $relLength
      *
-     * @return mixed|string
+     * @return string
      */
     private function extractRelevant($words, $fulltext, $relLength = 300)
     {
@@ -189,16 +232,16 @@ class Excerpt
         }
 
         $locations = $this->extractLocations($words, $fulltext);
-        $startPos  = $this->determineSnipLocation($locations, $prevCount);
+        $startPos = $this->determineSnipLocation($locations, $prevCount);
 
         // if we are going to snip too much...
         if ($textlength - $startPos < $relLength) {
-            $startPos = $startPos - ($textlength - $startPos) / 2;
+            $startPos -= ($textlength - $startPos) / 2;
         }
 
         $relText = substr($fulltext, $startPos, $relLength);
 
-        // check to ensure we dont snip the last word if thats the match
+        // check to ensure we don't snip the last word if that's the match
         if ($startPos + $relLength < $textlength) {
             $relText = substr($relText, 0, strrpos($relText, ' ')) . $indicator; // remove last word
         }
@@ -210,7 +253,7 @@ class Excerpt
 
         // Highlight the words, using the `<mark>` tag.
         foreach ($words as $word) {
-            $relText = preg_replace('/\b(' . $word . ')\b/i', '<mark>$1</mark>', $relText);
+            $relText = preg_replace('/\b(' . preg_quote($word, '/') . ')\b/i', '<mark>$1</mark>', $relText);
         }
 
         return $relText;

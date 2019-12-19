@@ -2,6 +2,7 @@
 
 namespace Bolt\Storage\Query\Handler;
 
+use Bolt\Storage\Entity\Content;
 use Bolt\Storage\Query\ContentQueryParser;
 use Bolt\Storage\Query\QueryResultset;
 use Bolt\Storage\Query\SelectQuery;
@@ -15,7 +16,7 @@ class SelectQueryHandler
     /**
      * @param ContentQueryParser $contentQuery
      *
-     * @return QueryResultset
+     * @return QueryResultset|Content|false
      */
     public function __invoke(ContentQueryParser $contentQuery)
     {
@@ -24,6 +25,7 @@ class SelectQueryHandler
         $query = $contentQuery->getService('select');
 
         foreach ($contentQuery->getContentTypes() as $contentType) {
+            $contentType = str_replace('-', '_', $contentType);
             $repo = $contentQuery->getEntityManager()->getRepository($contentType);
             $query->setQueryBuilder($repo->createQueryBuilder('_' . $contentType));
             $query->setContentType($contentType);
@@ -38,19 +40,25 @@ class SelectQueryHandler
 
             /** Continue and run the query add the results to the set */
             $query->setParameters($params);
+            $contentQuery->runScopes($query);
             $contentQuery->runDirectives($query);
 
             $result = $repo->queryWith($query);
             if ($result) {
+                $set->setOriginalQuery($contentType, $query->getQueryBuilder());
                 $set->add($result, $contentType);
             }
         }
 
         if ($query->getSingleFetchMode()) {
+            if ($set->count() === 0) {
+                return false;
+            }
+
             return $set->current();
-        } else {
-            return $set;
         }
+
+        return $set;
     }
 
     /**
@@ -90,8 +98,8 @@ class SelectQueryHandler
                 if (!count($allowedKeys)) {
                     return false;
                 }
-                $allowed = join(' ||| ', $allowedKeys);
-                $cleanParams[$allowed] = join(' ||| ', $allowedVals);
+                $allowed = implode(' ||| ', $allowedKeys);
+                $cleanParams[$allowed] = implode(' ||| ', $allowedVals);
             } else {
                 if (!in_array($fieldSelect, $allowedParams)) {
                     return false;

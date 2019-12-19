@@ -3,11 +3,14 @@
 namespace Bolt\Tests\Extension;
 
 use Bolt\Events\ControllerEvents;
+use Bolt\Extension\AbstractExtension;
 use Bolt\Tests\BoltUnitTest;
 use Bolt\Tests\Extension\Mock\NormalExtension;
+use Silex\ServiceProviderInterface;
+use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
- * Class to test Bolt\Extension\SimpleExtension
+ * Class to test Bolt\Extension\SimpleExtension.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
@@ -16,7 +19,10 @@ class SimpleExtensionTest extends BoltUnitTest
     public function testRegister()
     {
         $app = $this->getApp();
-        $mock = $this->getMock('Bolt\Tests\Extension\Mock\NormalExtension', ['getContainer']);
+        $mock = $this->getMockBuilder(NormalExtension::class)
+            ->setMethods(['getContainer'])
+            ->getMock()
+        ;
         $mock->expects($this->atLeast(4))->method('getContainer')->willReturn($app);
 
         /** @var NormalExtension $mock */
@@ -24,6 +30,10 @@ class SimpleExtensionTest extends BoltUnitTest
         $mock->register($app);
     }
 
+    /**
+     * @expectedException \RuntimeException
+     * @expectedExceptionMessage Drop Bear Alert!
+     */
     public function testSubscribe()
     {
         $app = $this->getApp();
@@ -32,9 +42,8 @@ class SimpleExtensionTest extends BoltUnitTest
         $ext->boot($app);
 
         $listeners = $app['dispatcher']->getListeners('dropbear.sighting');
-        $this->assertInstanceOf('Bolt\Tests\Extension\Mock\NormalExtension', $listeners[0][0]);
+        $this->assertInstanceOf(NormalExtension::class, $listeners[0][0]);
 
-        $this->setExpectedException('RuntimeException', 'Drop Bear Alert!');
         $app['dispatcher']->dispatch('dropbear.sighting');
     }
 
@@ -43,9 +52,9 @@ class SimpleExtensionTest extends BoltUnitTest
         $ext = new NormalExtension();
 
         $providers = $ext->getServiceProviders();
-        $this->assertInstanceOf('Bolt\Extension\AbstractExtension', $providers[0]);
-        $this->assertInstanceOf('Silex\ServiceProviderInterface', $providers[0]);
-        $this->assertInstanceOf('Symfony\Component\EventDispatcher\EventSubscriberInterface', $providers[0]);
+        $this->assertInstanceOf(AbstractExtension::class, $providers[0]);
+        $this->assertInstanceOf(ServiceProviderInterface::class, $providers[0]);
+        $this->assertInstanceOf(EventSubscriberInterface::class, $providers[0]);
     }
 
     public function testGetSubscribedEvents()

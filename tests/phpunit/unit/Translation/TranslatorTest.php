@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Tests\Translation;
 
 use Bolt\Tests\BoltUnitTest;
@@ -29,15 +30,15 @@ class TranslatorTest extends BoltUnitTest
     {
         $app = $this->getApp();
         $app->boot();
-        $this->assertEquals('JavaScript disabled', Translator::__('generic.noscript.headline'));
+        $this->assertEquals('About Bolt', Translator::__('general.about-bolt'));
     }
 
     public function testContenttypes()
     {
         $app = $this->getApp();
         $app->boot();
-        $this->assertEquals('Delete Page', Translator::__('contenttypes.generic.delete', ['%contenttype%' => 'pages']));
-        $this->assertEquals('Delete Showcase', Translator::__('contenttypes.generic.delete', ['%contenttype%' => 'showcase']));
+        $this->assertEquals('Delete Page', Translator::__('contenttypes.generic.delete', ['%contenttype%' => 'Page']));
+        $this->assertEquals('Delete Showcase', Translator::__('contenttypes.generic.delete', ['%contenttype%' => 'Showcase']));
     }
 
     public function testTransDefault()

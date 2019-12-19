@@ -15,9 +15,9 @@ class Thumbnail
     protected $title;
     /** @var string */
     protected $altTitle;
-    /** @var integer */
+    /** @var int */
     protected $height;
-    /** @var integer */
+    /** @var int */
     protected $width;
     /** @var string */
     protected $scale;
@@ -120,12 +120,13 @@ class Thumbnail
 
         return $this;
     }
+
     /**
      * Get the thumbnail width.
      *
-     * @param boolean $round
+     * @param bool $round
      *
-     * @return integer
+     * @return int
      */
     public function getWidth($round = true)
     {
@@ -139,8 +140,8 @@ class Thumbnail
     /**
      * Set the thumbnail width.
      *
-     * @param integer $width
-     * @param integer $default
+     * @param int $width
+     * @param int $default
      *
      * @return Thumbnail
      */
@@ -159,9 +160,9 @@ class Thumbnail
     /**
      * Get the thumbnail height.
      *
-     * @param boolean $round
+     * @param bool $round
      *
-     * @return integer
+     * @return int
      */
     public function getHeight($round = true)
     {
@@ -175,8 +176,8 @@ class Thumbnail
     /**
      * Set the thumbnail height.
      *
-     * @param integer $height
-     * @param integer $default
+     * @param int $height
+     * @param int $default
      *
      * @return Thumbnail
      */

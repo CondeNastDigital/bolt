@@ -5,6 +5,8 @@ namespace Bolt\Tests\Composer\Action;
 /**
  * Class to test src/Composer/Action/CheckPackage.
  *
+ * @group slow
+ *
  * @author Ross Riley <riley.ross@gmail.com>
  */
 class CheckPackageTest extends ActionUnitTest
@@ -20,8 +22,8 @@ class CheckPackageTest extends ActionUnitTest
     {
         $app = $this->getApp();
         $result = $app['extend.action']['check']->execute();
-        $this->assertTrue(is_array($result['updates']));
-        $this->assertTrue(is_array($result['installs']));
+        $this->assertInternalType('array', $result['updates']);
+        $this->assertInternalType('array', $result['installs']);
     }
 
     public function testNewlyAdded()
@@ -44,6 +46,6 @@ class CheckPackageTest extends ActionUnitTest
 
         $action = $app['extend.action']['check'];
         $result = $action->execute();
-        $this->assertTrue(is_array($result['updates']));
+        $this->assertInternalType('array', $result['updates']);
     }
 }

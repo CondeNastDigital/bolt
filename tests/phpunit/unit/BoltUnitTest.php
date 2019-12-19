@@ -1,32 +1,40 @@
 <?php
+
 namespace Bolt\Tests;
 
+use Bolt;
+use Bolt\AccessControl\AccessChecker;
+use Bolt\AccessControl\Login;
+use Bolt\AccessControl\Permissions;
 use Bolt\AccessControl\Token;
-use Bolt\Application;
 use Bolt\Configuration as Config;
-use Bolt\Configuration\Standard;
 use Bolt\Legacy\Storage;
-use Bolt\Render;
+use Bolt\Logger\FlashLogger;
+use Bolt\Logger\Manager;
 use Bolt\Storage\Entity;
+use Bolt\Tests\Mocks\ImageApiMock;
 use Bolt\Tests\Mocks\LoripsumMock;
-use Bolt\Twig\Handler\AdminHandler;
-use Bolt\Twig\Handler\ArrayHandler;
-use Bolt\Twig\Handler\HtmlHandler;
-use Bolt\Twig\Handler\ImageHandler;
-use Bolt\Twig\Handler\RecordHandler;
-use Bolt\Twig\Handler\TextHandler;
-use Bolt\Twig\Handler\UserHandler;
-use Bolt\Twig\Handler\UtilsHandler;
-use Cocur\Slugify\Slugify;
-use Symfony\Component\HttpFoundation\Response;
+use Bolt\Users;
+use Doctrine\Common\Cache\VoidCache;
+use GuzzleHttp\Client;
+use Monolog\Logger;
+use PHPUnit\Framework\TestCase;
+use PHPUnit_Framework_MockObject_MockObject as MockObject;
+use Silex\Application;
+use Swift_Mailer;
+use Symfony\Component\HttpFoundation\Session\Session;
+use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
+use Symfony\Component\Security\Csrf\CsrfTokenManager;
+use Symfony\Component\Security\Csrf\TokenStorage\SessionTokenStorage;
 
 /**
  * Abstract Class that other unit tests can extend, provides generic methods for Bolt tests.
  *
  * @author Ross Riley <riley.ross@gmail.com>
  **/
-abstract class BoltUnitTest extends \PHPUnit_Framework_TestCase
+abstract class BoltUnitTest extends TestCase
 {
+    /** @var \Silex\Application|\Bolt\Application */
     private $app;
 
     protected function resetDb()
@@ -54,8 +62,16 @@ abstract class BoltUnitTest extends \PHPUnit_Framework_TestCase
                 unlink(PHPUNIT_WEBROOT . '/app/config/' . $configFile);
             }
         }
+        if (is_readable(PHPUNIT_WEBROOT . '/app/cache/config-cache.json')) {
+            unlink(PHPUNIT_WEBROOT . '/app/cache/config-cache.json');
+        }
     }
 
+    /**
+     * @param bool $boot
+     *
+     * @return \Silex\Application
+     */
     protected function getApp($boot = true)
     {
         if (!$this->app) {
@@ -63,30 +79,32 @@ abstract class BoltUnitTest extends \PHPUnit_Framework_TestCase
             $this->app->initialize();
 
             $verifier = new Config\Validation\Validator(
-                $this->app['controller.exception'],
                 $this->app['config'],
-                $this->app['resources'],
+                $this->app['path_resolver'],
                 $this->app['logger.flash']
             );
             $verifier->checks();
 
             if ($boot) {
                 $this->app->boot();
+                $this->app->flush();
             }
         }
 
         return $this->app;
     }
 
+    /**
+     * @return \Silex\Application
+     */
     protected function makeApp()
     {
-        $config = new Standard(TEST_ROOT);
-        $this->setAppPaths($config);
+        $app = new Bolt\Application();
+        $app['path_resolver.root'] = PHPUNIT_WEBROOT;
+        $app['path_resolver.paths'] = ['web' => '.'];
+        $app['debug'] = false;
 
-        $bolt = new Application(['resources' => $config]);
-        $bolt['session.test'] = true;
-        $bolt['debug'] = false;
-        $bolt['config']->set(
+        $app['config']->set(
             'general/database',
             [
                 'driver'       => 'pdo_sqlite',
@@ -97,27 +115,7 @@ abstract class BoltUnitTest extends \PHPUnit_Framework_TestCase
             ]
         );
 
-        $bolt['config']->set('general/canonical', 'bolt.test');
-        $bolt['slugify'] = Slugify::create();
-
-        $this->setAppPaths($bolt['resources']);
-
-        return $bolt;
-    }
-
-    /**
-     * @param Config\ResourceManager $config
-     */
-    protected function setAppPaths($config)
-    {
-        $config->setPath('app', PHPUNIT_WEBROOT . '/app');
-        $config->setPath('config', PHPUNIT_WEBROOT . '/app/config');
-        $config->setPath('cache', PHPUNIT_WEBROOT . '/app/cache');
-        $config->setPath('web', PHPUNIT_WEBROOT . '/');
-        $config->setPath('files', PHPUNIT_WEBROOT . '/files');
-        $config->setPath('themebase', PHPUNIT_WEBROOT . '/theme/');
-        $config->setPath('extensionsconfig', PHPUNIT_WEBROOT . '/config/extensions');
-        $config->setPath('extensions', PHPUNIT_WEBROOT . '/extensions');
+        return $app;
     }
 
     protected function rmdir($dir)
@@ -143,7 +141,7 @@ abstract class BoltUnitTest extends \PHPUnit_Framework_TestCase
     {
         // Check if default user exists before adding
         $existingUser = $app['users']->getUser('admin');
-        if (false !== $existingUser) {
+        if ($existingUser !== false) {
             return $existingUser;
         }
 
@@ -153,7 +151,7 @@ abstract class BoltUnitTest extends \PHPUnit_Framework_TestCase
             'email'       => 'admin@example.com',
             'displayname' => 'Admin',
             'roles'       => ['admin'],
-            'enabled'     => true   ,
+            'enabled'     => true,
         ];
 
         $app['users']->saveUser(array_merge($app['users']->getEmptyUser(), $user));
@@ -172,153 +170,69 @@ abstract class BoltUnitTest extends \PHPUnit_Framework_TestCase
             'enabled'     => $enabled,
         ];
 
-        $app['users']->saveUser(array_merge($app['users']->getEmptyUser(), $user));
-        $app['users']->users = [];
-    }
-
-    protected function getRenderMock(Application $app)
-    {
-        $render = $this->getMock(Render::class, ['render', 'fetchCachedRequest'], [$app]);
-        $render->expects($this->any())
-            ->method('fetchCachedRequest')
-            ->will($this->returnValue(false));
-
-        return $render;
-    }
-
-    protected function checkTwigForTemplate(Application $app, $testTemplate)
-    {
-        $render = $this->getRenderMock($app);
-
-        $render->expects($this->atLeastOnce())
-            ->method('render')
-            ->with($this->equalTo($testTemplate))
-            ->will($this->returnValue(new Response()));
-
-        $app['render'] = $render;
+        /** @var \Bolt\Users $users */
+        $users = $app['users'];
+        $users->saveUser(array_merge($users->getEmptyUser(), $user));
+        $users->users = [];
     }
 
     protected function allowLogin($app)
     {
         $this->addDefaultUser($app);
-        $users = $this->getMock('Bolt\Users', ['isEnabled'], [$app]);
+        $users = $this->getMockUsers(['isEnabled']);
         $users->expects($this->any())
             ->method('isEnabled')
             ->will($this->returnValue(true));
-        $app['users'] = $users;
+        $this->setService('users', $users);
 
-        $permissions = $this->getMock('Bolt\AccessControl\Permissions', ['isAllowed'], [$this->getApp()]);
+        $permissions = $this->getMockPermissions(['isAllowed']);
         $permissions->expects($this->any())
             ->method('isAllowed')
             ->will($this->returnValue(true));
         $this->setService('permissions', $permissions);
 
-        $auth = $this->getAccessCheckerMock($app);
+        $auth = $this->getMockAccessChecker($app);
         $auth->expects($this->any())
             ->method('isValidSession')
             ->will($this->returnValue(true));
 
-        $app['access_control'] = $auth;
-    }
-
-    /**
-     * @param \Silex\Application $app
-     * @param array              $functions Defaults to ['isValidSession']
-     *
-     * @return \Bolt\AccessControl\AccessChecker|\PHPUnit_Framework_MockObject_MockObject
-     */
-    protected function getAccessCheckerMock($app, $functions = ['isValidSession'])
-    {
-        $accessCheckerMock = $this->getMock(
-            'Bolt\AccessControl\AccessChecker',
-            $functions,
-            [
-                $app['storage.lazy'],
-                $app['request_stack'],
-                $app['session'],
-                $app['dispatcher'],
-                $app['logger.flash'],
-                $app['logger.system'],
-                $app['permissions'],
-                $app['randomgenerator'],
-                $app['access_control.cookie.options'],
-            ]
-        );
-
-        return $accessCheckerMock;
-    }
-
-    /**
-     * @param \Silex\Application $app
-     * @param array              $functions Defaults to ['login']
-     *
-     * @return \PHPUnit_Framework_MockObject_MockObject A mocked \Bolt\AccessControl\Login
-     */
-    protected function getLoginMock($app, $functions = ['login'])
-    {
-        $loginMock = $this->getMock('Bolt\AccessControl\Login', $functions, [$app]);
-
-        return $loginMock;
-    }
-
-    protected function getCacheMock($path = null)
-    {
-        $app = $this->getApp();
-        if ($path === null) {
-            $path = $app['resources']->getPath('cache');
-        }
-
-        $params = [
-            $path,
-            \Bolt\Cache::EXTENSION,
-            0002,
-            $app['filesystem'],
-        ];
-
-        $cache = $this->getMock('Bolt\Cache', ['flushAll'], $params);
-
-        return $cache;
-    }
-
-    protected function getTwigHandlers($app)
-    {
-        return new \Pimple([
-            'admin'  => $app->share(function () use ($app) { return new AdminHandler($app); }),
-            'array'  => $app->share(function () use ($app) { return new ArrayHandler($app); }),
-            'html'   => $app->share(function () use ($app) { return new HtmlHandler($app); }),
-            'image'  => $app->share(function () use ($app) { return new ImageHandler($app); }),
-            'record' => $app->share(function () use ($app) { return new RecordHandler($app); }),
-            'text'   => $app->share(function () use ($app) { return new TextHandler($app); }),
-            'user'   => $app->share(function () use ($app) { return new UserHandler($app); }),
-            'utils'  => $app->share(function () use ($app) { return new UtilsHandler($app); }),
-        ]);
+        $this->setService('access_control', $auth);
     }
 
     protected function removeCSRF($app)
     {
         // Symfony forms need a CSRF token so we have to mock this too
-        $csrf = $this->getMock('Symfony\Component\Form\Extension\Csrf\CsrfProvider\DefaultCsrfProvider', ['isCsrfTokenValid', 'generateCsrfToken'], ['form']);
+        $csrf = $this->getMockCsrfTokenManager(['isTokenValid', 'getToken']);
         $csrf->expects($this->any())
-            ->method('isCsrfTokenValid')
+            ->method('isTokenValid')
             ->will($this->returnValue(true));
 
         $csrf->expects($this->any())
-            ->method('generateCsrfToken')
+            ->method('getToken')
             ->will($this->returnValue('xyz'));
 
-        $app['form.csrf_provider'] = $csrf;
+        $this->setService('form.csrf_provider', $csrf);
     }
 
-    protected function addSomeContent()
+    /**
+     * @param array $contentTypes
+     * @param array $categories
+     * @param int   $count
+     */
+    protected function addSomeContent($contentTypes = null, $categories = null, $count = null)
     {
+        $contentTypes = $contentTypes ?: ['showcases', 'pages', 'homepage'];
+        $categories = $categories ?: ['news'];
+        $count = $count ?: 5;
+
         $app = $this->getApp();
         $this->addDefaultUser($app);
-        $app['config']->set('taxonomy/categories/options', ['news']);
-        $prefillMock = new LoripsumMock();
-        $app['prefill'] = $prefillMock;
+        $app['config']->set('taxonomy/categories/options', $categories);
+        $this->setService('prefill', new LoripsumMock());
+        $this->setService('prefill.image', new ImageApiMock());
 
-        $storage = new Storage($app);
-        $storage->prefill(['showcases', 'pages']);
+        $builder = $app['prefill.builder'];
+        $builder->build($contentTypes, $count);
     }
 
     /**
@@ -327,6 +241,9 @@ abstract class BoltUnitTest extends \PHPUnit_Framework_TestCase
      */
     protected function setService($key, $value)
     {
+        // In Pimple v3+ you can't re-set a container value,
+        // this just keeps us working forward with tests.
+        $this->getApp()->offsetUnset($key);
         $this->getApp()->offsetSet($key, $value);
     }
 
@@ -342,5 +259,205 @@ abstract class BoltUnitTest extends \PHPUnit_Framework_TestCase
         $authToken = new Token\Token($userEntity, $tokenEntity);
 
         $this->getService('session')->set('authentication', $authToken);
+    }
+
+    /*
+     * MOCKS
+     */
+
+    /**
+     * @param \Silex\Application $app
+     * @param array              $methods Defaults to ['isValidSession']
+     *
+     * @return \Bolt\AccessControl\AccessChecker|MockObject
+     */
+    protected function getMockAccessChecker($app, $methods = ['isValidSession'])
+    {
+        $parameters = [
+            $app['storage.lazy'],
+            $app['request_stack'],
+            $app['session'],
+            $app['dispatcher'],
+            $app['logger.flash'],
+            $app['logger.system'],
+            $app['permissions'],
+            $app['randomgenerator'],
+            $app['access_control.cookie.options'],
+        ];
+        $accessCheckerMock = $this->getMockBuilder(AccessChecker::class)
+            ->setMethods($methods)
+            ->setConstructorArgs($parameters)
+            ->getMock()
+        ;
+
+        return $accessCheckerMock;
+    }
+
+    /**
+     * @return VoidCache|MockObject
+     */
+    protected function getMockCache()
+    {
+        return $this->getMockBuilder(VoidCache::class)
+            ->setMethods(['flushAll'])
+            ->getMock()
+        ;
+    }
+
+    /**
+     * @param array $methods
+     *
+     * @return CsrfTokenManager|MockObject
+     */
+    protected function getMockCsrfTokenManager($methods = ['isTokenValid'])
+    {
+        return $this->getMockBuilder(CsrfTokenManager::class)
+            ->setMethods($methods)
+            ->setConstructorArgs([null, new SessionTokenStorage(new Session(new MockArraySessionStorage()))])
+            ->getMock()
+        ;
+    }
+
+    /**
+     * @return Client|MockObject
+     */
+    protected function getMockGuzzleClient()
+    {
+        return $this->getMockBuilder(Client::class)
+            ->setMethods(['get'])
+            ->getMock()
+        ;
+    }
+
+    /**
+     * @param array $methods
+     *
+     * @return FlashLogger|MockObject
+     */
+    protected function getMockFlashLogger($methods = ['danger', 'error', 'success'])
+    {
+        return $this->getMockBuilder(FlashLogger::class)
+            ->setMethods($methods)
+            ->getMock()
+        ;
+    }
+
+    /**
+     * @param array $methods Defaults to ['login']
+     *
+     * @return MockObject A mocked \Bolt\AccessControl\Login
+     */
+    protected function getMockLogin($methods = ['login'])
+    {
+        return $this->getMockBuilder(Login::class)
+            ->setMethods($methods)
+            ->setConstructorArgs([$this->getApp()])
+            ->getMock()
+        ;
+    }
+
+    /**
+     * @param array $methods
+     *
+     * @return Manager|MockObject
+     */
+    protected function getMockLoggerManager($methods = ['clear', 'error', 'info', 'trim'])
+    {
+        $app = $this->getApp();
+        $changeRepository = $this->getService('storage')->getRepository(Entity\LogChange::class);
+        $systemRepository = $this->getService('storage')->getRepository(Entity\LogSystem::class);
+
+        return $this->getMockBuilder(Manager::class)
+            ->setMethods($methods)
+            ->setConstructorArgs([$app, $changeRepository, $systemRepository])
+            ->getMock()
+        ;
+    }
+
+    /**
+     * @param array $methods
+     *
+     * @return Logger|MockObject
+     */
+    protected function getMockMonolog($methods = ['alert', 'clear', 'debug', 'error', 'info'])
+    {
+        return $this->getMockBuilder(Logger::class)
+            ->setMethods($methods)
+            ->setConstructorArgs(['testlogger'])
+            ->getMock()
+        ;
+    }
+
+    /**
+     * @param array $methods
+     *
+     * @return Permissions|MockObject
+     */
+    protected function getMockPermissions($methods = ['isAllowed', 'isAllowedToManipulate'])
+    {
+        return $this->getMockBuilder(Permissions::class)
+            ->setMethods($methods)
+            ->setConstructorArgs([$this->getApp()])
+            ->getMock()
+        ;
+    }
+
+    /**
+     * @param array $methods
+     *
+     * @return MockObject|Swift_Mailer
+     */
+    protected function getMockSwiftMailer($methods = ['send'])
+    {
+        return $this->getMockBuilder(Swift_Mailer::class)
+            ->setMethods($methods)
+            ->disableOriginalConstructor()
+            ->getMock()
+        ;
+    }
+
+    /**
+     * @param array $methods
+     *
+     * @return Storage|MockObject
+     */
+    protected function getMockStorage($methods = ['getContent', 'getContentType', 'getTaxonomyType'])
+    {
+        return $this->getMockBuilder(Storage::class)
+            ->setMethods($methods)
+            ->setConstructorArgs([$this->getApp()])
+            ->getMock()
+        ;
+    }
+
+    /**
+     * @param array $methods
+     *
+     * @return Users|MockObject
+     */
+    protected function getMockUsers($methods = ['getUsers', 'isAllowed'])
+    {
+        return $this->getMockBuilder(Users::class)
+            ->setMethods($methods)
+            ->setConstructorArgs([$this->getApp()])
+            ->getMock()
+        ;
+    }
+
+    /**
+     * @deprecated remove in v4 as PHPUnit 5 includes this
+     *
+     * @param mixed $originalClassName
+     *
+     * @return MockObject
+     */
+    protected function createMock($originalClassName)
+    {
+        return $this->getMockBuilder($originalClassName)
+            ->disableOriginalConstructor()
+            ->disableOriginalClone()
+            ->disableArgumentCloning()
+            ->getMock()
+        ;
     }
 }

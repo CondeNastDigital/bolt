@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Tests\Nut;
 
 use Bolt\Filesystem\Adapter\Local;
@@ -23,12 +24,12 @@ class ConfigGetTest extends BoltUnitTest
         $command = new ConfigGet($app);
         $tester = new CommandTester($command);
         $tester->execute(['key' => 'sitename', '--file' => 'config.yml']);
-        $this->assertEquals("sitename: A sample site\n", $tester->getDisplay());
+        $this->assertRegExp('/sitename: A sample site/', $tester->getDisplay());
 
         // test invalid
         $tester = new CommandTester($command);
         $tester->execute(['key' => 'nonexistent', '--file' => 'config.yml']);
-        $this->assertEquals("The key 'nonexistent' was not found in config.yml.\n", $tester->getDisplay());
+        $this->assertRegExp("/The key 'nonexistent' was not found in config:\/\/config.yml/", $tester->getDisplay());
     }
 
     public function testDefaultFile()
@@ -39,9 +40,8 @@ class ConfigGetTest extends BoltUnitTest
 
         $command = new ConfigGet($app);
         $tester = new CommandTester($command);
-        $app['resources']->setPath('config', PHPUNIT_ROOT . '/resources');
         $tester->execute(['key' => 'sitename']);
-        $this->assertEquals("sitename: A sample site\n", $tester->getDisplay());
+        $this->assertRegExp('/sitename: A sample site/', $tester->getDisplay());
     }
 
     public function setUp()

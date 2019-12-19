@@ -1,18 +1,17 @@
 <?php
+
 namespace Bolt\Configuration;
 
-use Bolt\Configuration\Validation\ValidatorInterface;
-use Bolt\Controller;
+use Bolt\Common\Deprecated;
 use Bolt\Exception\BootException;
-use Symfony\Component\HttpFoundation\Response;
 
 /**
  * @deprecated Deprecated since 3.1, to be removed in 4.0.
  */
-class LowlevelChecks implements ValidatorInterface
+class LowlevelChecks
 {
     public $config;
-    public $disableApacheChecks = false;
+    private $disableApacheChecks = false;
 
     public $checks = [
         'magicQuotes',
@@ -42,48 +41,31 @@ class LowlevelChecks implements ValidatorInterface
      */
     public function __construct($config = null)
     {
+        Deprecated::cls(static::class, 3.1);
+
         $this->config = $config;
         $this->magicQuotes = get_magic_quotes_gpc();
-        $this->safeMode = ini_get('safe_mode');
+        $this->safeMode = false;
         $this->isApache = (isset($_SERVER['SERVER_SOFTWARE']) && strpos($_SERVER['SERVER_SOFTWARE'], 'Apache') !== false);
         $this->postgresLoaded = extension_loaded('pdo_pgsql');
         $this->sqliteLoaded = extension_loaded('pdo_sqlite');
         $this->mysqlLoaded = extension_loaded('pdo_mysql');
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function check($checkName)
+    public function __get($property)
     {
+        return $this->$property;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function checks()
+    public function __set($property, $value)
     {
-    }
+        if ($property === 'disableApacheChecks' && $value === true) {
+            $this->disableApacheChecks();
 
-    /**
-     * {@inheritdoc}
-     */
-    public function add($checkName, $className, $prepend = false)
-    {
-    }
+            return;
+        }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function has($checkName)
-    {
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function remove($checkName)
-    {
+        $this->$property = $value;
     }
 
     /**
@@ -99,10 +81,10 @@ class LowlevelChecks implements ValidatorInterface
     }
 
     /**
-     * Add a check
+     * Add a check.
      *
-     * @param string  $check
-     * @param boolean $top
+     * @param string $check
+     * @param bool   $top
      */
     public function addCheck($check, $top = false)
     {
@@ -209,103 +191,26 @@ class LowlevelChecks implements ValidatorInterface
     }
 
     /**
-     * @return Controller\Exception
-     */
-    private function getExceptionController()
-    {
-        return $this->config->app['controller.exception'];
-    }
-
-    /**
-     * Perform the check for the database folder. We do this seperately, because it can only
+     * Perform the check for the database folder. We do this separately, because it can only
      * be done _after_ the other checks, since we need to have the $config, to see if we even
      * _need_ to do this check.
-     *
-     * @return Response|null
      */
     public function doDatabaseCheck()
     {
-        $cfg = $this->config->app['config']->get('general/database');
-        $driver = $cfg['driver'];
-
-        if ($driver === 'pdo_sqlite') {
-            return $this->doDatabaseSqliteCheck($cfg);
-        }
-
-        if (!in_array($driver, ['pdo_mysql', 'pdo_pgsql'])) {
-            return $this->getExceptionController()->databaseDriver('unsupported', null, $driver);
-        }
-
-        if ($driver == 'pdo_mysql' && !$this->mysqlLoaded) {
-            return $this->getExceptionController()->databaseDriver('missing', 'MySQL', 'pdo_mysql');
-        }
-
-        if ($driver == 'pdo_pgsql' && !$this->postgresLoaded) {
-            return $this->getExceptionController()->databaseDriver('missing', 'PostgreSQL', 'pdo_pgsql');
-        }
-
-        if (empty($cfg['dbname'])) {
-            return $this->getExceptionController()->databaseDriver('parameter', null, $driver, 'databasename');
-        }
-        if (empty($cfg['user'])) {
-            return $this->getExceptionController()->databaseDriver('parameter', null, $driver, 'username');
-        }
-        if (empty($cfg['password']) && ($cfg['user'] === 'root')) {
-            return $this->getExceptionController()->databaseDriver('insecure', null, $driver);
-        }
-
-        return null;
-    }
-
-    protected function doDatabaseSqliteCheck($config)
-    {
-        if (!$this->sqliteLoaded) {
-            return $this->getExceptionController()->databaseDriver('missing', 'SQLite', 'pdo_sqlite');
-        }
-
-        // If in-memory connection, skip path checks
-        if (isset($config['memory']) && $config['memory'] === true) {
-            return null;
-        }
-
-        // If the file is present, make sure it is writable
-        $file = $config['path'];
-        if (file_exists($file)) {
-            if (!is_writable($file)) {
-                return $this->getExceptionController()->databasePath('file', $file, 'is not writable');
-            }
-
-            return null;
-        }
-
-        // If the file isn't present, make sure the directory
-        // exists and is writable so the file can be created
-        $dir = dirname($file);
-        if (!file_exists($dir)) {
-            // At this point, it is possible that the site has been moved and
-            // the configured Sqlite database file path is no longer relevant
-            // to the site's root path
-            $cacheJson = $this->config->getPath('cache/config-cache.json');
-            if (file_exists($cacheJson)) {
-                unlink($cacheJson);
-                $this->config->app['config']->initialize();
-                $config = $this->config->app['config']->get('general/database');
-                if (!file_exists(dirname($config['path']))) {
-                    return $this->getExceptionController()->databasePath('folder', $dir, 'does not exist');
-                }
-            } else {
-                return $this->getExceptionController()->databasePath('folder', $dir, 'does not exist');
-            }
-        }
-
-        if (!is_writable($dir)) {
-            return $this->getExceptionController()->databasePath('folder', $dir, 'is not writable');
-        }
+        $validator = new Validation\Database();
+        $validator->setPathResolver($this->config->app['path_resolver']);
+        $validator->setConfig($this->config->app['config']);
+        $validator->check();
     }
 
     public function disableApacheChecks()
     {
+        Deprecated::method(3.3, 'Extend "config.validator" service and remove the apache check there.');
+
         $this->disableApacheChecks = true;
+        if ($this->config) {
+            $this->config->disableApacheChecks();
+        }
     }
 
     /**

@@ -3,32 +3,30 @@
 namespace Bolt\Asset;
 
 use Bolt\Filesystem\Exception\IOException;
-use Bolt\Filesystem\FilesystemInterface;
-use Symfony\Component\Asset\VersionStrategy\StaticVersionStrategy;
+use Bolt\Filesystem\Handler\DirectoryInterface;
+use Symfony\Component\Asset\VersionStrategy\VersionStrategyInterface;
 
 /**
  * A version strategy that hashes a base salt, path, and timestamp of file.
  *
  * @author Carson Full <carsonfull@gmail.com>
  */
-class BoltVersionStrategy extends StaticVersionStrategy
+class BoltVersionStrategy implements VersionStrategyInterface
 {
-    /** @var FilesystemInterface */
-    protected $filesystem;
+    /** @var DirectoryInterface */
+    protected $directory;
     /** @var string */
     protected $baseSalt;
 
     /**
      * Constructor.
      *
-     * @param FilesystemInterface $filesystem
-     * @param string              $baseSalt
-     * @param string              $format
+     * @param DirectoryInterface $directory
+     * @param string             $baseSalt
      */
-    public function __construct(FilesystemInterface $filesystem, $baseSalt, $format = null)
+    public function __construct(DirectoryInterface $directory, $baseSalt)
     {
-        parent::__construct(null, $format);
-        $this->filesystem = $filesystem;
+        $this->directory = $directory;
         $this->baseSalt = $baseSalt;
     }
 
@@ -37,12 +35,26 @@ class BoltVersionStrategy extends StaticVersionStrategy
      */
     public function getVersion($path)
     {
-        $file = $this->filesystem->getFile($path);
+        $file = $this->directory->getFile($path);
 
         try {
             return substr(md5($this->baseSalt . $file->getFullPath() . $file->getTimestamp()), 0, 10);
         } catch (IOException $e) {
             return '';
         }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function applyVersion($path)
+    {
+        $version = $this->getVersion($path);
+
+        if (!$version) {
+            return $path;
+        }
+
+        return sprintf('%s?%s', $path, $version);
     }
 }

@@ -3,7 +3,7 @@
 use Codeception\Util\Fixtures;
 
 /**
- * Frontend navigation and render tests
+ * Frontend navigation and render tests.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
@@ -30,7 +30,7 @@ class FrontendCest
     }
 
     /**
-     * Check the homepage
+     * Check the homepage.
      *
      * @param \AcceptanceTester $I
      */
@@ -44,8 +44,8 @@ class FrontendCest
         $I->see('Recent Pages');
         $I->dontSee('Recent Resources');
 
-        $I->see('A Page I Made', 'h1');
-        $I->see('Built with Bolt, tested with Codeception', 'footer');
+        $I->see('Welcome Home (Sanitarium)', 'h2');
+        $I->see('This website is tested with Codeception, built with Bolt.', 'footer');
     }
 
     /**
@@ -67,7 +67,7 @@ class FrontendCest
     }
 
     /**
-     * Check the about page and pagebind route
+     * Check the about page and pagebind route.
      *
      * @param \AcceptanceTester $I
      */
@@ -83,7 +83,7 @@ class FrontendCest
     }
 
     /**
-     * Check the contact page for templatefields
+     * Check the contact page for templatefields.
      *
      * @param \AcceptanceTester $I
      */
@@ -107,12 +107,12 @@ class FrontendCest
 
         $I->amOnPage('/resources');
 
-        $I->see('404 not found');
-        $I->see('The requested page was not found.');
+        $I->see('404 reasons to cry');
+        $I->see('Well, this is kind of embarrassing!');
     }
 
     /**
-     * Check a non-existing URL and check for our 404
+     * Check a non-existing URL and check for our 404.
      *
      * @param \AcceptanceTester $I
      */
@@ -122,12 +122,12 @@ class FrontendCest
 
         $I->amOnPage('/derp-a-derp');
 
-        $I->see('404 not found');
-        $I->see('The requested page was not found.');
+        $I->see('404 reasons to cry');
+        $I->see('Well, this is kind of embarrassing!');
     }
 
     /**
-     * Check that canonical links are the same on URIs by slug and ID
+     * Check that canonical links are the same on URIs by slug and ID.
      *
      * @param \AcceptanceTester $I
      */
@@ -144,7 +144,7 @@ class FrontendCest
 
     /**
      * Check that menus have a 'Home' with class 'first' and and active URI with
-     * the class 'active'
+     * the class 'active'.
      *
      * @param \AcceptanceTester $I
      */
@@ -153,11 +153,10 @@ class FrontendCest
         $I->wantTo("see that menus have 'first' and a correct 'active'.");
 
         $I->amOnPage('/');
-        $I->seeElement('a', ['href' => '/', 'class' => 'first']);
-        $I->seeElement('li', ['class' => 'index-1 menu-text first active']);
+        $I->seeElement('a', ['href' => '/', 'class' => 'navbar-item is-active first']);
 
         $I->amOnPage('/pages');
-        $I->seeElement('li', ['class' => 'index-3 active']);
+        $I->seeElement('a', ['href' => '/pages', 'class' => 'navbar-item is-active ']);
     }
 
     /**

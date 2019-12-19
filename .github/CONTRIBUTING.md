@@ -24,7 +24,7 @@ with _extensions_. If you have found a bug in an extension, the best place to
 report this would be in the extension's own repository, so that the original
 author can look into it.
 
-1. I'm reporting a bug
+<a name="1-im-reporting-a-bug"></a>1. I'm reporting a bug
 ----------------------
 
 If you think you've found a bug, try to make sure it's actually a bug, and not
@@ -75,7 +75,7 @@ will be handled confidentially. After fixing them, you will be credited for any
 security issues that you may have discovered.
 
 
-2. I'd like to request/propose a feature
+<a name="2-id-like-to-requestpropose-a-feature"></a>2. I'd like to request/propose a feature
 ----------------------------------------
 
 We get a lot of feature requests for Bolt, and we can't do them all, even if we
@@ -89,23 +89,23 @@ an issue with a title like `[RFC] Wouldn't it be swell, if we had [X]?`. That
 will make it obvious that you're open for discussion about the feature, and that
 it'll be a good fit for Bolt itself, or that it might be better suited as an
 extension. If you want to discuss your idea first, before 'officially' posting
-it, you can always join us on [IRC](http://bolt.cm/community).
+it, you can always join us on [Slack or IRC](http://bolt.cm/community).
 
 On the other hand, if you have a suggestion for a cool new feature, but don't
 have the skill to work on it yourself, we'll gladly read it, and comment on it,
 but we can't make any promises as to when/if it'll be realised.
 
 
-3. I'm making a pull request
+<a name="3-im-making-a-pull-request"></a>3. I'm making a pull request
 ----------------------------
 
 Your contributions to the project are very welcome. If you would like to fix a
 bug or implement a proposed feature, you can submit a Pull Request.
 
 Make sure you read our guide on [Contributing to
-Bolt](https://docs.bolt.cm/internals/contributing), the page on [Code
-Quality](https://docs.bolt.cm/internals/code-quality) and the page describing
-our [Release process](https://docs.bolt.cm/internals/release-process).
+Bolt](https://docs.bolt.cm/other/contributing), the page on [Code
+Quality](https://docs.bolt.cm/other/code-quality) and the page describing
+our [Release process](https://docs.bolt.cm/other/release-process).
 
 ### Bug fixes & "mini" features
 

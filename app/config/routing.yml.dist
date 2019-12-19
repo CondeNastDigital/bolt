@@ -1,6 +1,6 @@
 # This file defines user-definable routes for the frontend of your Bolt website.
 # Check below for examples, or read the documentation at
-# https://docs.bolt.cm/templates/templates-routes#routing
+# https://docs.bolt.cm/configuration/routing
 
 # ------------------------------------------------------------------------------
 # Place your own routes here, that have a HIGHER priority than the default routes.
@@ -28,6 +28,7 @@ preview:
         _controller: controller.frontend:preview
     requirements:
         contenttypeslug: controller.requirement:anyContentType
+    methods: [POST]
 
 contentlink:
     path: /{contenttypeslug}/{slug}
@@ -66,7 +67,7 @@ contentlisting:
 #         _controller: controller.frontend:record
 #         contenttypeslug: page
 #     requirements:
-#         slug: [a-z0-9-_]+
+#         slug: '[a-z0-9-_]+'
 
 
 # Example route with a host requirement

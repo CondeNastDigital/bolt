@@ -1,9 +1,11 @@
 <?php
+
 namespace Bolt\Tests\Controller\Backend;
 
-use Bolt\Configuration\ResourceManager;
+use Bolt\Storage\Database\Schema\Manager;
 use Bolt\Storage\Database\Schema\SchemaCheck;
 use Bolt\Tests\Controller\ControllerUnitTest;
+use PHPUnit_Framework_MockObject_MockObject as MockObject;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -22,30 +24,29 @@ class DatabaseTest extends ControllerUnitTest
     {
         $this->allowLogin($this->getApp());
         $checkResponse = new SchemaCheck();
-        $check = $this->getMock('Bolt\Storage\Database\Schema\Manager', ['check'], [$this->getApp()]);
+        $check = $this->getMockSchemaManager(['check']);
         $check->expects($this->atLeastOnce())
             ->method('check')
             ->will($this->returnValue($checkResponse));
 
         $this->setService('schema', $check);
         $this->setRequest(Request::create('/bolt/dbcheck'));
-        $this->checkTwigForTemplate($this->getApp(), '@bolt/dbcheck/dbcheck.twig');
 
-        $this->controller()->check($this->getRequest());
+        $response = $this->controller()->check($this->getRequest());
+        $this->assertEquals('@bolt/dbcheck/dbcheck.twig', $response->getTemplate());
     }
 
     public function testUpdate()
     {
         $this->allowLogin($this->getApp());
         $checkResponse = new SchemaCheck();
-        $check = $this->getMock('Bolt\Storage\Database\Schema\Manager', ['update'], [$this->getApp()]);
+        $check = $this->getMockSchemaManager(['update']);
 
         $check->expects($this->any())
             ->method('update')
             ->will($this->returnValue($checkResponse));
 
         $this->setService('schema', $check);
-        ResourceManager::$theApp = $this->getApp();
 
         $this->setRequest(Request::create('/bolt/dbupdate', 'POST'));
         $response = $this->controller()->update($this->getRequest());
@@ -59,9 +60,9 @@ class DatabaseTest extends ControllerUnitTest
         $this->allowLogin($this->getApp());
 
         $this->setRequest(Request::create('/bolt/dbupdate_result'));
-        $this->checkTwigForTemplate($this->getApp(), '@bolt/dbcheck/dbcheck.twig');
 
-        $this->controller()->updateResult($this->getRequest());
+        $response = $this->controller()->updateResult();
+        $this->assertEquals('@bolt/dbcheck/dbcheck.twig', $response->getTemplate());
     }
 
     /**
@@ -70,5 +71,19 @@ class DatabaseTest extends ControllerUnitTest
     protected function controller()
     {
         return $this->getService('controller.backend.database');
+    }
+
+    /**
+     * @param array $methods
+     *
+     * @return Manager|MockObject
+     */
+    protected function getMockSchemaManager(array $methods)
+    {
+        return $this->getMockBuilder(Manager::class)
+            ->setMethods($methods)
+            ->setConstructorArgs([$this->getApp()])
+            ->getMock()
+        ;
     }
 }

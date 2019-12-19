@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Tests\Users;
 
 use Bolt\Events\AccessControlEvent;
@@ -17,9 +18,6 @@ class AuthenticationTest extends BoltUnitTest
      */
     private $user;
 
-    /**
-     * @see \PHPUnit_Framework_TestCase::setUp
-     */
     protected function setUp()
     {
         $this->resetDb();
@@ -33,8 +31,8 @@ class AuthenticationTest extends BoltUnitTest
     public function testLoginWithUsername()
     {
         // Setup test
-        $app = $this->getApp();
-        $loginMock = $this->getLoginMock($app);
+        $this->getApp();
+        $loginMock = $this->getMockLogin();
 
         $loginMock->expects($this->once())->method('login')->willReturn(true);
 
@@ -45,14 +43,14 @@ class AuthenticationTest extends BoltUnitTest
         $result = $loginMock->login('anotheruser', 'test123', $event);
 
         // Check result
-        $this->assertEquals(true, $result);
+        $this->assertTrue($result);
     }
 
     public function testLoginWithEmail()
     {
         // Setup test
         $app = $this->getApp();
-        $loginMock = $this->getLoginMock($app);
+        $loginMock = $this->getMockLogin();
         $loginMock->expects($this->once())->method('login')->willReturn(true);
 
         // Run test
@@ -62,6 +60,6 @@ class AuthenticationTest extends BoltUnitTest
         $result = $loginMock->login('test@example.com', 'test123', $event);
 
         // Check result
-        $this->assertEquals(true, $result);
+        $this->assertTrue($result);
     }
 }

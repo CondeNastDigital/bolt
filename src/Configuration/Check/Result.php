@@ -1,24 +1,34 @@
 <?php
+
 namespace Bolt\Configuration\Check;
+
+use Bolt\Common\Deprecated;
 
 /**
  * A container class for a check result.
+ *
+ * @deprecated Since 3.4, to be removed in 4.0
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
 class Result implements \JsonSerializable
 {
-    /** @var boolean */
+    /** @var bool */
     protected $pass;
     /** @var string */
     protected $message;
     /** @var \Exception */
     protected $exception;
 
+    public function __construct()
+    {
+        Deprecated::cls(__CLASS__, 3.4);
+    }
+
     /**
      * Check if the result is a pass or fail.
      *
-     * @return boolean
+     * @return bool
      */
     public function isPass()
     {
@@ -52,7 +62,7 @@ class Result implements \JsonSerializable
     /**
      * Check if the result contains an exception.
      *
-     * @return boolean
+     * @return bool
      */
     public function isException()
     {
@@ -112,9 +122,7 @@ class Result implements \JsonSerializable
     }
 
     /**
-     * Valid output for json_encode()
-     *
-     * @return array
+     * {@inheritdoc}
      */
     public function jsonSerialize()
     {

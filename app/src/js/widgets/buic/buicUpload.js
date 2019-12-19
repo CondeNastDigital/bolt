@@ -30,7 +30,7 @@
         _create: function () {
             var fieldset = this.element,
                 fileInput = $('input[type=file]', fieldset),
-                dropZone = $('.dropzone', fieldset),
+                dropZone = $('.elm-dropzone', fieldset),
                 //
                 accept = $(fileInput).attr('accept'),
                 extensions = accept ? accept.replace(/^\./, '').split(/,\./) : [],
@@ -169,7 +169,7 @@
                 if (file.error) {
                     bootbox.alert(bolt.data('field.uploads.template.error', {'%ERROR%': file.error}));
                 } else {
-                    self._trigger('uploaded', event, {path: file.name});
+                    self._trigger('uploaded', event, file);
                 }
             });
         },

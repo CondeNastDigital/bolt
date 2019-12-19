@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Storage\Entity;
 
 use Bolt\Storage\CaseTransformTrait;
@@ -42,7 +43,8 @@ trait MagicAttributeTrait
     {
         if ($this->has($key) && property_exists($this, $key)) {
             unset($this->$key);
-        } elseif ($this->has($key)) {
+        }
+        if ($this->has($key)) {
             unset($this->_fields[$key]);
         }
 
@@ -51,6 +53,10 @@ trait MagicAttributeTrait
 
     public function __call($method, $arguments)
     {
+        if (method_exists($this, $method)) {
+            return call_user_func_array([$this, $method], (array) $arguments);
+        }
+
         $var = lcfirst(preg_replace('/^(get|set|serialize)/i', '', $method));
         $underscored = $this->underscore($var);
         $camelized = $this->camelize($var);
@@ -59,14 +65,15 @@ trait MagicAttributeTrait
             $var,
             $camelized,
             $underscored,
-            $numericCamel
+            $numericCamel,
         ];
 
         if (strncasecmp($method, 'get', 3) == 0) {
             foreach ($try as $test) {
                 if ($this->has($test) && property_exists($this, $test)) {
                     return $this->$test;
-                } elseif ($this->has($test)) {
+                }
+                if ($this->has($test)) {
                     return $this->_fields[$test];
                 }
             }
@@ -90,7 +97,7 @@ trait MagicAttributeTrait
     }
 
     /**
-     * An internal method that builds a list of available fields depending on context
+     * An internal method that builds a list of available fields depending on context.
      *
      * @return array
      **/
@@ -99,20 +106,22 @@ trait MagicAttributeTrait
         $fields = [];
 
         foreach ($this as $k => $v) {
-            if (strpos($k, '_') !== 0) {
+            if (is_string($k) && strpos($k, '_') !== 0) {
                 $fields[] = $k;
             }
         }
 
         foreach ($this->_fields as $k => $v) {
-            $fields[] = $k;
+            if (is_string($k)) {
+                $fields[] = $k;
+            }
         }
 
         return $fields;
     }
 
     /**
-     * Boolean check on whether entity has field
+     * Boolean check on whether entity has field.
      *
      * @param string $field
      *

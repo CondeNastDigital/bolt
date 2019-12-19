@@ -39,7 +39,7 @@ var init = {
     },
 
     /*
-     * Bind editfile field
+     * Bind file_edit_contents field
      *
      * @param {object} data
      * @returns {undefined}
@@ -55,9 +55,36 @@ var init = {
         var editor;
 
         if (typeof CodeMirror !== 'undefined') {
-            editor = CodeMirror.fromTextArea(document.getElementById('form_contents'), {
+            editor = CodeMirror.fromTextArea(document.getElementById('file_edit_contents'), {
                 lineNumbers: true,
                 autofocus: true,
+                foldGutter: {
+                    rangeFinder: CodeMirror.fold.indent
+                },
+                gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
+                extraKeys: {
+                    "Ctrl-Q": function (cm) {
+                        cm.foldCode(
+                            cm.getCursor(),
+                            {
+                                rangeFinder: CodeMirror.fold.indent,
+                                minFoldSize: 3
+                            }
+                        );
+                    },
+                    "Tab": function (cm) {
+                        if (cm.somethingSelected()) {
+                            cm.indentSelection("add");
+                        } else {
+                            cm.replaceSelection(cm.getOption("indentWithTabs") ? "\t" :
+                            Array(cm.getOption("indentUnit") + 1).join(" "), "end", "+input");
+                        }
+                    },
+                    "Ctrl-S": function () {
+                        $('#file_edit_save').click();
+                    },
+                    "Ctrl-H": "replaceAll"
+                },
                 tabSize: 4,
                 indentUnit: 4,
                 indentWithTabs: false,
@@ -70,8 +97,11 @@ var init = {
             editor.setSize(null, newheight);
         }
 
-        $('#saveeditfile').on('click', function () {
+        $('#file_edit_save').on('click', function (e) {
             Bolt.events.fire('Bolt.File.Save.Start');
+
+            // Disable the form POST
+            e.preventDefault();
 
             // Copy back to the textarea.
             if (editor) {
@@ -81,11 +111,16 @@ var init = {
             var msgNotSaved = 'Not saved';
 
             // Disable the buttons, to indicate stuff is being done.
-            $('#saveeditfile').addClass('disabled');
-            $('#saveeditfile i').addClass('fa-spin fa-spinner');
+            $('#file_edit_save').addClass('disabled');
+            $('#file_edit_save i').addClass('fa-spin fa-spinner');
             $('p.lastsaved').text(Bolt.data('editcontent.msg.saving'));
 
-            $.post('?returnto=ajax', $('#editfile').serialize())
+            var button = $(e.target);
+            var postData = $('form[name="file_edit"]').serialize()
+                + '&' + encodeURI(button.attr('name'))
+                + '=' + encodeURI(button.attr('value'))
+            ;
+            $.post('?returnto=ajax', postData)
                 .done(function (data) {
                     if (!data.ok) {
                         alert(data.msg);
@@ -104,8 +139,8 @@ var init = {
 
                     // Re-enable buttons
                     window.setTimeout(function () {
-                        $('#saveeditfile').removeClass('disabled').blur();
-                        $('#saveeditfile i').removeClass('fa-spin fa-spinner');
+                        $('#file_edit_save').removeClass('disabled').blur();
+                        $('#file_edit_save i').removeClass('fa-spin fa-spinner');
                     }, 300);
                 });
         });
@@ -120,7 +155,7 @@ var init = {
     bindEditLocale: function (data) {
         "use strict";
 
-        var editor = CodeMirror.fromTextArea(document.getElementById('form_contents'), {
+        var editor = CodeMirror.fromTextArea(document.getElementById('file_edit_contents'), {
             lineNumbers: true,
             autofocus: true,
             tabSize: 4,
@@ -188,13 +223,15 @@ var init = {
     bindPrefill: function () {
         "use strict";
 
-        $('#check-all').on('click', function () {
+        var checkboxes = $('#form_contenttypes').find(':checkbox');
+
+        $('#prefill_check_all').on('click', function () {
             // because jQuery is being retarded.
             // See: http://stackoverflow.com/questions/5907645/jquery-chrome-and-checkboxes-strange-behavior
-            $("#form_contenttypes :checkbox").removeAttr('checked').trigger('click');
+            checkboxes.removeAttr('checked').trigger('click');
         });
-        $('#uncheck-all').on('click', function () {
-            $("#form_contenttypes :checkbox").removeAttr('checked');
+        $('#prefill_uncheck_all').on('click', function () {
+            checkboxes.removeAttr('checked');
         });
     },
 
@@ -208,34 +245,6 @@ var init = {
 
         $('.confirm').on('click', function () {
             return confirm($(this).data('confirm'));
-        });
-    },
-
-    /*
-     * Render any deferred widgets, if any.
-     *
-     * @returns {undefined}
-     */
-    deferredWidgets: function () {
-        "use strict";
-
-        $('div.widget').each(function () {
-            if (typeof $(this).data('defer') === 'undefined') {
-                return;
-            }
-
-            var key = $(this).data('key');
-
-            $.ajax({
-                url: Bolt.conf('paths.async') + 'widget/' + key,
-                type: 'GET',
-                success: function (result) {
-                    $('#widget-' + key).html(result);
-                },
-                error: function () {
-                    console.log('failed to get widget');
-                }
-            });
         });
     },
 
@@ -290,7 +299,7 @@ var init = {
 
         // @todo make it prettier, and distinguish between '.in' and '.hover'.
         $(document).bind('dragover', function (e) {
-            var dropZone = $('.dropzone'),
+            var dropZone = $('.elm-dropzone'),
                 timeout = window.dropZoneTimeout;
             if (!timeout) {
                 dropZone.addClass('in');
@@ -360,11 +369,11 @@ var init = {
 
         $(".togglepass").on('click', function () {
             if ($(this).hasClass('show-password')) {
-                $('input[name="password"]').attr('type', 'text');
+                $('input[name="user_login[password]"]').attr('type', 'text');
                 $('.togglepass.show-password').hide();
                 $('.togglepass.hide-password').show();
             } else {
-                $('input[name="password"]').attr('type', 'password');
+                $('input[name="user_login[password]"]').attr('type', 'password');
                 $('.togglepass.show-password').show();
                 $('.togglepass.hide-password').hide();
             }
@@ -372,11 +381,13 @@ var init = {
 
         $('.login-forgot').bind('click', function () {
             $('.login-group, .password-group').hide();
+            $('#user_login_password').attr('required', false);
             $('.reset-group').show();
         });
 
         $('.login-remembered').bind('click', function () {
             $('.login-group, .password-group').show();
+            $('#user_login_password').attr('required', true);
             $('.reset-group').hide();
         });
     },

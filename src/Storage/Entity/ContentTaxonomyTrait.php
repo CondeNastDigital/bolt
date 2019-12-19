@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Storage\Entity;
 
 use Symfony\Component\Routing\Exception\RouteNotFoundException;
@@ -20,7 +21,7 @@ use Symfony\Component\Routing\Exception\RouteNotFoundException;
 trait ContentTaxonomyTrait
 {
     /**
-     * NOTE: This probably needs to implement, or be called by, Bolt\Storage::getTaxonomy()
+     * NOTE: This probably needs to implement, or be called by, Bolt\Storage::getTaxonomy().
      *
      * @param string $taxonomyType
      */
@@ -31,12 +32,10 @@ trait ContentTaxonomyTrait
     /**
      * Set the 'group', 'groupname' and 'sortorder' properties of the current object.
      *
-     * @param string  $group
-     * @param string  $name
-     * @param string  $taxonomytype
-     * @param integer $sortorder
-     *
-     * @return void
+     * @param string $group
+     * @param string $name
+     * @param string $taxonomytype
+     * @param int    $sortorder
      */
     public function setGroup($group, $name, $taxonomytype, $sortorder = 0)
     {
@@ -68,9 +67,9 @@ trait ContentTaxonomyTrait
      * @param string       $taxonomyType
      * @param string|array $slug
      * @param string       $name
-     * @param integer      $sortorder
+     * @param int          $sortorder
      *
-     * @return boolean
+     * @return bool
      */
     public function setTaxonomy($taxonomyType, $slug, $name = '', $sortorder = 0)
     {
@@ -130,8 +129,6 @@ trait ContentTaxonomyTrait
 
     /**
      * Sort the taxonomy of the current object, based on the order given in taxonomy.yml.
-     *
-     * @return void
      */
     public function sortTaxonomy()
     {

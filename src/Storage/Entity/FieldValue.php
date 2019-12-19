@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Storage\Entity;
 
 /**
@@ -20,6 +21,8 @@ class FieldValue extends Entity
     protected $fieldname;
     /** @var string */
     protected $fieldtype;
+    /** @var string */
+    protected $block;
 
     /** @var mixed */
     protected $value;
@@ -28,11 +31,11 @@ class FieldValue extends Entity
     protected $value_string;
     /** @var string @internal Use $value instead */
     protected $value_text;
-    /** @var integer @internal Use $value instead */
+    /** @var int @internal Use $value instead */
     protected $value_integer;
-    /** @var double @internal Use $value instead */
+    /** @var float @internal Use $value instead */
     protected $value_float;
-    /** @var integer @internal Use $value instead */
+    /** @var int @internal Use $value instead */
     protected $value_decimal;
     /** @var \DateTime @internal Use $value instead */
     protected $value_date;
@@ -57,6 +60,9 @@ class FieldValue extends Entity
         $this->value = $value;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function __toString()
     {
         return (string) $this->getValue();
@@ -79,7 +85,47 @@ class FieldValue extends Entity
     }
 
     /**
-     * When the entity needs to be persisted the value has to be copied to a field specific to the storage type
+     * @return string
+     */
+    public function getContentType()
+    {
+        return $this->contenttype;
+    }
+
+    /**
+     * @return int
+     */
+    public function getContentId()
+    {
+        return $this->content_id;
+    }
+
+    /**
+     * @return int
+     */
+    public function getGrouping()
+    {
+        return $this->grouping;
+    }
+
+    /**
+     * @return string
+     */
+    public function getFieldName()
+    {
+        return $this->fieldname;
+    }
+
+    /**
+     * @return string
+     */
+    public function getFieldType()
+    {
+        return $this->fieldtype;
+    }
+
+    /**
+     * When the entity needs to be persisted the value has to be copied to a field specific to the storage type.
      *
      * To do this we need a field type so we lookup the correct column to write to.
      *
@@ -88,7 +134,12 @@ class FieldValue extends Entity
     public function handleStorage($fieldObject)
     {
         $type = $fieldObject->getStorageType();
-        $typeCol = 'value_' . $type->getName();
+        $typeName = $type->getName();
+        if ($typeName === 'json') {
+            /** @deprecated since 3.3 to be renamed in v4. */
+            $typeName = 'json_array';
+        }
+        $typeCol = 'value_' . $typeName;
         $this->$typeCol = $this->getValue();
     }
 }

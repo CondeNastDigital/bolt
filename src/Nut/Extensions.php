@@ -6,12 +6,12 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Nut command to list all installed extensions
+ * Nut command to list all installed extensions.
  */
 class Extensions extends BaseCommand
 {
     /**
-     * @see \Symfony\Component\Console\Command\Command::configure()
+     * {@inheritdoc}
      */
     protected function configure()
     {
@@ -22,31 +22,33 @@ class Extensions extends BaseCommand
     }
 
     /**
-     * @see \Symfony\Component\Console\Command\Command::execute()
+     * {@inheritdoc}
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        if (count($this->app['extend.manager']->getMessages())) {
-            foreach ($this->app['extend.manager']->getMessages() as $message) {
-                $output->writeln(sprintf('<error>%s</error>', $message));
-            }
+        $messages = $this->app['extend.manager']->getMessages();
+        if (count($messages)) {
+            $this->io->error($messages);
 
-            return;
+            return 1;
         }
 
-        $installed = $this->app['extend.manager']->showPackage('installed');
         $rows = [];
+        $installed = $this->app['extend.manager']->showPackage('installed');
+        if (empty($installed)) {
+            $this->io->note('No extensions installed');
 
+            return 0;
+        }
+
+        $this->io->title('Installed extensions');
         foreach ($installed as $ext) {
             /** @var \Composer\Package\CompletePackageInterface $package */
             $package = $ext['package'];
             $rows[] = [$package->getPrettyName(), $package->getPrettyVersion(), $package->getType(), $package->getDescription()];
         }
+        $this->io->table(['Name', 'Version', 'Type',  'Description'], $rows);
 
-        $table = $this->getHelper('table');
-        $table
-            ->setHeaders(['Name', 'Version', 'Type',  'Description'])
-            ->setRows($rows);
-        $table->render($output);
+        return 0;
     }
 }

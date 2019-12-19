@@ -2,7 +2,12 @@
 
 namespace Bolt\Helpers;
 
-class Arr
+use Bolt\Collection;
+
+/**
+ * @deprecated since 3.3, to be removed in 4.0. Use {@see Bolt\Collection\Arr} instead.
+ */
+class Arr extends Collection\Arr
 {
     /**
      * Make a simple array consisting of key=>value pairs, that can be used
@@ -13,54 +18,35 @@ class Arr
      * @param string $value
      *
      * @return array
+     *
+     * @deprecated since 3.3, to be removed in 4.0. Use {@see array_column} or {@see Arr::column} instead.
      */
     public static function makeValuePairs($array, $key, $value)
     {
-        $tempArray = [];
+        Deprecated::method(3.3, 'Use array_column() or Arr::column() instead.');
 
-        if (is_array($array)) {
-            foreach ($array as $item) {
-                if (empty($key)) {
-                    $tempArray[] = $item[$value];
-                } else {
-                    $tempArray[$item[$key]] = $item[$value];
-                }
-            }
+        if (!is_array($array)) {
+            return [];
         }
 
-        return $tempArray;
+        return self::column($array, $value, $key);
     }
 
     /**
-     * array_merge_recursive does indeed merge arrays, but it converts values with duplicate
-     * keys to arrays rather than overwriting the value in the first array with the duplicate
-     * value in the second array, as array_merge does. I.e., with array_merge_recursive,
-     * this happens (documented behavior):
-     *
-     * array_merge_recursive(array('key' => 'org value'), array('key' => 'new value'));
-     *     => array('key' => array('org value', 'new value'));
-     *
-     * array_merge_recursive_distinct does not change the datatypes of the values in the arrays.
-     * Matching keys' values in the second array overwrite those in the first array, as is the
-     * case with array_merge, i.e.:
-     *
-     * array_merge_recursive_distinct(array('key' => 'org value'), array('key' => 'new value'));
-     *     => array('key' => array('new value'));
-     *
-     * Parameters are passed by reference, though only for performance reasons. They're not
-     * altered by this function.
+     * This is the same as {@see array_replace_recursive}.
+     * Use that instead or the smarter {@see replaceRecursive}.
      *
      * @param array $array1
      * @param array $array2
      *
      * @return array
      *
-     * @author Daniel <daniel (at) danielsmedegaardbuus (dot) dk>
-     * @author Gabriel Sobrinho <gabriel (dot) sobrinho (at) gmail (dot) com>
-     * @author Bob den Otter for Bolt-specific excludes
+     * @deprecated since 3.3, to be removed in 4.0.
      */
     public static function mergeRecursiveDistinct(array &$array1, array &$array2)
     {
+        Deprecated::method(3.3, 'Use array_replace_recursive() or Arr::replaceRecursive() instead.');
+
         $merged = $array1;
 
         foreach ($array2 as $key => &$value) {
@@ -81,14 +67,21 @@ class Arr
     }
 
     /**
-     * Check if an array is indexed or associative.
+     * Use {@see isIndexed} or {@see isAssociative} instead.
+     *
+     * This is the same as isIndexed but it does not check if
+     * array is zero-indexed and has sequential keys.
      *
      * @param array $arr
      *
-     * @return boolean True if indexed, false if associative
+     * @return bool True if indexed, false if associative
+     *
+     * @deprecated since 3.3, to be removed in 4.0.
      */
     public static function isIndexedArray(array $arr)
     {
+        Deprecated::method(3.3, 'Use Arr::isIndexed() or Arr::isAssociative() instead.');
+
         foreach ($arr as $key => $val) {
             if ($key !== (int) $key) {
                 return false;

@@ -1,17 +1,20 @@
 <?php
+
 namespace Bolt\AccessControl;
 
 use Bolt\Events\AccessControlEvent;
 use Bolt\Events\AccessControlEvents;
 use Bolt\Exception\AccessControlException;
 use Bolt\Logger\FlashLoggerInterface;
+use Bolt\Security\Random\Generator;
 use Bolt\Storage\Entity;
 use Bolt\Storage\EntityManagerInterface;
 use Bolt\Storage\Repository;
 use Bolt\Translation\Translator as Trans;
+use Doctrine\DBAL\Exception\DriverException;
+use Doctrine\DBAL\Exception\InvalidFieldNameException;
 use Doctrine\DBAL\Exception\TableNotFoundException;
 use Psr\Log\LoggerInterface;
-use RandomLib\Generator;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
@@ -36,13 +39,13 @@ class AccessChecker
     protected $systemLogger;
     /** @var \Bolt\AccessControl\Permissions */
     protected $permissions;
-    /** @var \RandomLib\Generator */
+    /** @var Generator */
     protected $randomGenerator;
     /** @var EventDispatcherInterface */
     protected $dispatcher;
     /** @var array */
     protected $cookieOptions;
-    /** @var boolean */
+    /** @var bool */
     protected $validSession;
 
     /**
@@ -106,7 +109,7 @@ class AccessChecker
      *
      * @throws AccessControlException
      *
-     * @return boolean
+     * @return bool
      */
     public function isValidSession($authCookie)
     {
@@ -143,7 +146,7 @@ class AccessChecker
     /**
      * Log out the currently logged in user.
      *
-     * @return boolean
+     * @return bool
      */
     public function revokeSession()
     {
@@ -160,14 +163,18 @@ class AccessChecker
         // Remove all auth tokens when logging off a user
         if ($sessionAuth = $this->session->get('authentication')) {
             try {
-                $this->getRepositoryAuthtoken()->deleteTokens($sessionAuth->getUser()->getUsername());
+                $this->getRepositoryAuthtoken()->deleteTokens($sessionAuth->getUser()->getId());
             } catch (TableNotFoundException $e) {
                 // Database tables have been dropped
+            } catch (InvalidFieldNameException $e) {
+                // Database tables need updating
+            } catch (DriverException $e) {
+                // Database tables need updating
             }
         }
 
         $this->session->remove('authentication');
-        $this->session->migrate(true);
+        $this->session->migrate(true, 0);
 
         return false;
     }
@@ -179,7 +186,7 @@ class AccessChecker
      *
      * @param Token\Token $sessionAuth
      *
-     * @return boolean
+     * @return bool
      */
     protected function checkSessionStored(Token\Token $sessionAuth)
     {
@@ -196,18 +203,19 @@ class AccessChecker
      *
      * @param string $authCookie
      *
-     * @return boolean
+     * @return bool
      */
     protected function checkSessionDatabase($authCookie)
     {
+        $userIp = $this->cookieOptions['remoteaddr'] ? $this->getClientIp() : null;
         $userAgent = $this->cookieOptions['browseragent'] ? $this->getClientUserAgent() : null;
 
         try {
-            if (!$authTokenEntity = $this->getRepositoryAuthtoken()->getToken($authCookie, $this->getClientIp(), $userAgent)) {
+            if (!$authTokenEntity = $this->getRepositoryAuthtoken()->getToken($authCookie, $userIp, $userAgent)) {
                 return false;
             }
 
-            if (!$databaseUser = $this->getRepositoryUsers()->getUser($authTokenEntity->getUsername())) {
+            if (!$databaseUser = $this->getRepositoryUsers()->getUser($authTokenEntity->getUserId())) {
                 return false;
             }
         } catch (TableNotFoundException $e) {
@@ -235,7 +243,7 @@ class AccessChecker
      *
      * @param Token\Token $sessionAuth
      *
-     * @return boolean
+     * @return bool
      */
     protected function checkSessionKeys(Token\Token $sessionAuth)
     {
@@ -243,7 +251,7 @@ class AccessChecker
         $tokenEntity = $sessionAuth->getToken();
 
         // The auth token is based on hostname, IP and browser user agent
-        $key = $this->getAuthToken($userEntity->getUsername(), $tokenEntity->getSalt());
+        $key = $this->getAuthToken($userEntity->getId(), $tokenEntity->getSalt());
 
         if ($key === $tokenEntity->getToken()) {
             return true;
@@ -251,10 +259,7 @@ class AccessChecker
 
         // Audit the failure
         $event = new AccessControlEvent($this->requestStack->getCurrentRequest());
-        /** @var Token\Token $sessionAuth */
-        $sessionAuth = $this->session->get('authentication');
-        $userName = $sessionAuth ? $sessionAuth->getToken()->getUsername() : null;
-        $event->setUserName($userName);
+        $event->setUserName($userEntity->getUsername());
         $this->dispatcher->dispatch(AccessControlEvents::ACCESS_CHECK_FAILURE, $event->setReason(AccessControlEvents::FAILURE_INVALID));
 
         $this->systemLogger->error("Invalidating session: Recalculated session token '$key' doesn't match user provided token '" . $tokenEntity->getToken() . "'", ['event' => 'authentication']);
@@ -288,20 +293,20 @@ class AccessChecker
      * a name, a salt, and optionally the remote IP address, broswer's agent
      * string and the user's HTTP hostname.
      *
-     * @param string $username
+     * @param string $userId
      * @param string $salt
      *
-     * @return string|boolean
+     * @return string|bool
      */
-    protected function getAuthToken($username, $salt)
+    protected function getAuthToken($userId, $salt)
     {
-        if (empty($username) || empty($salt)) {
+        if (empty($userId) || empty($salt)) {
             throw new \InvalidArgumentException(__FUNCTION__ . ' required a name and salt to be provided.');
         }
 
-        $token = (string) new Token\Generator($username, $salt, $this->getClientIp(), $this->getClientHost(), $this->getClientUserAgent(), $this->cookieOptions);
+        $token = (string) new Token\Generator($userId, $salt, $this->getClientIp(), $this->getClientHost(), $this->getClientUserAgent(), $this->cookieOptions);
 
-        $this->systemLogger->debug("Generating authentication cookie — Username: '$username' Salt: '$salt' IP: '{$this->getClientIp()}' Host name: '{$this->getClientHost()}' Agent: '{$this->getClientUserAgent()}' Result: $token", ['event' => 'authentication']);
+        $this->systemLogger->debug("Generating authentication cookie — User ID: '$userId' Salt: '$salt' IP: '{$this->getClientIp()}' Host name: '{$this->getClientHost()}' Agent: '{$this->getClientUserAgent()}' Result: $token", ['event' => 'authentication']);
 
         return $token;
     }

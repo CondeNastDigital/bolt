@@ -2,6 +2,7 @@
 
 namespace Bolt;
 
+use Bolt\Menu\MenuEntry;
 use Bolt\Translation\Translator as Trans;
 use Silex;
 use Symfony\Component\Finder\Finder;
@@ -19,21 +20,21 @@ class Omnisearch
 {
     const OMNISEARCH_LANDINGPAGE = 99999;
     const OMNISEARCH_CONTENTTYPE = 9999;
-    const OMNISEARCH_MENUITEM    = 5000;
-    const OMNISEARCH_EXTENSION   = 3000;
-    const OMNISEARCH_CONTENT     = 2000;
-    const OMNISEARCH_FILE        = 1000;
+    const OMNISEARCH_MENUITEM = 5000;
+    const OMNISEARCH_EXTENSION = 3000;
+    const OMNISEARCH_CONTENT = 2000;
+    const OMNISEARCH_FILE = 1000;
 
-    private $showNewContenttype  = true;
-    private $showViewContenttype = true;
-    private $showConfiguration   = true;
-    private $showMaintenance     = true;
-    private $showExtensions      = true;
-    private $showFiles           = true;
-    private $showRecords         = true;
+    private $showNewContentType = true;
+    private $showViewContentType = true;
+    private $showConfiguration = true;
+    private $showMaintenance = true;
+    private $showExtensions = true;
+    private $showFiles = true;
+    private $showRecords = true;
 
     // Show the option to the landing page for search results.
-    private $showLandingpage     = true;
+    private $showLandingpage = true;
 
     private $app;
     private $data;
@@ -47,38 +48,38 @@ class Omnisearch
 
     public function initialize()
     {
-        $this->initContenttypes();
+        $this->initContentTypes();
         $this->initMenuitems();
         $this->initExtensions();
     }
 
-    private function initContenttypes()
+    private function initContentTypes()
     {
         $contenttypes = $this->app['config']->get('contenttypes');
 
         foreach ($contenttypes as $key => $value) {
-            $pluralname   = $value['name'];
-            $singularname = $value['singular_name'];
-            $slug         = $value['slug'];
-            $keywords     = [
-                $pluralname,
-                $singularname,
+            $pluralName = $value['name'];
+            $singularName = $value['singular_name'];
+            $slug = $value['slug'];
+            $keywords = [
+                $pluralName,
+                $singularName,
                 $slug,
                 $key,
             ];
 
-            $viewContenttype = Trans::__('contenttypes.generic.view', ['%contenttypes%' => $key]);
-            $newContenttype  = Trans::__('contenttypes.generic.new', ['%contenttype%' => $key]);
+            $viewContentType = Trans::__('contenttypes.generic.view', ['%contenttypes%' => $pluralName]);
+            $newContentType = Trans::__('contenttypes.generic.new', ['%contenttype%' => $singularName]);
 
-            if ($this->showViewContenttype) {
-                $viewKeywords   = $keywords;
-                $viewKeywords[] = $viewContenttype;
-                $viewKeywords[] = 'View ' . $pluralname;
+            if ($this->showViewContentType) {
+                $viewKeywords = $keywords;
+                $viewKeywords[] = $viewContentType;
+                $viewKeywords[] = 'View ' . $pluralName;
 
                 $this->register(
                     [
                         'keywords'    => $viewKeywords,
-                        'label'       => $viewContenttype,
+                        'label'       => $viewContentType,
                         'description' => '',
                         'priority'    => self::OMNISEARCH_CONTENTTYPE,
                         'path'        => $this->generatePath('overview', ['contenttypeslug' => $slug]),
@@ -86,15 +87,15 @@ class Omnisearch
                 );
             }
 
-            if ($this->showNewContenttype) {
-                $newKeywords    = $keywords;
-                $newKeywords[]  = $newContenttype;
-                $newKeywords[]  = 'New ' . $singularname;
+            if ($this->showNewContentType) {
+                $newKeywords = $keywords;
+                $newKeywords[] = $newContentType;
+                $newKeywords[] = 'New ' . $singularName;
 
                 $this->register(
                     [
                         'keywords'    => $newKeywords,
-                        'label'       => $newContenttype,
+                        'label'       => $newContentType,
                         'description' => '',
                         'priority'    => self::OMNISEARCH_CONTENTTYPE,
                         'path'        => $this->generatePath('editcontent', ['contenttypeslug' => $slug]),
@@ -128,7 +129,7 @@ class Omnisearch
             );
             $this->register(
                 [
-                    'keywords'    => ['Contenttypes', 'Configuration'],
+                    'keywords'    => ['ContentTypes', 'Configuration'],
                     'label'       => Trans::__('general.phrase.configuration') . ' » ' . Trans::__('general.phrase.content-types'),
                     'description' => '',
                     'priority'    => self::OMNISEARCH_MENUITEM - 2,
@@ -172,7 +173,7 @@ class Omnisearch
                     'label'       => Trans::__('general.phrase.maintenance') . ' » ' . Trans::__('general.phrase.extensions'),
                     'description' => '',
                     'priority'    => self::OMNISEARCH_MENUITEM - 6,
-                    'path'        => $this->generatePath('extend'),
+                    'path'        => $this->generatePath('extensions'),
                 ]
             );
             $this->register(
@@ -219,8 +220,13 @@ class Omnisearch
         if (!$this->showExtensions) {
             return;
         }
+        /** @var MenuEntry $menus */
+        $menus = $this->app['menu.admin'];
+        if (!$menus->has('extensions')) {
+            return;
+        }
+        $extensionsMenu = $menus->get('extensions')->children();
 
-        $extensionsMenu = $this->app['menu.admin']->get('extend')->children();
         $index = 0;
         /** @var \Bolt\Menu\MenuEntry $extension */
         foreach ($extensionsMenu as $extension) {
@@ -234,7 +240,7 @@ class Omnisearch
                 ]
             );
 
-            $index--;
+            --$index;
         }
     }
 
@@ -311,11 +317,12 @@ class Omnisearch
             return;
         }
 
-        $finder = new Finder();
-        $finder->files()
-                  ->ignoreVCS(true)
-                  ->notName('*~')
-                  ->in($this->app['resources']->getPath($path));
+        $finder = (new Finder())
+            ->files()
+            ->ignoreVCS(true)
+            ->notName('*~')
+            ->in($this->app['path_resolver']->resolve($path))
+        ;
 
         if ($name) {
             $finder->name($name);
@@ -326,13 +333,13 @@ class Omnisearch
         }
 
         $dirPrefix = '';
-        if ($path === 'theme') {
+        if ($path === 'theme') { // TODO WTF?
             $dirPrefix = ltrim($this->app['config']->get('general/theme') . '/', '/');
         }
         /** @var \Symfony\Component\Finder\SplFileInfo $file */
         foreach ($finder as $file) {
             $relativePathname = $file->getRelativePathname();
-            $filename         = $file->getFilename();
+            $filename = $file->getFilename();
 
             $this->register(
                 [

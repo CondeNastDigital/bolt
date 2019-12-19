@@ -11,12 +11,14 @@ class ListingOptions
 {
     /** @var string */
     protected $order;
-    /** @var integer */
+    /** @var int */
     protected $page;
     /** @var array */
     protected $taxonomies;
     /** @var string */
     protected $filter;
+    /** @var bool */
+    protected $groupSort;
 
     /**
      * Set the order.
@@ -45,7 +47,7 @@ class ListingOptions
     /**
      * Set the page.
      *
-     * @param integer|null $page
+     * @param int|null $page
      *
      * @return ListingOptions
      */
@@ -59,7 +61,7 @@ class ListingOptions
     /**
      * Get the page.
      *
-     * @return integer
+     * @return int
      */
     public function getPage()
     {
@@ -69,7 +71,7 @@ class ListingOptions
     /**
      * Get the previous page number.
      *
-     * @return integer
+     * @return int
      */
     public function getPreviousPage()
     {
@@ -124,5 +126,25 @@ class ListingOptions
     public function getFilter()
     {
         return $this->filter;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getGroupSort()
+    {
+        return $this->groupSort;
+    }
+
+    /**
+     * @param mixed $groupSort
+     *
+     * @return ListingOptions
+     */
+    public function setGroupSort($groupSort)
+    {
+        $this->groupSort = $groupSort;
+
+        return $this;
     }
 }

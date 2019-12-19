@@ -17,9 +17,12 @@ abstract class AbstractCasterProvider
         return [];
     }
 
+    /**
+     * @return callable[]
+     */
     public static function getCasters()
     {
-        $cls = get_called_class();
+        $cls = static::class;
 
         return array_map(
             function ($func) use ($cls) {

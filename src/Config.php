@@ -2,24 +2,27 @@
 
 namespace Bolt;
 
+use Bolt\Collection\Arr;
+use Bolt\Common\Deprecated;
 use Bolt\Controller\Zone;
+use Bolt\Filesystem\Exception\FileNotFoundException;
 use Bolt\Filesystem\Exception\IOException;
 use Bolt\Filesystem\Exception\ParseException;
+use Bolt\Filesystem\Handler\DirectoryInterface;
 use Bolt\Filesystem\Handler\Image;
 use Bolt\Filesystem\Handler\JsonFile;
-use Bolt\Helpers\Arr;
+use Bolt\Filesystem\Handler\ParsableInterface;
 use Bolt\Helpers\Html;
 use Bolt\Helpers\Str;
+use Bolt\Storage\Database;
 use Bolt\Translation\Translator;
 use Bolt\Translation\Translator as Trans;
 use Cocur\Slugify\Slugify;
-use Eloquent\Pathogen\PathInterface;
-use Eloquent\Pathogen\RelativePathInterface;
 use InvalidArgumentException;
 use RuntimeException;
 use Silex;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Yaml\Parser;
+use Webmozart\PathUtil\Path;
 
 /**
  * Class for our config object.
@@ -51,7 +54,7 @@ class Config
         'username',
     ];
 
-    /** @var integer */
+    /** @var int */
     protected $cachetimestamp;
 
     /**
@@ -62,17 +65,16 @@ class Config
      */
     public $fields;
 
-    /** @var boolean  @deprecated Deprecated since 3.2, to be removed in 4.0 */
+    /** @var bool @deprecated Deprecated since 3.2, to be removed in 4.0 */
     public $notify_update;
-
-    /** @var \Symfony\Component\Yaml\Parser */
-    protected $yamlParser = false;
 
     /** @var array */
     private $exceptions;
 
     /** @var JsonFile */
     private $cacheFile;
+
+    private $passed;
 
     /**
      * @param Silex\Application $app
@@ -95,7 +97,7 @@ class Config
         $this->fields = new Storage\Field\Manager();
         $this->defaultConfig = $this->getDefaults();
 
-        $this->cacheFile = $this->app['filesystem.cache']->getFile('config-cache.json');
+        $this->cacheFile = $this->app['filesystem']->getFile('cache://config-cache.json');
 
         $data = $this->loadCache();
         if ($data === null) {
@@ -119,46 +121,51 @@ class Config
      */
     private function loadTheme()
     {
-        $this->app['resources']->initializeConfig($this->data);
-
         if ($this->isThemeCacheValid()) {
             return;
         }
         $this->invalidateCache();
 
-        $this->data['theme'] = $this->parseTheme($this->app['resources']->getPath('theme'), $this->data['general']);
+        $themeDir = $this->app['filesystem']->getDir('themes://' . $this->get('general/theme'));
+
+        $this->data['theme'] = $this->parseTheme($themeDir, $this->data['general']);
     }
 
     /**
-     * Read and parse a YAML configuration file
+     * Read and parse a YAML configuration file.
      *
-     * @param string $filename The name of the YAML file to read
-     * @param string $path     The (optional) path to the YAML file
+     * @param string             $filename  The name of the YAML file to read
+     * @param DirectoryInterface $directory The (optional) directory to the YAML file
      *
      * @return array
      */
-    protected function parseConfigYaml($filename, $path = null)
+    protected function parseConfigYaml($filename, DirectoryInterface $directory = null)
     {
-        // Initialise parser
-        if ($this->yamlParser === false) {
-            $this->yamlParser = new Parser();
+        $directory = $directory ?: $this->app['filesystem']->getDir('config://');
+
+        try {
+            $file = $directory->get($filename);
+        } catch (FileNotFoundException $e) {
+            // Copy in dist files if applicable
+            $distFiles = ['config.yml', 'contenttypes.yml', 'menu.yml', 'permissions.yml', 'routing.yml', 'taxonomy.yml'];
+            if ($directory->getMountPoint() !== 'config' || !in_array($filename, $distFiles)) {
+                return [];
+            }
+
+            $this->app['filesystem']->copy("bolt://app/config/$filename.dist", "config://$filename");
+            $file = $directory->get($filename);
         }
 
-        // By default we assume that config files are located in app/config/
-        $path = $path ?: $this->app['resources']->getPath('config');
-        $filename = $path . '/' . $filename;
-
-        if (!is_readable($filename)) {
-            return [];
+        if (!$file instanceof ParsableInterface) {
+            throw new \LogicException('File is not parsable.');
         }
 
-        $yml = $this->yamlParser->parse(file_get_contents($filename) . "\n");
+        $yml = $file->parse() ?: [];
 
         // Unset the repeated nodes key after parse
         unset($yml['__nodes']);
 
-        // Invalid, non-existing, or empty files return NULL
-        return $yml ?: [];
+        return $yml;
     }
 
     /**
@@ -170,31 +177,11 @@ class Config
      * @param string $path
      * @param mixed  $value
      *
-     * @return boolean
+     * @return bool
      */
     public function set($path, $value)
     {
-        $path = explode('/', $path);
-
-        // Only do something if we get at least one key.
-        if (empty($path[0])) {
-            $logline = "Config: can't set empty path to '" . (string) $value . "'";
-            $this->app['logger.system']->critical($logline, ['event' => 'config']);
-
-            return false;
-        }
-
-        $part = & $this->data;
-
-        foreach ($path as $key) {
-            if (!isset($part[$key])) {
-                $part[$key] = [];
-            }
-
-            $part = & $part[$key];
-        }
-
-        $part = $value;
+        Arr::set($this->data, $path, $value);
 
         return true;
     }
@@ -205,41 +192,18 @@ class Config
      * For example:
      * $var = $config->get('general/wysiwyg/ck/contentsCss');
      *
-     * @param string               $path
-     * @param string|array|boolean $default
+     * @param string            $path
+     * @param string|array|bool $default
      *
      * @return mixed
      */
     public function get($path, $default = null)
     {
-        $path = explode('/', $path);
-
-        // Only do something if we get at least one key.
-        if (empty($path[0]) || !isset($this->data[$path[0]])) {
-            return false;
-        }
-
-        $part = & $this->data;
-        $value = null;
-
-        foreach ($path as $key) {
-            if (!isset($part[$key])) {
-                $value = null;
-                break;
-            }
-
-            $value = $part[$key];
-            $part = & $part[$key];
-        }
-        if ($value !== null) {
-            return $value;
-        }
-
-        return $default;
+        return Arr::get($this->data, $path, $default);
     }
 
     /**
-     * Replaces placeholders in config values %foo% will be resolved to $app['foo'] from the container
+     * Replaces placeholders in config values %foo% will be resolved to $app['foo'] from the container.
      *
      * @internal This is only public so that it can be called from the service provider boot method.
      * Do not access this directly since the API is liable to be changed at short notice.
@@ -274,6 +238,12 @@ class Config
         if (is_string($value)) {
             $serviceName = substr($value, 1, strlen($value) - 2);
 
+            // First we pass the raw variable name to getenv to see if an environment variable is set
+            $env = getenv($serviceName);
+            if ($env !== false) {
+                return $env;
+            }
+
             if (strpos($serviceName, ':') !== false) {
                 list($serviceName, $params) = explode(':', $serviceName);
             } else {
@@ -281,16 +251,16 @@ class Config
             }
 
             if (!isset($this->app[$serviceName])) {
-                return;
+                return null;
             }
 
             $service = $this->app[$serviceName];
 
             if (is_callable($service)) {
-                return call_user_func_array($service, [$params]);
-            } else {
-                return $service;
+                return call_user_func($service, $params);
             }
+
+            return $service;
         }
 
         return $value;
@@ -305,13 +275,13 @@ class Config
     {
         $config = [];
 
-        $config['general']      = $this->parseGeneral();
-        $config['taxonomy']     = $this->parseTaxonomy();
+        $config['general'] = $this->parseGeneral();
+        $config['taxonomy'] = $this->parseTaxonomy();
         $config['contenttypes'] = $this->parseContentTypes($config['general']);
-        $config['menu']         = $this->parseConfigYaml('menu.yml');
-        $config['routing']      = $this->parseConfigYaml('routing.yml');
-        $config['permissions']  = $this->parseConfigYaml('permissions.yml');
-        $config['extensions']   = $this->parseConfigYaml('extensions.yml');
+        $config['menu'] = $this->parseConfigYaml('menu.yml');
+        $config['routing'] = $this->parseConfigYaml('routing.yml');
+        $config['permissions'] = $this->parseConfigYaml('permissions.yml');
+        $config['extensions'] = $this->parseConfigYaml('extensions.yml');
 
         return $config;
     }
@@ -327,14 +297,7 @@ class Config
         // "Only variables should be passed by reference")
         $tempconfig = $this->parseConfigYaml('config.yml');
         $tempconfiglocal = $this->parseConfigYaml('config_local.yml');
-        $general = Arr::mergeRecursiveDistinct($tempconfig, $tempconfiglocal);
-
-        // Make sure old settings for 'contentsCss' are still picked up correctly
-        if (isset($general['wysiwyg']['ck']['contentsCss'])) {
-            $general['wysiwyg']['ck']['contentsCss'] = [
-                1 => $general['wysiwyg']['ck']['contentsCss'],
-            ];
-        }
+        $general = Arr::replaceRecursive($tempconfig, $tempconfiglocal);
 
         // Make sure old settings for 'accept_file_types' are not still picked up. Before 1.5.4 we used to store them
         // as a regex-like string, and we switched to an array. If we find the old style, fall back to the defaults.
@@ -343,7 +306,7 @@ class Config
         }
 
         // Merge the array with the defaults. Setting the required values that aren't already set.
-        $general = Arr::mergeRecursiveDistinct($this->defaultConfig, $general);
+        $general = Arr::replaceRecursive($this->defaultConfig, $general);
 
         // Make sure Bolt's mount point is OK:
         $general['branding']['path'] = '/' . Str::makeSafe($general['branding']['path']);
@@ -361,28 +324,31 @@ class Config
     /**
      * Read and parse the taxonomy.yml configuration file.
      *
+     * @param array|null $taxonomies
+     *
      * @return array
      */
-    protected function parseTaxonomy()
+    protected function parseTaxonomy(array $taxonomies = null)
     {
-        $taxonomies = $this->parseConfigYaml('taxonomy.yml');
+        $taxonomies = $taxonomies ?: $this->parseConfigYaml('taxonomy.yml');
+        $slugify = Slugify::create();
 
         foreach ($taxonomies as $key => $taxonomy) {
             if (!isset($taxonomy['name'])) {
-                $taxonomy['name'] = ucwords($taxonomy['slug']);
+                $taxonomy['name'] = ucwords(str_replace('-', ' ', Common\Str::humanize($taxonomy['slug'])));
             }
             if (!isset($taxonomy['singular_name'])) {
                 if (isset($taxonomy['singular_slug'])) {
-                    $taxonomy['singular_name'] = ucwords($taxonomy['singular_slug']);
+                    $taxonomy['singular_name'] = ucwords(str_replace('-', ' ', Common\Str::humanize($taxonomy['singular_slug'])));
                 } else {
-                    $taxonomy['singular_name'] = ucwords($taxonomy['slug']);
+                    $taxonomy['singular_name'] = ucwords(str_replace('-', ' ', Common\Str::humanize($taxonomy['slug'])));
                 }
             }
             if (!isset($taxonomy['slug'])) {
-                $taxonomy['slug'] = strtolower(Str::makeSafe($taxonomy['name']));
+                $taxonomy['slug'] = $slugify->slugify($taxonomy['name']);
             }
             if (!isset($taxonomy['singular_slug'])) {
-                $taxonomy['singular_slug'] = strtolower(Str::makeSafe($taxonomy['singular_name']));
+                $taxonomy['singular_slug'] = $slugify->slugify($taxonomy['singular_name']);
             }
             if (!isset($taxonomy['has_sortorder'])) {
                 $taxonomy['has_sortorder'] = false;
@@ -394,18 +360,24 @@ class Config
             // Make sure the options are $key => $value pairs, and not have implied integers for keys.
             if (!empty($taxonomy['options']) && is_array($taxonomy['options'])) {
                 $options = [];
-                foreach ($taxonomy['options'] as $optionkey => $optionvalue) {
-                    if (is_numeric($optionkey)) {
-                        $optionkey = Slugify::create()->slugify($optionvalue);
+                foreach ($taxonomy['options'] as $optionKey => $optionValue) {
+                    if (is_numeric($optionKey)) {
+                        $optionKey = $optionValue;
                     }
-                    $options[$optionkey] = $optionvalue;
+                    $optionKey = $slugify->slugify($optionKey);
+                    $options[$optionKey] = $optionValue;
                 }
                 $taxonomy['options'] = $options;
             }
 
+            if (!isset($taxonomy['behaves_like'])) {
+                $taxonomy['behaves_like'] = 'tags';
+            }
             // If taxonomy is like tags, set 'tagcloud' to true by default.
-            if (($taxonomy['behaves_like'] == 'tags') && (!isset($taxonomy['tagcloud']))) {
+            if (($taxonomy['behaves_like'] === 'tags') && (!isset($taxonomy['tagcloud']))) {
                 $taxonomy['tagcloud'] = true;
+            } else {
+                $taxonomy += ['tagcloud' => false];
             }
 
             $taxonomies[$key] = $taxonomy;
@@ -440,18 +412,18 @@ class Config
     /**
      * Read and parse the current theme's config.yml configuration file.
      *
-     * @param string $themePath
-     * @param array  $generalConfig
+     * @param DirectoryInterface $themeDir
+     * @param array              $generalConfig
      *
      * @return array
      */
-    protected function parseTheme($themePath, array $generalConfig)
+    protected function parseTheme(DirectoryInterface $themeDir, array $generalConfig)
     {
-        $themeConfig = $this->parseConfigYaml('theme.yml', $themePath);
+        $themeConfig = $this->parseConfigYaml('theme.yml', $themeDir);
 
         /** @deprecated Deprecated since 3.0, to be removed in 4.0. (config.yml was the old filename) */
         if (empty($themeConfig)) {
-            $themeConfig = $this->parseConfigYaml('config.yml', $themePath);
+            $themeConfig = $this->parseConfigYaml('config.yml', $themeDir);
         }
 
         if ((isset($themeConfig['templatefields'])) && (is_array($themeConfig['templatefields']))) {
@@ -578,6 +550,9 @@ class Config
         if (!isset($contentType['allow_numeric_slugs'])) {
             $contentType['allow_numeric_slugs'] = false;
         }
+        if (!isset($contentType['singleton'])) {
+            $contentType['singleton'] = false;
+        }
 
         list($fields, $groups) = $this->parseFieldsAndGroups($contentType['fields'], $generalConfig);
         $contentType['fields'] = $fields;
@@ -602,7 +577,7 @@ class Config
     }
 
     /**
-     * Parse a Contenttype's filed and determine the grouping
+     * Parse a Contenttype's filed and determine the grouping.
      *
      * @param array $fields
      * @param array $generalConfig
@@ -649,7 +624,7 @@ class Config
 
             // Make indexed arrays into associative for select fields
             // e.g.: [ 'yes', 'no' ] => { 'yes': 'yes', 'no': 'no' }
-            if ($field['type'] === 'select' && isset($field['values']) && is_array($field['values']) && Arr::isIndexedArray($field['values'])) {
+            if ($field['type'] === 'select' && isset($field['values']) && Arr::isIndexed($field['values'])) {
                 $field['values'] = array_combine($field['values'], $field['values']);
             }
 
@@ -739,7 +714,7 @@ class Config
         $options = array_replace($options, $master);
 
         // Add platform specific random functions
-        $driver = Str::replaceFirst('pdo_', '', $options['driver']);
+        $driver = \Bolt\Common\Str::replaceFirst($options['driver'], 'pdo_', '');
         if ($driver === 'sqlite') {
             $options['driver'] = 'pdo_sqlite';
             $options['randomfunction'] = 'RANDOM()';
@@ -752,7 +727,7 @@ class Config
         }
 
         // Specify the wrapper class for the connection
-        $options['wrapperClass'] = '\Bolt\Storage\Database\Connection';
+        $options['wrapperClass'] = Database\Connection::class;
 
         // Parse SQLite separately since it has to figure out database path
         if ($driver === 'sqlite') {
@@ -765,7 +740,7 @@ class Config
         }
 
         // Specify we want a master slave connection
-        $options['wrapperClass'] = '\Bolt\Storage\Database\MasterSlaveConnection';
+        $options['wrapperClass'] = Database\MasterSlaveConnection::class;
 
         // Add master connection where MasterSlaveConnection looks for it.
         $options['master'] = $master;
@@ -792,44 +767,38 @@ class Config
             unset($config['path']);
 
             return $config;
-        } else {
-            // Prevent SQLite driver from trying to use in-memory connection
-            unset($config['memory']);
         }
+        // Prevent SQLite driver from trying to use in-memory connection
+        unset($config['memory']);
 
         // Get path from config or use database path
-        if (isset($config['path'])) {
-            $path = $this->app['pathmanager']->create($config['path']);
-            // If path is relative, resolve against root path
-            if ($path instanceof RelativePathInterface) {
-                $path = $path->resolveAgainst($this->app['resources']->getPathObject('root'));
-            }
-        } else {
-            $path = $this->app['resources']->getPathObject('database');
+        $path = isset($config['path']) ? $config['path'] : $this->app['path_resolver']->resolve('database');
+        if (Path::isRelative($path)) {
+            $path = $this->app['path_resolver']->resolve($path);
         }
 
         // If path has filename with extension, use that
-        if ($path->hasExtension()) {
-            $config['path'] = $path->string();
+        if (Path::hasExtension($path)) {
+            $config['path'] = $path;
 
             return $config;
         }
 
         // Use database name for filename
-        /** @var PathInterface $filename */
-        $filename = $this->app['pathmanager']->create(basename($config['dbname']));
-        if (!$filename->hasExtension()) {
-            $filename = $filename->joinExtensions('db');
+        $filename = basename($config['dbname']);
+        if (!Path::hasExtension($filename)) {
+            $filename .= '.db';
         }
 
         // Join filename with database path
-        $config['path'] = $path->joinAtoms($filename)->string();
+        $config['path'] = Path::join($path, $filename);
 
         return $config;
     }
 
     /**
-     * Parses params to valid connection parameters:
+     * Parses params to valid connection parameters.
+     *
      * - Defaults are merged into the params
      * - Bolt keys are converted to Doctrine keys
      * - Invalid keys are filtered out
@@ -865,7 +834,7 @@ class Config
         $validKeys = [
             'user', 'password', 'host', 'port', 'dbname', 'charset',      // common
             'path', 'memory',                                             // Qqlite
-            'unix_socket', 'driverOptions',                               // MySql
+            'unix_socket', 'driverOptions', 'collate',                    // MySql
             'sslmode',                                                    // PostgreSQL
             'servicename', 'service', 'pooled', 'instancename', 'server', // Oracle
             'persistent',                                                 // SQL Anywhere
@@ -882,7 +851,6 @@ class Config
      */
     private function checkTaxonomy()
     {
-        $passed = true;
         foreach ($this->data['taxonomy'] as $key => $taxonomy) {
             if (empty($taxonomy['options']) || !is_array($taxonomy['options'])) {
                 continue;
@@ -893,7 +861,7 @@ class Config
                     continue;
                 }
 
-                $passed = false;
+                $this->passed = false;
                 $error = Trans::__(
                     'general.phrase.invalid-taxonomy-slug',
                     ['%taxonomy%' => $key, '%option%' => $optionValue]
@@ -902,8 +870,9 @@ class Config
             }
         }
 
-        return $passed;
+        return $this->passed;
     }
+
     /**
      * Sanity checks for doubles in in contenttypes.
      *
@@ -912,10 +881,13 @@ class Config
     public function checkConfig()
     {
         $slugs = [];
-        $passed = true;
+        if ($this->passed === null) {
+            $this->passed = true;
+        } else {
+            return $this->passed;
+        }
 
         foreach ($this->data['contenttypes'] as $key => $ct) {
-
             // Make sure that there are no hyphens in the contenttype name, advise to change to underscores
             if (strpos($key, '-') !== false) {
                 $error = Trans::__(
@@ -925,11 +897,9 @@ class Config
                     ]
                 );
                 $this->app['logger.flash']->error($error);
-                $original = $this->data['contenttypes'][$key];
-                $key = str_replace('-', '_', strtolower(Str::makeSafe($key, true)));
-                $this->data['contenttypes'][$key] = $original;
+                unset($this->data['contenttypes'][$key]);
 
-                $passed = false;
+                $this->passed = false;
             }
 
             /**
@@ -956,7 +926,7 @@ class Config
                     );
                     $this->app['logger.flash']->danger($error);
 
-                    $passed = false;
+                    $this->passed = false;
                 }
 
                 // Check 'uses'. If it's an array, split it up, and check the separate parts. We also need to check
@@ -970,12 +940,16 @@ class Config
                             );
                             $this->app['logger.flash']->warning($error);
 
-                            $passed = false;
+                            $this->passed = false;
                         }
                     }
                 }
 
-                // Make sure that there are no hyphens in the field names, advise to change to underscores
+                // Check if all the used fields are existing field types.
+                // Note: Check is disabled for now, because of the load order. At this point
+                // in the execution, field types added by extensions are not yet initialised,
+                // giving "false positives". See https://github.com/bolt/bolt/pull/7260
+                /*
                 if (!isset($field['type']) || !$this->fields->has($field['type'])) {
                     $error = Trans::__(
                         'contenttypes.generic.no-proper-type',
@@ -988,7 +962,24 @@ class Config
                     $this->app['logger.flash']->warning($error);
 
                     unset($ct['fields'][$fieldname]);
-                    $passed = false;
+                    $this->passed = false;
+                }
+                */
+
+                // Make sure that there are no consecutive underscores in field names
+                if (strpos($fieldname, '__') !== false) {
+                    $error = Trans::__(
+                        'contenttypes.generic.consecutive-underscores',
+                        [
+                            '%contenttype%' => $key,
+                            '%field%'       => $fieldname,
+                            '%type%'        => $field['type'],
+                        ]
+                    );
+                    $this->app['logger.flash']->warning($error);
+
+                    unset($ct['fields'][$fieldname]);
+                    $this->passed = false;
                 }
             }
 
@@ -1012,9 +1003,9 @@ class Config
                         $this->app['logger.flash']->error($error);
 
                         unset($this->data['contenttypes'][$key]['relations'][$relKey]);
-                        $passed = false;
+                        $this->passed = false;
                     }
-                    if (in_array($relKey, array_keys($ct['fields']))) {
+                    if (array_key_exists($relKey, $ct['fields'])) {
                         $error = Trans::__(
                             'general.phrase.clashing-relation',
                             ['%contenttype%' => $key, '%relation%' => $relKey]
@@ -1028,12 +1019,12 @@ class Config
             if (!isset($slugs[$ct['slug']])) {
                 $slugs[$ct['slug']] = 0;
             }
-            $slugs[$ct['slug']]++;
+            ++$slugs[$ct['slug']];
             if (!isset($slugs[$ct['singular_slug']])) {
                 $slugs[$ct['singular_slug']] = 0;
             }
             if ($ct['singular_slug'] != $ct['slug']) {
-                $slugs[$ct['singular_slug']]++;
+                ++$slugs[$ct['singular_slug']];
             }
         }
 
@@ -1047,7 +1038,7 @@ class Config
                 );
                 $this->app['logger.flash']->warning($error);
 
-                $passed = false;
+                $this->passed = false;
             }
         }
 
@@ -1061,12 +1052,12 @@ class Config
                     );
                     $this->app['logger.flash']->warning($error);
 
-                    $passed = false;
+                    $this->passed = false;
                 }
             }
         }
 
-        return $passed && $this->checkTaxonomy();
+        return $this->checkTaxonomy();
     }
 
     /**
@@ -1117,6 +1108,7 @@ class Config
             'debug_enable_whoops'         => false, /** @deprecated. Deprecated since 3.2, to be removed in 4.0 */
             'debug_error_use_symfony'     => false,
             'debug_permission_audit_mode' => false,
+            'debug_trace_argument_limit'  => 4,
             'strict_variables'            => null,
             'theme'                       => 'base-2016',
             'listing_template'            => 'listing.twig',
@@ -1145,19 +1137,16 @@ class Config
                 'ck'          => [
                     'autoParagraph'           => true,
                     'contentsCss'             => [
-                        $this->app['resources']->getUrl('app') . 'view/css/ckeditor-contents.css',
-                        $this->app['resources']->getUrl('app') . 'view/css/ckeditor.css',
+                        ['css/ckeditor-contents.css', 'bolt'],
+                        ['css/ckeditor.css', 'bolt'],
                     ],
                     'filebrowserWindowWidth'  => 640,
                     'filebrowserWindowHeight' => 480,
                 ],
-                'filebrowser' => [
-                    'browseUrl'      => $this->app['resources']->getUrl('async') . 'recordbrowser/',
-                    'imageBrowseUrl' => $this->app['resources']->getUrl('bolt') . 'files/files',
-                ],
             ],
             'liveeditor'                  => true,
             'canonical'                   => null,
+            'developer_notices'           => false,
             'cookies_use_remoteaddr'      => true,
             'cookies_use_browseragent'    => false,
             'cookies_use_httphost'        => true,
@@ -1168,8 +1157,8 @@ class Config
                 'default_image'     => [1000, 750],
                 'quality'           => 75,
                 'cropping'          => 'crop',
-                'notfound_image'    => 'view/img/default_notfound.png',
-                'error_image'       => 'view/img/default_error.png',
+                'notfound_image'    => 'bolt_assets://img/default_notfound.png',
+                'error_image'       => 'bolt_assets://img/default_error.png',
                 'only_aliases'      => false,
             ],
             'accept_file_types'           => explode(',', 'twig,html,js,css,scss,gif,jpg,jpeg,png,ico,zip,tgz,txt,md,doc,docx,pdf,epub,xls,xlsx,csv,ppt,pptx,mp3,ogg,wav,m4a,mp4,m4v,ogv,wmv,avi,webm,svg'),
@@ -1191,6 +1180,10 @@ class Config
                 'http_cache'    => [
                     'options' => [],
                 ],
+                'timed_records' => [
+                    'interval' => 3600,
+                    'use_cron' => false,
+                ],
             ],
         ];
     }
@@ -1202,6 +1195,8 @@ class Config
      */
     public function getTwigPath()
     {
+        Deprecated::method(3.3);
+
         $themepath = $this->app['resources']->getPath('templatespath');
 
         $twigpath = [];
@@ -1222,31 +1217,16 @@ class Config
 
         // We add these later, because the order is important: By having theme/ourtheme first,
         // files in that folder will take precedence. For instance when overriding the menu template.
-        $twigpath[] = $this->app['resources']->getPath('app/theme_defaults');
+        $twigpath[] = $this->app['resources']->getPath('src/../app/theme_defaults');
 
         return $twigpath;
     }
 
     /**
-     * Will be made protected in Bolt 3.0.
+     * @deprecated Deprecated since 3.3, to be removed in 4.0.
      */
     public function setCKPath()
     {
-        $app = $this->app['resources']->getUrl('app');
-
-        // Make sure the paths for CKeditor config are always set correctly.
-        $this->set(
-            'general/wysiwyg/ck/contentsCss',
-            [
-                $app . 'view/css/ckeditor-contents.css',
-                $app . 'view/css/ckeditor.css',
-            ]
-        );
-        $this->set('general/wysiwyg/filebrowser/browseUrl', $this->app['resources']->getUrl('async') . 'recordbrowser/');
-        $this->set(
-            'general/wysiwyg/filebrowser/imageBrowseUrl',
-            $this->app['resources']->getUrl('bolt') . 'files/files/'
-        );
     }
 
     /**
@@ -1304,7 +1284,7 @@ class Config
         $cachedConfigTimestamp = $this->cacheFile->getTimestamp();
 
         /** @var \Bolt\Filesystem\Filesystem $configFs */
-        $configFs = $this->app['filesystem.config'];
+        $configFs = $this->app['filesystem']->getFilesystem('config');
 
         $configFiles = [
             'config.yml',
@@ -1340,7 +1320,7 @@ class Config
             return false;
         }
 
-        $themeDir = $this->app['filesystem.themes']->getDir($this->get('general/theme'));
+        $themeDir = $this->app['filesystem']->getDir('themes://' . $this->get('general/theme'));
 
         // Check the timestamp for the theme's configuration file
         $timestampTheme = 0;
@@ -1397,10 +1377,14 @@ class Config
     /**
      * Get a timestamp, corrected to the timezone.
      *
+     * @param mixed $when
+     *
      * @return string Timestamp
      */
     public function getTimestamp($when)
     {
+        Deprecated::method(3.3);
+
         $timezone = $this->get('general/timezone');
         $now = date_format(new \DateTime($when, new \DateTimeZone($timezone)), 'Y-m-d H:i:s');
 
@@ -1414,6 +1398,8 @@ class Config
      */
     public function getCurrentTimestamp()
     {
+        Deprecated::method(3.3);
+
         $timezone = $this->get('general/timezone');
         $now = date_format(new \DateTime($timezone), 'Y-m-d H:i:s');
 
@@ -1440,6 +1426,8 @@ class Config
      */
     public function getWhichEnd()
     {
+        Deprecated::method(3.0);
+
         $zone = $this->determineZone();
         $this->app['end'] = $zone; // This is also deprecated
 

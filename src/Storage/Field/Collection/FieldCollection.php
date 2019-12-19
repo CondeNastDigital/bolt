@@ -4,6 +4,8 @@ namespace Bolt\Storage\Field\Collection;
 
 use Bolt\Storage\Entity\FieldValue;
 use Doctrine\Common\Collections\ArrayCollection;
+use ParsedownExtra as Markdown;
+use Twig\Markup;
 use Webmozart\Assert\Assert;
 
 /**
@@ -16,6 +18,8 @@ class FieldCollection extends ArrayCollection implements FieldCollectionInterfac
 {
     /** @var int */
     protected $grouping;
+    protected $block;
+    protected $toRemove = [];
 
     /**
      * Constructor.
@@ -90,13 +94,29 @@ class FieldCollection extends ArrayCollection implements FieldCollectionInterfac
     }
 
     /**
+     * @param mixed $block
+     */
+    public function setBlock($block)
+    {
+        $this->block = $block;
+    }
+
+    /**
+     * @return string
+     */
+    public function getBlock()
+    {
+        return $this->first()->getBlock();
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function add($value)
     {
         Assert::isInstanceOf($value, FieldValue::class);
 
-        $this->set($value->getFieldname(), $value);
+        $this->set($value->getFieldName(), $value);
 
         return true;
     }
@@ -119,5 +139,56 @@ class FieldCollection extends ArrayCollection implements FieldCollectionInterfac
     public function getIterator()
     {
         return parent::getIterator();
+    }
+
+    public function serialize()
+    {
+        $output = [];
+
+        foreach ($this->collection as $field) {
+            $output[$field->getFieldName()] = $field->getValue();
+        }
+
+        return $output;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getFieldType($fieldName)
+    {
+        $field = parent::get($fieldName);
+
+        if ($field) {
+            return $field->getFieldType();
+        }
+
+        return null;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getRenderedValue($fieldName)
+    {
+        $field = parent::get($fieldName);
+
+        if (!$field instanceof FieldValue) {
+            return null;
+        }
+
+        $fieldType = $field->getFieldType();
+        $value = $field->getValue();
+
+        if ($fieldType === 'markdown') {
+            $markdown = new Markdown();
+            $value = $markdown->text($value);
+        }
+
+        if (in_array($fieldType, ['markdown', 'html', 'text', 'textarea'], true)) {
+            $value = new Markup($value, 'UTF-8');
+        }
+
+        return $value;
     }
 }

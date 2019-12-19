@@ -17,8 +17,14 @@ class SearchConfig
     protected $config = [];
     /** @var array */
     protected $searchableTypes = [];
+
+    /** @var array */
+    protected $invisibleTypes = [];
+
     /** @var array */
     protected $joins = [];
+
+    protected $searchInvisible = false;
 
     public function __construct(Config $config)
     {
@@ -39,8 +45,13 @@ class SearchConfig
             return $this->searchableTypes[$contentType];
         }
 
+        if ($this->canSearchInvisible() && array_key_exists($contentType, $this->invisibleTypes)) {
+            return $this->invisibleTypes[$contentType];
+        }
+
         return false;
     }
+
 
     /**
      * Get the config of one given field for a given content type.
@@ -56,25 +67,25 @@ class SearchConfig
             return $this->searchableTypes[$contentType][$field];
         }
 
+        if ($this->canSearchInvisible() && isset($this->invisibleTypes[$contentType][$field])) {
+            return $this->invisibleTypes[$contentType][$field];
+        }
+
         return false;
     }
 
     /**
      * Iterates over the main config and delegates weighting to both
      * searchable columns and searchable taxonomies.
-     *
-     * @return void
      */
     protected function parseContenttypes()
     {
         $contentTypes = $this->config->get('contenttypes');
 
         foreach ($contentTypes as $type => $values) {
-            if (! $this->isInvisible($type)) {
-                $this->getSearchableColumns($type);
-                if (isset($values['taxonomy'])) {
-                    $this->parseTaxonomies($type, $values['taxonomy']);
-                }
+            $this->getSearchableColumns($type);
+            if (isset($values['taxonomy'])) {
+                $this->parseTaxonomies($type, $values['taxonomy']);
             }
         }
     }
@@ -85,8 +96,6 @@ class SearchConfig
      *
      * @param string $contentType
      * @param array  $taxonomies
-     *
-     * @return void
      */
     protected function parseTaxonomies($contentType, $taxonomies)
     {
@@ -99,7 +108,11 @@ class SearchConfig
             } else {
                 $weight = 50;
             }
-            $this->searchableTypes[$contentType][$taxonomy] = ['weight' => $weight];
+            if (!$this->isInvisible($contentType)) {
+                $this->searchableTypes[$contentType][$taxonomy] = ['weight' => $weight];
+            } else {
+                $this->invisibleTypes[$contentType][$taxonomy] = ['weight' => $weight];
+            }
             $this->joins[$contentType][] = $taxonomy;
         }
     }
@@ -121,8 +134,6 @@ class SearchConfig
      * Determine what columns are searchable for a given ContentType.
      *
      * @param string $type
-     *
-     * @return void
      */
     protected function getSearchableColumns($type)
     {
@@ -139,7 +150,11 @@ class SearchConfig
                     $weight = 50;
                 }
 
-                $this->searchableTypes[$type][$field] = ['weight' => $weight];
+                if (!$this->isInvisible($type)) {
+                    $this->searchableTypes[$type][$field] = ['weight' => $weight];
+                } else {
+                    $this->invisibleTypes[$type][$field] = ['weight' => $weight];
+                }
             }
         }
     }
@@ -150,20 +165,36 @@ class SearchConfig
      *
      * @param string $contentType
      *
-     * @return boolean
+     * @return bool
      */
     protected function isInvisible($contentType)
     {
         $info = $this->config->get('contenttypes/' . $contentType);
         if ($info) {
-            if (array_key_exists('viewless', $info) && $info['viewless'] == true) {
+            if (array_key_exists('viewless', $info) && $info['viewless'] === true) {
                 return true;
             }
-            if (array_key_exists('searchable', $info) && $info['searchable'] == false) {
+            if (array_key_exists('searchable', $info) && $info['searchable'] === false) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * @return bool
+     */
+    public function canSearchInvisible()
+    {
+        return $this->searchInvisible;
+    }
+
+    /**
+     * @param bool $searchInvisible
+     */
+    public function enableSearchInvisible($searchInvisible)
+    {
+        $this->searchInvisible = $searchInvisible;
     }
 }

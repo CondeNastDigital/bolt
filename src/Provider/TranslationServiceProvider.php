@@ -2,7 +2,7 @@
 
 namespace Bolt\Provider;
 
-use Bolt\Library as Lib;
+use Bolt\Common\Thrower;
 use Silex;
 use Silex\Application;
 use Silex\ServiceProviderInterface;
@@ -16,22 +16,32 @@ class TranslationServiceProvider implements ServiceProviderInterface
             $app->register(
                 new Silex\Provider\TranslationServiceProvider(),
                 [
-                    'locale_fallbacks'     => ['en_GB', 'en'],
+                    'locale_fallbacks' => ['en_GB', 'en'],
                 ]
             );
         }
 
-        $app['translator.caching'] = true;
-        if ($app['config']->get('general/caching/translations') === false) {
-            $app['translator.caching'] = false;
-        }
+        $previousLocale = $app->raw('locale');
+        $app['locale'] = $app->share(function ($app) use ($previousLocale) {
+            if (($locales = $app['config']->get('general/locale')) !== null) {
+                $locales = (array) $locales;
+
+                return reset($locales);
+            }
+
+            return $previousLocale;
+        });
+
+        $app['translator.caching'] = function ($app) {
+            return (bool) $app['config']->get('general/caching/translations');
+        };
 
         $app['translator.cache_dir'] = $app->share(function ($app) {
             if ($app['translator.caching'] === false) {
                 return null;
             }
 
-            return $app['resources']->getPath('cache/trans');
+            return $app['path_resolver']->resolve('%cache%/trans');
         });
 
         $app['translator'] = $app->share(
@@ -73,6 +83,15 @@ class TranslationServiceProvider implements ServiceProviderInterface
             }
         );
 
+        // for javascript datetime calculations, timezone offset. e.g. "+02:00"
+        $app['timezone_offset'] = date('P');
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function boot(Application $app)
+    {
         $locales = (array) $app['config']->get('general/locale');
 
         // Add fallback locales to list if they are not already there
@@ -85,16 +104,6 @@ class TranslationServiceProvider implements ServiceProviderInterface
         setlocale(LC_ALL, $locales);
 
         $this->setDefaultTimezone($app);
-
-        // for javascript datetime calculations, timezone offset. e.g. "+02:00"
-        $app['timezone_offset'] = date('P');
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function boot(Application $app)
-    {
     }
 
     /**
@@ -110,8 +119,10 @@ class TranslationServiceProvider implements ServiceProviderInterface
         // Directories to look for translation file(s)
         $transDirs = array_unique(
             [
-                $app['resources']->getPath("app/resources/translations/{$locale}"),
-                $app['resources']->getPath("root/app/resources/translations/{$locale}"),
+                $app['path_resolver']->resolve('%site%/app/translation/'),
+                $app['path_resolver']->resolve("%site%/app/translation/{$locale}"),
+                $app['path_resolver']->resolve("%bolt%/app/resources/translations/{$locale}"),
+                $app['path_resolver']->resolve("%root%/app/resources/translations/{$locale}"), // Will be done better in v3.4
             ]
         );
 
@@ -124,11 +135,9 @@ class TranslationServiceProvider implements ServiceProviderInterface
                 continue;
             }
             $iterator = new \DirectoryIterator($transDir);
-            /**
-             * @var \SplFileInfo $fileInfo
-             */
+            /** @var \SplFileInfo $fileInfo */
             foreach ($iterator as $fileInfo) {
-                $ext = Lib::getExtension((string) $fileInfo);
+                $ext = pathinfo($fileInfo, PATHINFO_EXTENSION);
                 if (!$fileInfo->isFile() || !in_array($ext, ['yml', 'xlf'], true)) {
                     continue;
                 }
@@ -197,18 +206,18 @@ class TranslationServiceProvider implements ServiceProviderInterface
             return;
         }
 
-        // PHP 7.0+ doesn't emit warning for no timezone set.
+        // PHP 7.0+ doesn't emit warning for no timezone set.
         if (PHP_MAJOR_VERSION > 5) {
             return;
         }
 
         // Run check to see if a default timezone has been set
-        $hasDefault = true;
-        set_error_handler(function () use (&$hasDefault) {
+        try {
+            Thrower::call('date_default_timezone_get');
+            $hasDefault = true;
+        } catch (\ErrorException $e) {
             $hasDefault = false;
-        });
-        date_default_timezone_get();
-        restore_error_handler();
+        }
 
         // If no default, set to UTC to prevent default not defined warnings
         if (!$hasDefault) {

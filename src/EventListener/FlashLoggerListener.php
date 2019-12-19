@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\EventListener;
 
 use Bolt\Logger\FlashBagAttachableInterface;
@@ -17,7 +18,7 @@ class FlashLoggerListener implements EventSubscriberInterface
 {
     /** @var FlashBagAttachableInterface */
     protected $flashLogger;
-    /** @var boolean */
+    /** @var bool */
     protected $debug;
     /** @var string */
     protected $profilerMountPrefix;
@@ -26,7 +27,7 @@ class FlashLoggerListener implements EventSubscriberInterface
      * Constructor.
      *
      * @param FlashBagAttachableInterface $flashLogger
-     * @param boolean                     $debug
+     * @param bool                        $debug
      * @param string                      $profilerMountPrefix
      */
     public function __construct(FlashBagAttachableInterface $flashLogger, $debug, $profilerMountPrefix)
@@ -37,7 +38,7 @@ class FlashLoggerListener implements EventSubscriberInterface
     }
 
     /**
-     * Resume the session if it has been started previously or debugging is enabled
+     * Resume the session if it has been started previously or debugging is enabled.
      *
      * @param GetResponseEvent $event
      */
@@ -57,7 +58,7 @@ class FlashLoggerListener implements EventSubscriberInterface
     }
 
     /**
-     * Attach session's flash bag to flash logger if it is started
+     * Attach session's flash bag to flash logger if it is started.
      *
      * @param GetResponseEvent|FilterResponseEvent $event
      */

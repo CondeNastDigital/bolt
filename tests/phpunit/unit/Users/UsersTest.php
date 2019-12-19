@@ -1,7 +1,9 @@
 <?php
+
 namespace Bolt\Tests\Users;
 
 use Bolt\Tests\BoltUnitTest;
+use Bolt\Users;
 
 /**
  * Class to test correct operation of src/Users.
@@ -15,9 +17,6 @@ class UsersTest extends BoltUnitTest
      */
     private $user;
 
-    /**
-     * @see \PHPUnit_Framework_TestCase::setUp
-     */
     protected function setUp()
     {
         $this->resetDb();
@@ -29,12 +28,12 @@ class UsersTest extends BoltUnitTest
     }
 
     /**
-     * @covers Bolt\Users::getUser
+     * @covers \Bolt\Users::getUser
      */
     public function testGetUserById()
     {
         // Setup test
-        $users = $this->getMock('Bolt\Users', ['getUsers'], [$this->getApp()]);
+        $users = $this->getMockUsers();
 
         // Run test
         $result = $users->getUser(2);
@@ -46,12 +45,12 @@ class UsersTest extends BoltUnitTest
     }
 
     /**
-     * @covers Bolt\Users::getUser
+     * @covers \Bolt\Users::getUser
      */
     public function testGetUserByUnknownId()
     {
         // Setup test
-        $users = $this->getMock('Bolt\Users', ['getUsers'], [$this->getApp()]);
+        $users = $this->getMockUsers();
 
         // Run test
         $result = $users->getUser(0);
@@ -61,12 +60,12 @@ class UsersTest extends BoltUnitTest
     }
 
     /**
-     * @covers Bolt\Users::getUser
+     * @covers \Bolt\Users::getUser
      */
     public function testGetUserByUsername()
     {
         // Setup test
-        $users = $this->getMock('Bolt\Users', ['getUsers'], [$this->getApp()]);
+        $users = $this->getMockUsers();
 
         // Run test
         $result = $users->getUser('editor');
@@ -78,12 +77,12 @@ class UsersTest extends BoltUnitTest
     }
 
     /**
-     * @covers Bolt\Users::getUser
+     * @covers \Bolt\Users::getUser
      */
     public function testGetUserByUnknownUsername()
     {
         // Setup test
-        $users = $this->getMock('Bolt\Users', ['getUsers'], [$this->getApp()]);
+        $users = $this->getMockUsers();
 
         // Run test
         $result = $users->getUser('anotheruser');

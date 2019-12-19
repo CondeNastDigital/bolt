@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Backend 'manager' tests
+ * Backend 'manager' tests.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
@@ -40,7 +40,7 @@ class BackendManagerCest extends AbstractAcceptanceTest
 
         $I->selectOption('#statusselect', 'published');
 
-        $I->click('Save', '#savecontinuebutton');
+        $I->submitForm('form[name="content_edit"]', ['content_edit' => ['save' => 1]]);
 
         $I->see('The changes to the Page have been saved.');
     }
@@ -63,7 +63,7 @@ class BackendManagerCest extends AbstractAcceptanceTest
 
         $I->selectOption('#statusselect', 'published');
 
-        $I->click('Save', '#savecontinuebutton');
+        $I->submitForm('form[name="content_edit"]', ['content_edit' => ['save' => 1]]);
 
         $I->see('The changes to the Page have been saved.');
     }
@@ -85,7 +85,7 @@ class BackendManagerCest extends AbstractAcceptanceTest
 
         $I->selectOption('#statusselect', 'published');
 
-        $I->click('Save', '#savecontinuebutton');
+        $I->submitForm('form[name="content_edit"]', ['content_edit' => ['save' => 1]]);
 
         $I->see('The changes to the Page have been saved.');
     }

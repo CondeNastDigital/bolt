@@ -3,15 +3,15 @@
 {% set field = context.contenttype.fields[key] %}
 
 <div data-bolt-fieldset="{{ field.type }}">
-    {# Prefix #}
-    {% if field.prefix is defined and field.prefix is not empty %}
+    {# Prefix. Except for Block and Repeater fields, since they handle it in the "group" #}
+    {% if field.prefix is defined and field.prefix is not empty and field.type not in ['block', 'repeater'] %}
         <div class="prefix">
             {{ field.prefix|markdown }}
         </div>
     {% endif %}
 
     {# Fields #}
-    {% set labelkey = field.label ?: key|ucfirst %}
+    {% set labelkey = field.label ?: key|capitalize %}
 
     {# Temporary approach until v4. @see https://github.com/bolt/bolt/issues/5237 #}
     {% set templatename = context.fields[field.type].template %}

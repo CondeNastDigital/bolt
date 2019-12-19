@@ -8,31 +8,34 @@
 
 {% block page_subtitle context.basename %}
 
+{% form_theme context.form 'form_bolt_layout.twig' _self %}
+
 {% block page_main %}
 
     {% import '@bolt/_macro/_macro.twig' as macro %}
 
-    {% set attr_text = {
-        _bind:     ismobileclient() ? '' : ['editlocale', {readonly: context.write_allowed ? false : true}],
-        class:     'CodeMirror-scroll',
-        id:        'form_contents',
-        name:      'form[contents]',
-        required:  true,
-        style:     'width: 98%;',
-    } %}
-
     <div class="row">
         <div class="col-xs-12">
-            <form method="post" class="form-inline" autocomplete="off">
+            {{ form_start(context.form, {'attr': {'class': 'form-inline', 'autocomplete': 'off'}}) }}
                 <div>
-                    <textarea{{ macro.attr(attr_text) }}>{{ context.form.vars.value.contents }}</textarea>
+                    {% set bind = ismobileclient() ? '' : {'bind': 'editlocale', 'readonly': context.write_allowed ? false : true} %}
+                    {{ form_errors(context.form.contents) }}
+                    {{ form_widget(context.form.contents,
+                        {
+                            'class': 'CodeMirror-scroll',
+                            'attr': {
+                                'data-bind': bind|json_encode
+                            }
+                        })
+                    }}
                 </div>
+                <br>
+                {# Let's play "Hide the button" … #}
                 {% if context.write_allowed %}
                     {{ form_widget(context.form._token) }}
-                    <br>
-                    <input type="submit" id="saveeditlocale" name="submit" value="{{ __('page.edit-locale.button.save') }}" class="btn btn-primary" {% if not context.write_allowed %}disabled{% endif %} />
+                    {{ form_widget(context.form.save) }}
                 {% endif %}
-            </form>
+            {{ form_end(context.form, { 'render_rest': false }) }}
         </div>
     </div>
 
@@ -40,7 +43,7 @@
         {# use the files includes in ckeditor/codemirror plugin, instead of duplicating files. #}
         <link rel="stylesheet" property="stylesheet" href="{{ asset('js/ckeditor/plugins/codemirror/css/codemirror.min.css', 'bolt') }}">
         <script src="{{ asset('js/ckeditor/ckeditor.js', 'bolt') }}"></script>
-        <script src="{{ asset('js/ckeditor/plugins/codemirror/js/codemirror.min.js', 'bolt') }}"></script>
+        <script src="{{ asset('js/ckeditor/plugins/codemirror/js/codemirror.js', 'bolt') }}"></script>
         <script src="{{ asset('js/ckeditor/plugins/codemirror/plugins/yaml.min.js', 'bolt') }}"></script>
     {% endif %}
 

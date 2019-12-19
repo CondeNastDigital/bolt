@@ -3,7 +3,7 @@
 use Codeception\Util\Locator;
 
 /**
- * Backend 'editor' tests
+ * Backend 'editor' tests.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
@@ -58,6 +58,39 @@ class BackendEditorCest extends AbstractAcceptanceTest
     }
 
     /**
+     * Create a homepage record.
+     *
+     * @param \AcceptanceTester $I
+     */
+    public function createHomepageTest(\AcceptanceTester $I)
+    {
+        $I->wantTo("Create and edit the Homepage as the 'editor' user");
+
+        // Set up the browser
+        $this->setLoginCookies($I);
+        $I->amOnPage('/bolt');
+
+        $I->see('New Homepage');
+
+        $I->click('New Homepage');
+        $I->see('Homepage',      Locator::href('/bolt/editcontent/homepage'));
+
+        $I->fillField('#title',   'Welcome Home (Sanitarium)');
+        $I->fillField('#slug',    'welcome-home-sanitarium');
+        $I->fillField('#teaser',  'Welcome to where time stands still');
+        $I->fillField('#content', 'No one leaves and no one will');
+
+        $I->submitForm('form[name="content_edit"]', ['content_edit' => ['save' => 1]]);
+        $I->see('The new Homepage has been saved.');
+
+        $I->see('Welcome Home (Sanitarium)');
+        $I->see('Welcome to where time stands still');
+        $I->see('No one leaves and no one will');
+
+        $I->seeOptionIsSelected('#statusselect', 'Published');
+    }
+
+    /**
      * Create a page record.
      *
      * @param \AcceptanceTester $I
@@ -82,7 +115,7 @@ class BackendEditorCest extends AbstractAcceptanceTest
         $I->fillField('#teaser', 'Woop woop woop! Crazy nice stuff inside!');
         $I->fillField('#body',   'Take it, take it! I have three more of these!');
 
-        $I->click('Save Page', '#savecontinuebutton');
+        $I->submitForm('form[name="content_edit"]', ['content_edit' => ['save' => 1]]);
         $I->see('The new Page has been saved.');
 
         $I->see('A page I made');
@@ -90,25 +123,7 @@ class BackendEditorCest extends AbstractAcceptanceTest
     }
 
     /**
-     * Check that the PRE_SAVE and POST_SAVE storage event triggered on create.
-     *
-     * @param \AcceptanceTester $I
-     */
-    public function checkCreateRecordsEventTest(\AcceptanceTester $I)
-    {
-        $I->wantTo('Check the PRE_SAVE & POST_SAVE StorageEvent triggered correctly on create');
-
-        // Set up the browser
-        $this->setLoginCookies($I);
-        $I->amOnPage('/bolt/editcontent/pages/1');
-
-        $I->seeInField('#title',  'A PAGE I MADE');
-        $I->see('Snuck in to teaser during PRE_SAVE on create');
-        $I->see('Snuck in to body during POST_SAVE on create');
-    }
-
-    /**
-     * Check that the editor can't publish Entries
+     * Check that the editor can't publish Entries.
      *
      * @param \AcceptanceTester $I
      */
@@ -127,7 +142,7 @@ class BackendEditorCest extends AbstractAcceptanceTest
         $I->dontSeeInField('#statusselect', 'published');
 
         // Save the page and return to the overview
-        $I->click('Save & return to overview');
+        $I->submitForm('form[name="content_edit"]', ['content_edit' => ['save_return' => 1]]);
         $I->see('Actions for Pages', '.panel-heading');
 
         // Check the 'Publish page' context menu option isn't shown
@@ -138,25 +153,7 @@ class BackendEditorCest extends AbstractAcceptanceTest
     }
 
     /**
-     * Check that the PRE_SAVE and POST_SAVE storage event triggered on save.
-     *
-     * @param \AcceptanceTester $I
-     */
-    public function checkSaveRecordsEventTest(\AcceptanceTester $I)
-    {
-        $I->wantTo('Check the PRE_SAVE & POST_SAVE StorageEvent triggered correctly on save');
-
-        // Set up the browser
-        $this->setLoginCookies($I);
-        $I->amOnPage('/bolt/editcontent/pages/1');
-
-        $I->seeInField('#title',  'A Page I Made');
-        $I->see('Added to teaser during PRE_SAVE on save');
-        $I->see('Added to body during POST_SAVE on save');
-    }
-
-    /**
-     * Check that the editor can't create Entries
+     * Check that the editor can't create Entries.
      *
      * @param \AcceptanceTester $I
      */
@@ -188,14 +185,14 @@ class BackendEditorCest extends AbstractAcceptanceTest
         $I->click('New Page');
 
         $teaser = file_get_contents(CODECEPTION_DATA . '/about.teaser.html');
-        $body   = file_get_contents(CODECEPTION_DATA . '/about.body.html');
+        $body = file_get_contents(CODECEPTION_DATA . '/about.body.html');
 
         $I->fillField('#title',  'About');
         $I->fillField('#slug',   'about');
         $I->fillField('#teaser', $teaser);
         $I->fillField('#body',   $body);
 
-        $I->click('Save Page', '#savecontinuebutton');
+        $I->submitForm('form[name="content_edit"]', ['content_edit' => ['save' => 1]]);
 
         $I->see('The new Page has been saved.');
         $I->see("Easy for editors, and a developer's dream cms");
@@ -224,9 +221,9 @@ class BackendEditorCest extends AbstractAcceptanceTest
         $I->fillField('#slug',        'contact');
         $I->selectOption('#template', 'page.twig');
 
-        $I->click('Save Page', '#savecontinuebutton');
+        $I->submitForm('form[name="content_edit"]', ['content_edit' => ['save' => 1]]);
         $I->see('The new Page has been saved.');
-        $I->click('CONTACT PAGE');
+        $I->click('Contact Page');
 
         // Page has been saved, fill TemplateFields
         $I->see('Template', 'a[data-toggle=tab]');
@@ -256,9 +253,9 @@ class BackendEditorCest extends AbstractAcceptanceTest
         $I->selectOption('#templatefields-select_record_single', '2');
         $I->selectOption('#templatefields-select_record_keys', 'contact');
 
-        $I->click('Save Page', '#savecontinuebutton');
+        $I->click('Save Page', '#content_edit_save');
 
-        $I->click('CONTACT PAGE');
+        $I->click('Contact Page');
 
         $I->seeInField('#templatefields-text', 'This is the contact text');
         $I->seeInField('#templatefields-html', '<p>HTML for Drop Bears</p>');
@@ -277,10 +274,10 @@ class BackendEditorCest extends AbstractAcceptanceTest
         $I->seeInField('#templatefields-select_multi', 'Donatello');
         $I->seeInField('#templatefields-select_multi', 'Rafael');
         $I->seeInField('#templatefields-select_record', '1');
-        $I->seeOptionIsSelected("#templatefields-select_record", '1 / A Page I Made');
+        $I->seeOptionIsSelected('#templatefields-select_record', '1 / A page I made');
         $I->seeInField('#templatefields-select_record_single', '2');
-        $I->seeOptionIsSelected("#templatefields-select_record_single", 'ABOUT');
+        $I->seeOptionIsSelected('#templatefields-select_record_single', 'About');
         $I->seeInField('#templatefields-select_record_keys', 'contact');
-        $I->seeOptionIsSelected("#templatefields-select_record_keys", 'Contact Page');
+        $I->seeOptionIsSelected('#templatefields-select_record_keys', 'Contact Page');
     }
 }

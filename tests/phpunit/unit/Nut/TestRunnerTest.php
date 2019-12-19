@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Tests\Nut;
 
 use Bolt\Nut\TestRunner;
@@ -20,7 +21,7 @@ class TestRunnerTest extends BoltUnitTest
 
         $tester->execute([]);
         $result = $tester->getDisplay();
-        $this->assertRegExp('/phpunit/', $result);
+        $this->assertRegExp('/Running PHPUnit/', $result);
     }
 }
 

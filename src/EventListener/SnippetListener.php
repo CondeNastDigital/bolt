@@ -2,46 +2,47 @@
 
 namespace Bolt\EventListener;
 
-use Bolt\Asset\Snippet\Queue;
+use Bolt\Asset\QueueInterface;
+use Bolt\Asset\Snippet\Queue as SnippetQueue;
 use Bolt\Asset\Snippet\Snippet;
 use Bolt\Asset\Target;
 use Bolt\Config;
-use Bolt\Configuration\ResourceManager;
 use Bolt\Controller\Zone;
-use Bolt\Render;
+use Bolt\Routing\Canonical;
+use Symfony\Component\Asset\Packages;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\Event\FilterResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 class SnippetListener implements EventSubscriberInterface
 {
-    /** @var Queue */
-    protected $queue;
+    /** @var QueueInterface[] */
+    protected $queues;
+    /** @var Canonical */
+    protected $canonical;
+    /** @var Packages */
+    protected $packages;
     /** @var Config */
     protected $config;
-    /** @var ResourceManager */
-    protected $resources;
-    /** @var Render */
-    protected $render;
 
     /**
-     * SnippetListener constructor.
+     * Constructor.
      *
-     * @param Queue           $queue
-     * @param Config          $config
-     * @param ResourceManager $resources
-     * @param Render          $render
+     * @param QueueInterface[] $queues
+     * @param Canonical        $canonical
+     * @param Packages         $packages
+     * @param Config           $config
      */
-    public function __construct(Queue $queue, Config $config, ResourceManager $resources, Render $render)
+    public function __construct(array $queues, Canonical $canonical, Packages $packages, Config $config)
     {
-        $this->queue = $queue;
+        $this->queues = $queues;
+        $this->canonical = $canonical;
+        $this->packages = $packages;
         $this->config = $config;
-        $this->resources = $resources;
-        $this->render = $render;
     }
 
     /**
-     * Callback for reponse event.
+     * Callback for response event.
      *
      * @param FilterResponseEvent $event
      */
@@ -52,20 +53,23 @@ class SnippetListener implements EventSubscriberInterface
         }
 
         $request = $event->getRequest();
-        if (Zone::isAsync($request)) {
+        if (Zone::isAsync($request) || $request->isXmlHttpRequest()) {
             return;
         }
 
         $response = $event->getResponse();
+        if ($response->isRedirection() || $response->isEmpty() || $response->isInformational()) {
+            return;
+        }
         if (strpos($response->headers->get('Content-Type'), 'text/html') === false) {
             return;
         }
 
-        if (!$event->getRequest()->isXmlHttpRequest()) {
-            $this->addSnippets();
-        }
+        $this->addSnippets();
 
-        $this->render->postProcess($request, $response);
+        foreach ($this->queues as $queue) {
+            $queue->process($request, $response);
+        }
     }
 
     /**
@@ -73,29 +77,38 @@ class SnippetListener implements EventSubscriberInterface
      */
     protected function addSnippets()
     {
+        $queue = null;
+        foreach ($this->queues as $q) {
+            if ($q instanceof SnippetQueue) {
+                $queue = $q;
+                break;
+            }
+        }
+        if (!$queue) {
+            return;
+        }
+
         $generatorSnippet = (new Snippet())
             ->setLocation(Target::END_OF_HEAD)
             ->setCallback('<meta name="generator" content="Bolt">')
         ;
-        $this->queue->add($generatorSnippet);
+        $queue->add($generatorSnippet);
 
-        if ($this->config->get('general/canonical')) {
-            $canonical = $this->resources->getUrl('canonicalurl');
+        if ($canonicalUrl = $this->canonical->getUrl()) {
             $canonicalSnippet = (new Snippet())
                 ->setLocation(Target::END_OF_HEAD)
-                ->setCallback($this->encode('<link rel="canonical" href="%s">', $canonical))
+                ->setCallback($this->encode('<link rel="canonical" href="%s">', $canonicalUrl))
             ;
-            $this->queue->add($canonicalSnippet);
+            $queue->add($canonicalSnippet);
         }
 
         if ($favicon = $this->config->get('general/favicon')) {
-            $host = $this->resources->getUrl('hosturl');
-            $theme = $this->resources->getUrl('theme');
+            $faviconUrl = $this->packages->getUrl($favicon, 'theme');
             $faviconSnippet = (new Snippet())
                 ->setLocation(Target::END_OF_HEAD)
-                ->setCallback($this->encode('<link rel="shortcut icon" href="%s%s%s">', $host, $theme, $favicon))
+                ->setCallback($this->encode('<link rel="shortcut icon" href="%s">', $faviconUrl))
             ;
-            $this->queue->add($faviconSnippet);
+            $queue->add($faviconSnippet);
         }
     }
 

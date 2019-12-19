@@ -2,9 +2,9 @@
 
 namespace Bolt\Nut;
 
+use Bolt\Common\Json;
 use Bolt\Storage\Entity;
 use Bolt\Storage\Repository\UsersRepository;
-use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -36,49 +36,64 @@ class UserManage extends BaseCommand
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         /** @var \Bolt\Storage\Repository\UsersRepository $repo */
-        $repo = $this->app['storage']->getRepository('Bolt\Storage\Entity\Users');
-        
+        $repo = $this->app['storage']->getRepository(Entity\Users::class);
+
         $userLogin = $input->getArgument('login');
         $userEntity = $this->getUser($repo, $userLogin);
         if ($userEntity === false) {
-            $output->writeln(sprintf('<error>User account not found for %s</error>', $userLogin));
+            $this->io->error(sprintf('User account not found for %s', $userLogin));
 
-            return;
+            return 1;
+        }
+
+        if ($input->getOption('enable') && $input->getOption('disable')) {
+            throw new \RuntimeException('You can not enable and disable a user at the same time.');
         }
 
         if ($input->getOption('enable')) {
+            $this->io->title("Updating user: '$userLogin'");
             $userEntity->setEnabled(true);
             $repo->save($userEntity);
-            $output->writeln("<info>Enabled user: {$userEntity->getUsername()}</info>");
+            $this->io->success("Enabled user: {$userEntity->getUsername()}");
+
+            return 0;
         }
 
         if ($input->getOption('disable')) {
+            $this->io->title("Updating user: '$userLogin'");
             $userEntity->setEnabled(false);
             $repo->save($userEntity);
-            $output->writeln("<info>Disabled user: {$userEntity->getUsername()}</info>");
+            $this->io->success("Disabled user: {$userEntity->getUsername()}");
+
+            return 0;
         }
 
         if ($input->getOption('list')) {
-            $table = new Table($output);
-            $table
-                ->setHeaders(['User name', 'Email', 'Display Name', 'Roles', 'Enabled'])
-                ->addRow([
+            $this->io->title("Account details for '$userLogin'");
+            $headers = ['User name', 'Email', 'Display Name', 'Roles', 'Enabled'];
+            $roles = array_filter($userEntity->getRoles(), function ($var) {
+                return $var !== 'everyone';
+            });
+            $rows = [
+                [
                     $userEntity->getUsername(),
                     $userEntity->getEmail(),
                     $userEntity->getDisplayname(),
-                    implode(', ', $userEntity->getRoles()),
-                    json_encode($userEntity->getEnabled()),
-                ])
-            ;
-            $table->render();
+                    implode(', ', $roles),
+                    Json::dump($userEntity->getEnabled()),
+                ],
+            ];
+            $this->io->table($headers, $rows);
         }
+
+        return 0;
     }
 
     /**
      * @param UsersRepository $repo
      * @param string          $userLogin
      *
-     * @return Entity\Users
+     * @return Entity\Users|false
      */
     protected function getUser(UsersRepository $repo, $userLogin)
     {

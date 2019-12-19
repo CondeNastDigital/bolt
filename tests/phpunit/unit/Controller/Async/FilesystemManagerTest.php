@@ -1,10 +1,10 @@
 <?php
+
 namespace Bolt\Tests\Controller\Async;
 
+use Bolt\Common\Json;
 use Bolt\Filesystem\Handler\HandlerInterface;
-use Bolt\Response\BoltResponse;
-use Bolt\Session\Handler\FileHandler;
-use Bolt\Storage\Entity;
+use Bolt\Response\TemplateView;
 use Bolt\Tests\Controller\ControllerUnitTest;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -27,7 +27,8 @@ class FilesystemManagerTest extends ControllerUnitTest
     private $oldFiles = [];
 
     /**
-     * Store the list of files in the files folder so we can delete any added files after we're done testing
+     * Store the list of files in the files folder so we can delete any added files after we're done testing.
+     *
      * @before
      */
     public function storeFileList()
@@ -36,7 +37,8 @@ class FilesystemManagerTest extends ControllerUnitTest
     }
 
     /**
-     * Remove any files added during the test
+     * Remove any files added during the test.
+     *
      * @after
      */
     public function restoreFileList()
@@ -59,9 +61,8 @@ class FilesystemManagerTest extends ControllerUnitTest
         $this->setRequest(Request::create('/async/browse'));
         $response = $this->controller()->browse($this->getRequest(), self::FILESYSTEM, '/');
 
-        $this->assertInstanceOf(BoltResponse::class, $response);
-        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
-        $this->assertEquals('@bolt/async/browse.twig', $response->getTemplateName());
+        $this->assertInstanceOf(TemplateView::class, $response);
+        $this->assertEquals('@bolt/async/browse.twig', $response->getTemplate());
     }
 
     public function testCreateFolder()
@@ -69,7 +70,7 @@ class FilesystemManagerTest extends ControllerUnitTest
         $this->setRequest(Request::create('/async/folder/create', 'POST', [
             'namespace'  => self::FILESYSTEM,
             'parent'     => '',
-            'foldername' => self::FOLDER_NAME
+            'foldername' => self::FOLDER_NAME,
         ]));
         $response = $this->controller()->createFolder($this->getRequest());
 
@@ -104,7 +105,7 @@ class FilesystemManagerTest extends ControllerUnitTest
         $this->setRequest(Request::create('/async/file/create', 'POST', [
             'namespace'  => self::FILESYSTEM,
             'parentPath' => '',
-            'filename'   => self::FILE_NAME
+            'filename'   => self::FILE_NAME,
         ]));
         $response = $this->controller()->createFile($this->getRequest());
 
@@ -131,7 +132,7 @@ class FilesystemManagerTest extends ControllerUnitTest
             $fileBase = substr($filename, 0, $extensionPos) . '_copy';
             $fileExtension = substr($filename, $extensionPos);
 
-            for ($i = 1; $i <= 5; $i++) {
+            for ($i = 1; $i <= 5; ++$i) {
                 $destination = $fileBase . $i . $fileExtension;
 
                 // The file shouldn't exist yet
@@ -139,7 +140,7 @@ class FilesystemManagerTest extends ControllerUnitTest
 
                 $this->setRequest(Request::create('/async/file/duplicate', 'POST', [
                     'namespace' => self::FILESYSTEM,
-                    'filename'  => $filename
+                    'filename'  => $filename,
                 ]));
 
                 $response = $this->controller()->duplicateFile($this->getRequest());
@@ -156,7 +157,7 @@ class FilesystemManagerTest extends ControllerUnitTest
     {
         $this->setRequest(Request::create('/async/file/delete', 'POST', [
             'namespace' => 'files',
-            'filename'  => self::FILE_NAME
+            'filename'  => self::FILE_NAME,
         ]));
 
         // The file should still exist before deleting
@@ -178,13 +179,13 @@ class FilesystemManagerTest extends ControllerUnitTest
     }
 
     /**
-     * Test renaming both files and folders, since the controller actions have the same signature and output
+     * Test renaming both files and folders, since the controller actions have the same signature and output.
      */
     public function testRename()
     {
         $definitions = [
             'file'   => ['old' => self::FILE_NAME, 'new' => self::FILE_NAME_2],
-            'folder' => ['old' => self::FOLDER_NAME, 'new' => self::FOLDER_NAME_2]
+            'folder' => ['old' => self::FOLDER_NAME, 'new' => self::FOLDER_NAME_2],
         ];
         foreach ($definitions as $object => $data) {
             $this->createObject($object, $data['old']);
@@ -208,7 +209,7 @@ class FilesystemManagerTest extends ControllerUnitTest
     {
         $definitions = [
             'file'   => ['old' => self::FILE_NAME, 'new' => self::FILE_NAME_2],
-            'folder' => ['old' => self::FOLDER_NAME, 'new' => self::FOLDER_NAME_2]
+            'folder' => ['old' => self::FOLDER_NAME, 'new' => self::FOLDER_NAME_2],
         ];
         foreach ($definitions as $object => $data) {
             /*
@@ -241,7 +242,7 @@ class FilesystemManagerTest extends ControllerUnitTest
         $extensions = ['ext1', 'ext2'];
         $count = 5;
 
-        for ($i = 1; $i <= $count; $i++) {
+        for ($i = 1; $i <= $count; ++$i) {
             foreach ($extensions as $extension) {
                 $this->getService('filesystem')->put(self::FILESYSTEM . '://' . $prefix . $i . '.' . $extension, '');
             }
@@ -250,22 +251,22 @@ class FilesystemManagerTest extends ControllerUnitTest
         // Querying should return all files
         $this->setRequest(Request::create('/async/file/autocomplete', 'GET', [
             'term' => $prefix,
-            'ext'  => '.*'
+            'ext'  => '.*',
         ]));
 
         $response = $this->controller()->filesAutoComplete($this->getRequest());
         $this->assertInstanceOf(JsonResponse::class, $response);
         $this->assertEquals(Response::HTTP_OK, $response->getStatusCode());
-        $this->assertCount($count * count($extensions), json_decode($response->getContent()));
+        $this->assertCount($count * count($extensions), Json::parse($response->getContent()));
 
         // Filtering by one extension should return only $count files
         $this->setRequest(Request::create('/async/file/autocomplete', 'GET', [
             'term' => $prefix,
-            'ext'  => $extensions[0]
+            'ext'  => $extensions[0],
         ]));
 
         $response = $this->controller()->filesAutoComplete($this->getRequest());
-        $this->assertCount($count, json_decode($response->getContent()));
+        $this->assertCount($count, Json::parse($response->getContent()));
     }
 
     public function testFileBrowser()
@@ -275,14 +276,13 @@ class FilesystemManagerTest extends ControllerUnitTest
 
         $response = $this->controller()->recordBrowser();
 
-        $this->assertTrue($response instanceof BoltResponse);
-        $this->assertSame('@bolt/recordbrowser/recordbrowser.twig', $response->getTemplateName());
-        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertTrue($response instanceof TemplateView);
+        $this->assertSame('@bolt/recordbrowser/recordbrowser.twig', $response->getTemplate());
     }
 
     /**
      * @param string $object The type of the object, either 'file' or 'folder'
-     * @param string $name The name of the new object
+     * @param string $name   The name of the new object
      */
     private function createObject($object, $name)
     {
@@ -290,7 +290,7 @@ class FilesystemManagerTest extends ControllerUnitTest
             'namespace'  => 'files',
             'parent'     => '',
             'filename'   => $name,
-            'foldername' => $name
+            'foldername' => $name,
         ]));
         switch ($object) {
             case 'file':
@@ -316,7 +316,7 @@ class FilesystemManagerTest extends ControllerUnitTest
             'namespace' => 'files',
             'parent'    => '',
             'oldname'   => $old,
-            'newname'   => $new
+            'newname'   => $new,
         ]));
         switch ($object) {
             case 'file':

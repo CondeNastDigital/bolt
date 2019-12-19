@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Configuration;
 
 use Bolt\Exception\BootException;
@@ -8,7 +9,6 @@ use Bolt\Exception\BootException;
  *
  * @author Ross Riley <riley.ross@gmail.com>
  **/
-
 class ComposerChecks extends LowlevelChecks
 {
     public $composerSuffix = <<<HTML

@@ -2,48 +2,38 @@
 
 namespace Bolt\Configuration\Validation;
 
-use Bolt\Configuration\ResourceManager;
-use Bolt\Controller\ExceptionControllerInterface;
+use Bolt\Configuration\PathResolver;
+use Bolt\Exception\Configuration\Validation\System\CacheValidationException;
 
 /**
  * Cache validation check.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
-class Cache implements ValidationInterface, ResourceManagerAwareInterface
+class Cache implements ValidationInterface, PathResolverAwareInterface
 {
-    /** @var ResourceManager */
-    private $resourceManager;
+    /** @var PathResolver */
+    private $pathResolver;
 
     /**
      * {@inheritdoc}
      */
-    public function check(ExceptionControllerInterface $exceptionController)
+    public function check()
     {
-        $path = $this->resourceManager->getPath('cache');
+        $path = $this->pathResolver->resolve('cache');
         if (!is_dir($path)) {
-            return $exceptionController->systemCheck(Validator::CHECK_CACHE, [], ['path' => $path]);
+            throw new CacheValidationException($path);
         }
         if (!is_writable($path)) {
-            return $exceptionController->systemCheck(Validator::CHECK_CACHE, [], ['path' => $path]);
+            throw new CacheValidationException($path);
         }
-
-        return null;
     }
 
     /**
      * {@inheritdoc}
      */
-    public function isTerminal()
+    public function setPathResolver(PathResolver $pathResolver)
     {
-        return true;
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function setResourceManager(ResourceManager $resourceManager)
-    {
-        $this->resourceManager = $resourceManager;
+        $this->pathResolver = $pathResolver;
     }
 }

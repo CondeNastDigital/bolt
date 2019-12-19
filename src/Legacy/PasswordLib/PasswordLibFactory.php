@@ -9,6 +9,8 @@ use PasswordLib\Password\Factory;
  * A PasswordLib Factory that uses our random generator.
  *
  * @internal
+ *
+ * @deprecated Deprecated since 3.3, to be removed in 4.0.
  */
 final class PasswordLibFactory extends Factory
 {
@@ -28,8 +30,9 @@ final class PasswordLibFactory extends Factory
         foreach ($this->implementations as $impl) {
             if ($impl::getPrefix() == $prefix) {
                 /** @var AbstractPassword $instance */
-                $instance = new $impl;
+                $instance = new $impl();
                 $instance->setGenerator($this->getGenerator());
+
                 return $instance->create($password);
             }
         }
@@ -46,6 +49,7 @@ final class PasswordLibFactory extends Factory
                 /** @var AbstractPassword $instance */
                 $instance = $impl::loadFromHash($hash);
                 $instance->setGenerator($this->getGenerator());
+
                 return $instance->verify($password, $hash);
             }
         }

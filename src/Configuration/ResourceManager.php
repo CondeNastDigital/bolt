@@ -2,7 +2,8 @@
 
 namespace Bolt\Configuration;
 
-use Bolt\Configuration\Validation\ValidatorInterface;
+use Bolt\Common\Deprecated;
+use Bolt\Legacy\AppSingleton;
 use Bolt\Pager\PagerManager;
 use Composer\Autoload\ClassLoader;
 use Eloquent\Pathogen\AbsolutePathInterface;
@@ -28,13 +29,6 @@ class ResourceManager
     /** @var string */
     public $urlPrefix = '';
 
-    /**
-     * @var \Silex\Application
-     *
-     * @deprecated Deprecated since 3.0, to be removed in 4.0.
-     */
-    public static $theApp;
-
     /** @var \Eloquent\Pathogen\AbsolutePathInterface */
     protected $root;
     /** @var Request */
@@ -54,9 +48,23 @@ class ResourceManager
 
     /**
      * @deprecated since 3.0, to be removed in 4.0.
+     *
      * @var PathsProxy
      */
     private $pathsProxy;
+
+    /** @var bool */
+    private $requestInitialized;
+
+    /** @var bool */
+    private $configInitialized;
+
+    /** @var PathResolver|null */
+    private $pathResolver;
+    /** @var PathResolverFactory */
+    private $pathResolverFactory;
+
+    private $disableApacheChecks;
 
     /**
      * Constructor initialises on the app root path.
@@ -70,29 +78,65 @@ class ResourceManager
      */
     public function __construct(\ArrayAccess $container)
     {
+        $trace = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+        foreach ($trace as $frame) {
+            // The debug backtrace shows filename and lineno of calling script. In case function is called from inside
+            // internal function (may be as callback) no filename and lineno may be set. — dmitry@php.net
+            $frame += ['file' => null];
+            if (in_array($frame['file'], [__DIR__ . '/ForwardToPathResolver.php', __DIR__ . '/ResourceManager.php', __DIR__ . '/Standard.php', __DIR__ . '/Composer.php'])) {
+                continue;
+            }
+            if ($frame['file'] === dirname(__DIR__) . '/Bootstrap.php') {
+                break;
+            }
+            if ($frame['file'] === dirname(__DIR__) . '/Provider/PathServiceProvider.php') {
+                break;
+            }
+
+            Deprecated::cls(static::class, 3.3);
+            break;
+        }
+
         $this->pathManager = $container['pathmanager'];
+
+        if (isset($container['path_resolver'])) {
+            $this->pathResolver = $container['path_resolver'];
+        }
+
+        if (isset($container['path_resolver_factory'])) {
+            $this->pathResolverFactory = $container['path_resolver_factory'];
+        }
+        if ($this->pathResolverFactory === null) {
+            $this->pathResolverFactory = new PathResolverFactory();
+        }
 
         if (!empty($container['classloader']) && $container['classloader'] instanceof ClassLoader) {
             $this->root = $this->useLoader($container['classloader']);
         } else {
-            $this->root = $this->setPath('root', $container['rootpath']);
+            $this->root = $this->setPath('root', $container['rootpath'], false);
+        }
+        if (!$this->pathResolverFactory->hasRootPath()) {
+            $this->pathResolverFactory->setRootPath($this->root->string());
         }
 
         if (!($container instanceof Application) && !empty($container['request'])) {
-            $this->requestObject = $container['request'];
+            try {
+                $this->requestObject = $container['request'];
+            } catch (\RuntimeException $e) {
+            }
         }
 
         $this->setUrl('root', '/');
 
         $this->setUrl('app', '/app/');
-        $this->setPath('apppath', 'app');
+        $this->setPath('apppath', '%root%/app', false);
 
         $this->setUrl('extensions', '/extensions/');
-        $this->setPath('extensionsconfig', 'app/config/extensions');
-        $this->setPath('extensionspath', 'extensions');
+        $this->setPath('extensionsconfig', '%config%/extensions', false);
+        $this->setPath('extensionspath', '%root%/extensions', false);
 
         $this->setUrl('files', '/files/');
-        $this->setPath('filespath', 'files');
+        $this->setPath('filespath', '%web%/files', false);
 
         $this->setUrl('async', '/async/');
         $this->setUrl('upload', '/upload/');
@@ -100,13 +144,13 @@ class ResourceManager
         $this->setUrl('theme', '/theme/');
         $this->setUrl('themes', '/theme/'); // Needed for filebrowser. See #5759
 
-        $this->setPath('web', '');
-        $this->setPath('cache', 'app/cache');
-        $this->setPath('config', 'app/config');
-        $this->setPath('src', dirname(__DIR__));
-        $this->setPath('database', 'app/database');
-        $this->setPath('themebase', 'theme');
-        $this->setPath('view', 'app/view');
+        $this->setPath('web', 'public', false);
+        $this->setPath('cache', 'app/cache', false);
+        $this->setPath('config', 'app/config', false);
+        $this->setPath('src', dirname(__DIR__), false);
+        $this->setPath('database', 'app/database', false);
+        $this->setPath('themebase', '%web%/theme', false);
+        $this->setPath('view', '%web%/bolt-public/view', false);
         $this->setUrl('view', '/app/view/');
     }
 
@@ -117,6 +161,10 @@ class ResourceManager
      */
     public function useLoader(ClassLoader $loader)
     {
+        if ($this->callerNotSelf()) {
+            Deprecated::method(3.3);
+        }
+
         $this->classLoader = $loader;
         $loaderPath = dirname($loader->findFile('Composer\\Autoload\\ClassLoader'));
         // Remove last vendor/* off loaderPath to get our root path
@@ -135,7 +183,24 @@ class ResourceManager
     public function setApp(Application $app)
     {
         $this->app = $app;
-        self::$theApp = $app;
+        AppSingleton::set($app);
+        $this->pathResolver = $app['path_resolver'];
+
+        // if RM is passed directly into Application c.v.a won't be set
+        // but if called later then we don't want to override the value if someone else has changed it,
+        // unless disableApacheChecks has been called.
+        $default = true;
+        if (isset($this->app['config.validator.apache_enabled'])) {
+            $default = $this->app['config.validator.apache_enabled'];
+        }
+        $this->app['config.validator.apache_enabled'] = function () use ($default) {
+            return $this->disableApacheChecks ? false : $default;
+        };
+    }
+
+    public function disableApacheChecks()
+    {
+        $this->disableApacheChecks = true;
     }
 
     /**
@@ -143,22 +208,47 @@ class ResourceManager
      *
      * @param string $name
      * @param string $value
+     * @param bool   $applyToResolver
      *
-     * @return \Eloquent\Pathogen\RelativePathInterface|\Eloquent\Pathogen\AbsolutePathInterface
+     * @return AbsolutePathInterface|RelativePathInterface|\Closure
      */
-    public function setPath($name, $value)
+    public function setPath($name, $value, $applyToResolver = true)
     {
-        // If this is a relative path make it relative to root.
-        $path = $this->pathManager->create($value);
-        if ($path instanceof RelativePathInterface) {
-            $path = $path->resolveAgainst($this->paths['root']);
+        if ($applyToResolver && $this->callerNotSelfOrChild()) {
+            Deprecated::method(3.3, 'Use Bolt\Filesystem (recommended) or PathResolver::resolve instead.');
         }
 
-        $path = $path->normalize();
+        if (strpos($value, '%') !== false) { // contains variable
+            $path = function () use ($value) {
+                if (!$this->pathResolver) {
+                    throw new \LogicException(sprintf('Cannot resolve path "%s" without having a path resolver.', $value));
+                }
+
+                $path = $this->pathResolver->resolve($value);
+
+                return $this->pathManager->create($path);
+            };
+        } else {
+            // If this is a relative path make it relative to root.
+            $path = $this->pathManager->create($value);
+            if ($path instanceof RelativePathInterface) {
+                $path = $path->resolveAgainst($this->paths['root']);
+            }
+
+            $path = $path->normalize();
+        }
 
         $this->paths[$name] = $path;
         if (strpos($name, 'path') === false) {
             $this->paths[$name . 'path'] = $path;
+        }
+
+        if ($applyToResolver) {
+            if ($this->pathResolver) {
+                $this->pathResolver->define($name, $value);
+            } else {
+                $this->pathResolverFactory->addPaths([$name => $value]);
+            }
         }
 
         return $path;
@@ -181,6 +271,10 @@ class ResourceManager
      */
     public function getPath($name)
     {
+        if ($this->callerNotSelfOrPathsProxy()) {
+            Deprecated::method(3.3, 'Use Bolt\Filesystem (recommended) or PathResolver::resolve instead.');
+        }
+
         return $this->getPathObject($name)->string();
     }
 
@@ -201,12 +295,20 @@ class ResourceManager
      */
     public function getPathObject($name)
     {
+        if ($this->callerNotSelf()) {
+            Deprecated::method(3.3, 'Use Bolt\Filesystem (recommended) or PathResolver::resolve instead.');
+        }
+
         $name = str_replace('\\', '/', $name);
 
         $parts = [];
         if (strpos($name, '/') !== false) {
             $parts = explode('/', $name);
             $name = array_shift($parts);
+        }
+
+        if (!$this->configInitialized && in_array($name, ['theme', 'themepath', 'templates', 'templatespath'])) {
+            $this->initializeConfig();
         }
 
         if (array_key_exists($name . 'path', $this->paths)) {
@@ -217,6 +319,10 @@ class ResourceManager
             throw new \InvalidArgumentException("Requested path $name is not available", 1);
         }
 
+        if (is_callable($path)) {
+            $path = $path();
+        }
+
         if (!empty($parts)) {
             $path = $path->joinAtomSequence($parts);
         }
@@ -225,20 +331,32 @@ class ResourceManager
     }
 
     /**
-     * Checks if the given name has a path associated with it
+     * Checks if the given name has a path associated with it.
      *
      * @param string $name of path
      *
-     * @return Boolean
+     * @return bool
      */
     public function hasPath($name)
     {
+        Deprecated::method(3.3, PathResolver::class);
+
         if (strpos($name, '/') !== false) {
             $parts = explode('/', $name);
             $name = array_shift($parts);
         }
 
         return array_key_exists($name, $this->paths) || array_key_exists($name . 'path', $this->paths);
+    }
+
+    public function getPathResolverFactory()
+    {
+        return $this->pathResolverFactory;
+    }
+
+    public function setPathResolver(PathResolver $pathResolver)
+    {
+        $this->pathResolver = $pathResolver;
     }
 
     /**
@@ -249,6 +367,10 @@ class ResourceManager
      */
     public function setUrl($name, $value)
     {
+        if ($this->callerNotSelfOrChild()) {
+            Deprecated::method(3.3, 'Use UrlGenerator or Asset Packages instead.');
+        }
+
         $this->urls[$name] = $value;
     }
 
@@ -264,6 +386,24 @@ class ResourceManager
      */
     public function getUrl($name, $includeBasePath = true)
     {
+        if ($this->callerNotSelfOrPathsProxy()) {
+            Deprecated::method(3.3, 'Use UrlGenerator or Asset Packages instead.');
+        }
+
+        if (($name === 'canonical' || $name === 'canonicalurl') && isset($this->app['canonical'])) {
+            if ($url = $this->app['canonical']->getUrl()) {
+                return $url;
+            }
+        }
+
+        if (!$this->requestInitialized && $this->app) {
+            $this->initializeRequest($this->app, $this->requestObject);
+        }
+
+        if (!$this->configInitialized && in_array($name, ['theme', 'bolt', 'templates', 'templatespath'])) {
+            $this->initializeConfig();
+        }
+
         if (array_key_exists($name . 'url', $this->urls) && $name !== 'root') {
             return $this->urls[$name . 'url'];
         }
@@ -281,14 +421,16 @@ class ResourceManager
     }
 
     /**
-     * Set a parameter that describes the request.
-     * e.g. 'hostname', 'protocol' or 'canonical'
+     * Set a parameter that describes the request,
+     * e.g. 'hostname', 'protocol' or 'canonical'.
      *
      * @param string $name
      * @param string $value
      */
     public function setRequest($name, $value)
     {
+        Deprecated::method(3.3, 'Use Request object in request cycle instead.');
+
         $this->request[$name] = $value;
     }
 
@@ -303,6 +445,14 @@ class ResourceManager
      */
     public function getRequest($name)
     {
+        if ($this->callerNotSelfOrPathsProxy()) {
+            Deprecated::method(3.3, 'Use Request object in request cycle instead.');
+        }
+
+        if (!$this->requestInitialized && in_array($name, ['canonical', 'protocol', 'hostname'])) {
+            $this->initializeRequest($this->app, $this->requestObject);
+        }
+
         if (! array_key_exists($name, $this->request)) {
             throw new \InvalidArgumentException("Request component $name is not available", 1);
         }
@@ -319,6 +469,8 @@ class ResourceManager
      */
     public function getPaths()
     {
+        Deprecated::method(3.0);
+
         if ($this->pathsProxy === null) {
             $this->pathsProxy = new PathsProxy($this);
         }
@@ -336,7 +488,7 @@ class ResourceManager
     public function initializeRequest(Application $app, Request $request = null)
     {
         if ($request === null) {
-            $request = Request::createFromGlobals();
+            $request = $app['request_stack']->getCurrentRequest() ?: Request::createFromGlobals();
         }
 
         // This is where we set the canonical. Note: The protocol (scheme) defaults to 'http',
@@ -364,61 +516,53 @@ class ResourceManager
             $canonical['scheme'] = 'https';
         }
 
-        $this->setRequest('canonical', sprintf('%s://%s', $canonical['scheme'], $canonical['host']));
+        $this->request['canonical'] = sprintf('%s://%s', $canonical['scheme'], $canonical['host']);
 
-        $rootUrl = rtrim($this->getUrl('root'), '/');
+        $rootUrl = rtrim($this->urls['root'], '/');
         if ($rootUrl !== $request->getBasePath()) {
             $this->urlPrefix = $request->getBasePath();
         }
 
-        $this->setRequest('protocol', $canonical['scheme']);
+        $this->request['protocol'] = $canonical['scheme'];
         $hostname = $request->server->get('HTTP_HOST', 'localhost');
-        $this->setRequest('hostname', $hostname);
+        $this->request['hostname'] = $hostname;
         $current = $request->getBasePath() . $request->getPathInfo();
         $this->setUrl('current', $current);
         $this->setUrl('currenturl', sprintf('%s://%s%s', $canonical['scheme'], $hostname, $current));
         $this->setUrl('hosturl', sprintf('%s://%s', $canonical['scheme'], $hostname));
-        $this->setUrl('rooturl', sprintf('%s%s/', $this->getRequest('canonical'), $rootUrl));
+        $this->setUrl('rooturl', sprintf('%s%s/', $this->request['canonical'], $rootUrl));
 
-        $url = sprintf('%s%s', $this->getRequest('canonical'), $current);
+        $url = sprintf('%s%s', $this->request['canonical'], $current);
         if (PagerManager::isPagingRequest($request)) {
             $url .= '?' . http_build_query($request->query->all());
         }
         $this->setUrl('canonicalurl', $url);
+
+        $this->requestInitialized = true;
     }
 
     /**
      * Takes a loaded config array and uses it to initialize settings that depend on it.
-     *
-     * @param array $config
      */
-    public function initializeConfig($config)
+    public function initializeConfig()
     {
-        if (is_array($config) && isset($config['general'])) {
-            $this->setThemePath($config['general']);
-        }
-    }
+        $this->configInitialized = true;
 
-    public function initialize()
-    {
-        $this->initializeRequest($this->app, $this->requestObject);
-        $this->postInitialize();
-    }
-
-    public function postInitialize()
-    {
         $this->setThemePath($this->app['config']->get('general'));
 
         $theme = $this->app['config']->get('theme');
         if (isset($theme['template_directory'])) {
-            $this->setPath('templatespath', $this->getPath('theme') . '/' . $this->app['config']->get('theme/template_directory'));
+            $this->setPath('templatespath', $this->getPath('theme') . '/' . $theme['template_directory']);
         } else {
             $this->setPath('templatespath', $this->getPath('theme'));
         }
 
         $branding = '/' . trim($this->app['config']->get('general/branding/path'), '/') . '/';
         $this->setUrl('bolt', $branding);
-        $this->app['config']->setCkPath();
+    }
+
+    public function initialize()
+    {
     }
 
     /**
@@ -439,7 +583,9 @@ class ResourceManager
             $this->setPath('themepath', $this->getPath('themebase') . $themeDir);
             $this->setUrl('theme', $themeUrl . $themeDir . '/');
         } else {
-            $this->setPath('themepath', $this->getPath('rootpath') . $themePath . $themeDir);
+            Deprecated::warn('Config option "theme_path"', 3.3, 'Modify the "themes" path in .bolt.yml instead.');
+
+            $this->setPath('themepath', $this->getPath('root') . $themePath . $themeDir);
             $this->setUrl('theme', $themeUrl . $themeDir . '/');
         }
     }
@@ -461,10 +607,12 @@ class ResourceManager
     /**
      * Get the LowlevelChecks object.
      *
-     * @return ValidatorInterface
+     * @return LowlevelChecks
      */
     public function getVerifier()
     {
+        Deprecated::method(3.3);
+
         if (! $this->verifier) {
             $verifier = new LowlevelChecks($this);
             $this->verifier = $verifier;
@@ -476,10 +624,12 @@ class ResourceManager
     /**
      * Set the LowlevelChecks object.
      *
-     * @param ValidatorInterface|null $verifier
+     * @param LowlevelChecks|null $verifier
      */
     public function setVerifier($verifier)
     {
+        Deprecated::method(3.3);
+
         $this->verifier = $verifier;
     }
 
@@ -490,6 +640,8 @@ class ResourceManager
      */
     public function getClassLoader()
     {
+        Deprecated::method(3.3);
+
         return $this->classLoader;
     }
 
@@ -502,14 +654,9 @@ class ResourceManager
      */
     public static function getApp()
     {
-        if (! static::$theApp) {
-            $trace = debug_backtrace(false);
-            $trace = $trace[0]['file'] . '::' . $trace[0]['line'];
-            $message = sprintf("The Bolt 'Application' object isn't initialized yet so the container can't be accessed here: <code>%s</code>", $trace);
-            throw new \RuntimeException($message);
-        }
+        Deprecated::method(3.0);
 
-        return static::$theApp;
+        return AppSingleton::get();
     }
 
     /**
@@ -522,9 +669,41 @@ class ResourceManager
      */
     public function findRelativePath($frompath, $topath)
     {
+        Deprecated::method(3.3);
+
         $filesystem = new Filesystem();
         $relative = $filesystem->makePathRelative($topath, $frompath);
 
         return $relative;
+    }
+
+    private function callerNotSelfOrPathsProxy($index = 1)
+    {
+        if (!$this->callerNotSelf($index + 1)) {
+            return true;
+        }
+
+        return $this->callerNot(['PathsProxy', 'LazyPathsProxy'], $index + 1);
+    }
+
+    private function callerNotSelfOrChild($index = 1)
+    {
+        return $this->callerNot(['ResourceManager', 'Standard', 'Composer'], $index + 1);
+    }
+
+    private function callerNotSelf($index = 1)
+    {
+        return $this->callerNot(['ResourceManager'], $index + 1);
+    }
+
+    private function callerNot(array $files, $index = 1)
+    {
+        $files = array_map(function ($file) {
+            return __DIR__ . '/' . $file . '.php';
+        }, $files);
+
+        $caller = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, $index + 1)[$index];
+
+        return !in_array($caller['file'], $files);
     }
 }

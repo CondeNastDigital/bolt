@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\EventListener;
 
 use Bolt\Controller\Zone;
@@ -63,7 +64,7 @@ class ZoneGuesser implements EventSubscriberInterface
     }
 
     /**
-     * Determine the zone and return it
+     * Determine the zone and return it.
      *
      * @param Request $request
      *
@@ -75,9 +76,9 @@ class ZoneGuesser implements EventSubscriberInterface
             return Zone::ASYNC;
         } elseif ($this->isPathApplicable($request, Zone::BACKEND)) {
             return Zone::BACKEND;
-        } else {
-            return Zone::FRONTEND;
         }
+
+        return Zone::FRONTEND;
     }
 
     /**
@@ -86,7 +87,7 @@ class ZoneGuesser implements EventSubscriberInterface
      * @param Request $request
      * @param string  $zone
      *
-     * @return boolean
+     * @return bool
      */
     protected function isPathApplicable(Request $request, $zone)
     {
@@ -101,7 +102,7 @@ class ZoneGuesser implements EventSubscriberInterface
      * @param string $path
      * @param string $prefix
      *
-     * @return boolean
+     * @return bool
      */
     protected function startsWith($path, $prefix)
     {

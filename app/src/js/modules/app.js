@@ -55,7 +55,6 @@
         init.dropZone();
         init.popOvers();
         init.dropDowns();
-        init.deferredWidgets();
         init.passwordInput();
         init.sortables();
         init.focusStatusSelect();
@@ -165,6 +164,7 @@
         bolt.stack.init();
         bolt.omnisearch.init();
         bolt.extend.init();
+        bolt.filemanager.init();
 
         bolt.ckeditor.init();
         bolt.datetime.init();

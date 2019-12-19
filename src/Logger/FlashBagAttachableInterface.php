@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Logger;
 
 use Symfony\Component\HttpFoundation\Session\Flash\FlashBagInterface;
@@ -18,7 +19,7 @@ interface FlashBagAttachableInterface
     /**
      * Returns whether a FlashBag has been attached.
      *
-     * @return boolean
+     * @return bool
      */
     public function isFlashBagAttached();
 }

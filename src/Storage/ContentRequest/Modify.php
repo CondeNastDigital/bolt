@@ -5,7 +5,9 @@ namespace Bolt\Storage\ContentRequest;
 use Bolt\Helpers\Input;
 use Bolt\Logger\FlashLoggerInterface;
 use Bolt\Storage\Entity\Content;
+use Bolt\Storage\Entity\FieldValue;
 use Bolt\Storage\EntityManager;
+use Bolt\Storage\Mapping;
 use Bolt\Storage\Repository;
 use Bolt\Translation\Translator as Trans;
 use Bolt\Users;
@@ -76,13 +78,14 @@ class Modify
      * @param string     $action
      * @param array|null $fieldData
      *
-     * @return boolean
+     * @return bool
      */
     protected function modifyContentTypeRecord(Repository $repo, Content $entity, $action, $fieldData)
     {
         if ($action === 'delete') {
             return $this->deleteRecord($repo, $entity);
-        } elseif ($action === 'modify' && $fieldData !== null) {
+        }
+        if ($action === 'modify' && $fieldData !== null) {
             $this->modifyRecord($entity, $fieldData);
 
             if ($entity->_modified === true) {
@@ -97,13 +100,14 @@ class Modify
      * @param Repository $repo
      * @param Content    $entity
      *
-     * @return boolean
+     * @return bool
      */
     protected function deleteRecord(Repository $repo, Content $entity)
     {
         $recordId = $entity->getId();
+        /** @var Mapping\ContentType $contentType */
         $contentType = $entity->getContenttype();
-        $contentTypeName = $contentType['singular_name'];
+        $contentTypeName = (string) $contentType;
         if (!$this->users->isAllowed("contenttype:$contentTypeName:delete:$recordId")) {
             $this->loggerFlash->error(Trans::__('general.access-denied.content-not-modified', ['%title%' => $entity->getTitle()]));
 
@@ -111,7 +115,15 @@ class Modify
         }
         $result = $repo->delete($entity);
         if ($result) {
-            $this->loggerSystem->info(sprintf('Deleted %s: %s', $contentTypeName, $entity->getTitle()), ['event' => 'content']);
+            $this->loggerSystem->info(sprintf('Deleted %s: %s', $contentType['singular_name'], $entity->getTitle()), ['event' => 'content']);
+            $fieldRepo = $this->em->getRepository(FieldValue::class);
+            $deleteFieldQuery = $fieldRepo->createQueryBuilder()
+                ->delete($fieldRepo->getTableName())
+                ->where('content_id = :content_id')
+                ->andWhere('contenttype= :contenttype')
+                ->setParameter('content_id', $recordId)
+                ->setParameter('contenttype', $contentTypeName);
+            $deleteFieldQuery->execute();
         }
 
         return $result;
@@ -180,7 +192,7 @@ class Modify
      * Transition a record's owner if permitted.
      *
      * @param Content $entity
-     * @param integer $ownerId
+     * @param int     $ownerId
      */
     protected function transistionRecordOwner(Content $entity, $ownerId)
     {

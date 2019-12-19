@@ -1,7 +1,7 @@
 <?php
+
 namespace Bolt\Tests\Events;
 
-use Bolt\Cache;
 use Bolt\Events\CronEvent;
 use Bolt\Events\CronEvents;
 use Bolt\Tests\BoltUnitTest;
@@ -19,17 +19,18 @@ class CronEventTest extends BoltUnitTest
     {
         $app = $this->getApp();
 
-        $app['cache'] = $this->getCacheMock();
-        $app['cache']
+        $cache = $this->getMockCache();
+        $cache
             ->expects($this->exactly(1))
-            ->method('flushAll');
+            ->method('flushAll')
+        ;
+        $this->setService('cache', $cache);
 
-        $changeRepository = $app['storage']->getRepository('Bolt\Storage\Entity\LogChange');
-        $systemRepository = $app['storage']->getRepository('Bolt\Storage\Entity\LogSystem');
-        $app['logger.manager'] = $this->getMock('Bolt\Logger\Manager', ['trim'], [$app, $changeRepository, $systemRepository]);
-        $app['logger.manager']
+        $logger = $this->getMockLoggerManager();
+        $logger
             ->expects($this->exactly(2))
             ->method('trim');
+        $this->setService('logger.manager', $logger);
 
         $output = new BufferedOutput();
 

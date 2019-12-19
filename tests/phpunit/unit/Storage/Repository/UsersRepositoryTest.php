@@ -1,10 +1,12 @@
 <?php
+
 namespace Bolt\Tests\Storage\Repository;
 
+use Bolt\Storage\Entity;
 use Bolt\Tests\BoltUnitTest;
 
 /**
- * Class to test src/Storage/Repository/UsersRepository
+ * Class to test src/Storage/Repository/UsersRepository.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
@@ -15,7 +17,7 @@ class UsersRepositoryTest extends BoltUnitTest
         $this->resetDb();
         $app = $this->getApp();
         $em = $app['storage'];
-        $repo = $em->getRepository('Bolt\Storage\Entity\Users');
+        $repo = $em->getRepository(Entity\Users::class);
 
         $queryDelUserById = $repo->deleteUserQuery(1);
         $this->assertEquals('DELETE FROM bolt_users WHERE id = :userId', $queryDelUserById->getSql());

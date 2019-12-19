@@ -2,7 +2,7 @@
 
 
 /**
- * Backend 'lemmings' test(s)
+ * Backend 'lemmings' test(s).
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
@@ -44,9 +44,9 @@ class BackendLemmingsCest extends AbstractAcceptanceTest
 
         $yaml = $I->getLemmingsPermissions();
 
-        $I->fillField('#form_contents', $yaml);
+        $I->fillField('#file_edit_contents', $yaml);
 
-        $I->click('Save', '#saveeditfile');
+        $I->click('Save', '#file_edit_save');
 
         $I->reloadApp();
 
@@ -57,7 +57,7 @@ class BackendLemmingsCest extends AbstractAcceptanceTest
         $I->see('Recent Pages');
         $I->dontSee('Recent Resources');
 
-        $I->see('A Page I Made', 'h1');
-        $I->see('Built with Bolt, tested with Codeception', 'footer');
+        $I->see('Welcome Home (Sanitarium)', 'h2');
+        $I->see('This website is tested with Codeception, built with Bolt.', 'footer');
     }
 }

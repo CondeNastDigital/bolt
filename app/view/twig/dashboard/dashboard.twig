@@ -23,15 +23,16 @@
             {{ widgets('dashboard_below_header', 'backend') }}
 
             <div class="quicklinks">
-                {% if app.config.get('contenttypes')|length() > 3 %}
+                {% if config.get('contenttypes')|length() > 3 %}
                     {{ include('@bolt/dashboard/_quicklinks-dropdown.twig') }}
                 {% else %}
                     {{ include('@bolt/dashboard/_quicklinks-buttons.twig') }}
                 {% endif %}
             </div>
 
-            {% for contenttype, multiplecontent in context.latest %}
+            {% for contenttype_key, multiplecontent in context.latest %}
                 {% if multiplecontent %}
+                    {% set contenttype = config.get('contenttypes/' ~ contenttype_key) %}
                     {{ include('@bolt/dashboard/_recently_edited.twig') }}
                 {% endif %}
             {% endfor %}

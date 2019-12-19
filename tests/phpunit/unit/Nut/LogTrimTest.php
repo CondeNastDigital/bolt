@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Tests\Nut;
 
 use Bolt\Nut\LogTrim;
@@ -16,9 +17,10 @@ class LogTrimTest extends BoltUnitTest
     {
         $app = $this->getApp();
         $command = new LogTrim($app);
+        $command->addOption('--no-interaction');
         $tester = new CommandTester($command);
 
-        $tester->execute([]);
+        $tester->execute(['--no-interaction' => true]);
         $result = $tester->getDisplay();
         $this->assertRegExp('/System & change logs trimmed/', $result);
     }

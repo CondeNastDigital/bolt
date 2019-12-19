@@ -9,7 +9,6 @@ extensions/*
 thumbs/
 vendor/
 theme/*
-!theme/base-*
 composer.lock
 
 # Bolt development files
@@ -18,6 +17,7 @@ app/src/docs/
 app/src/grunt-local/*.js
 app/view/maps/
 pimple.json
+.deploy.yml
 
 # Bolt testing files
 coverage.xml
@@ -46,15 +46,12 @@ npm-debug.log
 
 # File-system cruft and temporary files
 .DS_Store
-.idea
 __*
 ._*
 Vagrantfile
 .vagrant*
-*.sublime-*
 .*.swp
 .swp
 *.lock
 .buildpath
-.project
-dump.php
+

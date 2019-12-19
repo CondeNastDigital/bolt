@@ -7,34 +7,54 @@
 #          process and your PR so that it will eventually be necessary to
 #          re-map your translations.
 
-#   0 Unused messages
-#  16 Legacy untranslated messages
-#  48 Untranslated messages
-#  76 Legacy translation messages
-# 483 Translation messages
+#   3 Unused messages
+#  11 Legacy untranslated messages
+#  92 Untranslated messages
+#  30 Legacy translation messages
+# 478 Translation messages
+
+#--- Unused messages ----------------------------------------------------------
+
+"contenttypes.generic.no-proper-type": "I innehållstypen '%contenttype%', fältet '%field%' har 'typ: %type%', som inte är ett korrekt fält. Redigera contenttypes.yml för att lösa det."
+"general.phrase.duplicate-set": "Duplicera grupp"
+"users.your-password": "Ditt lösenord"
 
 #--- Legacy untranslated messages ---------------------------------------------
 
+"Added records to the ContentType <tt>%CONTENTYPE%</tt> titled": #
 "Dependencies": #
 "Detected Bolt version change to <b>%VERSION%</b>, and the cache has been cleared. Please <a href=\"%URI%\">check the database</a>, if you haven't done so already.": #
 "Error reading extensions/composer.json file: %ERROR%": #
-"Extend": #
-"Extension package %NAME% base class '%CLASS%' does not implement \\\\Bolt\\\\Extension\\\\ExtensionInterface and has been skipped.": #
-"Extension package %NAME% has an invalid class '%CLASS%' and has been skipped.": #
 "Finding packages that require this one…": #
-"Group": #
-"Groups": #
-"Link": #
-"Menu item property \"add\" is deprecated. Use \"#\" under \"param\" instead.": #
-"Repeater": #
-"The database needs to be updated/repaired. Go to 'Configuration' > '<a href=\"%link%\">Check Database</a>' to do this now.": #
+"Menu": #
+"Search": #
 "The field %field% has been changed to \"%newValue%\"": #
 "Unable to duplicate file: %FILE%": #
 "Unfortunately, no content could be found. Try another page, or go to the <a href=\"%paths_root%\">homepage</a>.": #
+"field.embed.provider_name": #
 
 #--- Untranslated messages ----------------------------------------------------
 
+contenttypes.generic.consecutive-underscores: # "In the ContentType for '%contenttype%', the field '%field%' has consecutive underscores, which is not supported. Please edit contenttypes.yml and use a single underscore."
 contenttypes.generic.invalid-hyphen: # "In the ContentType for '%contenttype%', you have used a hyphen in the definition which is not supported. Please edit contenttypes.yml and remove the hyphen or alternatively replace with an underscore."
+
+field.block.label.add-new: # "Add new..."
+field.block.label.add-set: # "Add new %label% set"
+
+field.embed.height: # "Height"
+field.embed.label.preview: # "Preview"
+field.embed.label.size: # "Size"
+field.embed.label.url: # "URL of content to embed"
+field.embed.matched-embed: # "Matched Embed"
+field.embed.pixel: # "pixel"
+field.embed.placeholder.url: # "URL of content on Facebook, Twitter, Soundcloud or other media website"
+field.embed.width: # "Width"
+
+field.repeater.collapse: # "Collapse this set"
+field.repeater.collapse-all: # "Collapse all"
+field.repeater.expand: # "Expand this set"
+field.repeater.expand-all: # "Expand all"
+field.repeater.label.add-set: # "Add new %label% set"
 
 field.slug.button.generate: # "Generate from:"
 
@@ -44,11 +64,17 @@ field.video.width: # "Width"
 general.bolt-configuration-issues-detected: # "Bolt has detected one or more configuration issues. You should resolve these, for optimum performance:"
 
 general.phrase.add-selected: # "Add Selected"
+general.phrase.changelog-not-enabled: # "The changelog is not enabled. If you enable it, any changes made to the content in all ContentTypes will be logged on this page, for reference. See the section <code>changelog:</code> in your <code>config.yml</code> to change this setting."
+general.phrase.changelog-note: # "Note: The database table will continue to grow as the editors keep adding content. If you enable this functionality in a production environment the table may end up taking up a lot of space."
 general.phrase.clashing-relation: # "In the ContentType for '%contenttype%', both a field and a relation are named '%relation%' which will prevent the relation from working. Please edit contenttypes.yml, and correct this."
 general.phrase.clear-cache-complete: # "Cleared cache."
+general.phrase.database-check: # "Check Database"
+general.phrase.database-update-required-post: # "to do this now."
+general.phrase.database-update-required-pre: # "The database needs to be updated/repaired. Go to 'Configuration'"
 general.phrase.depublish-explanation: # "If set, the record will be automatically depublished on the given date."
 general.phrase.error-cache-clear: # "Failed to clear cache. You should delete it manually."
-general.phrase.error-local-extension-set-up-incomplete: # "Local extension set up incomplete. Please run 'Install all packages' on the Extensions page."
+general.phrase.extensions-overview: # "Extensions Overview"
+general.phrase.folder: # "Folder"
 general.phrase.invalid-taxonomy-slug: # "In the taxonomy '%taxonomy%' the slug for option '%option%' contains a slash. Please edit taxonomy.yml, and correct this."
 general.phrase.missing-about-page-block: # "There currently is no Block with 'about-us' as its slug. If you create one, it will be shown here. Go to 'Configuration' > 'Check Database' and select 'Add sample Records' to automatically generate this Block."
 general.phrase.move-down: # "Move Down"
@@ -63,12 +89,27 @@ general.phrase.selection: # "Selection"
 general.phrase.show-proposed-alterations: # "Show proposed alterations"
 general.phrase.status-explanation: # "The status defines whether or not this record is published. Select 'Timed publish' to automatically publish on the set Publication Date."
 general.phrase.toggle-all: # "Check/Uncheck all"
+general.phrase.upload-drop-here: # "Drop files in the file manager to upload them or use the button below."
+general.phrase.upload-progress: # "Current uploads"
 general.phrase.value-maximum-variable: # "The value must not be greater than “%MAXVAL%”!"
 general.phrase.value-minimum-variable: # "The value has to be at least “%MINVAL%”!"
+
+menu.configuration.checks: # "Set-up checks"
 
 nut.greeting: # "Welcome to Bolt!"
 
 nut.version: # "version"
+
+page.checks.php-pass: # "All PHP configuration checks pass!"
+page.checks.php-problem: # "PHP configuration check found problems!"
+page.checks.show-all: # "Show all checks"
+page.checks.show-failed: # "Show only failed checks"
+page.checks.system-pass: # "All system configuration checks pass!"
+page.checks.system-problem: # "System configuration check found problems!"
+
+page.edit-users.error.email-invalid: # "This email address is not valid."
+page.edit-users.error.password-different-email: # "Password must not match the email address."
+page.edit-users.error.password-long: # "This value is too long. It should have 128 characters or less."
 
 page.extend.button.link-config: # "Edit configuration"
 page.extend.button.link-marketplace: # "View on marketplace"
@@ -78,8 +119,13 @@ page.extend.button.link-uninstall: # "Uninstall extension"
 page.extend.button.link-versions: # "Install different version"
 page.extend.button.manage: # "Manage"
 page.extend.button.package-dependencies: # "Identify installed packages requiring this"
+page.extend.error-class-implement: # "Extension package %NAME% base class '%CLASS%' does not implement %TARGET% and has been skipped."
+page.extend.error-class-invalid: # "Extension package %NAME% has an invalid class '%CLASS%' and has been skipped."
 page.extend.error-composer-json-not-readable: # "The Bolt extensions composer.json isn't readable."
 page.extend.error-composer-json-not-writable: # "The Bolt extensions composer.json isn't writable."
+page.extend.headline.bundled: # "Bundled Extensions"
+page.extend.listheader.class: # "Class"
+page.extend.listheader.name: # "Name"
 page.extend.message.autoloader-start: # "Loading Composer autoload dumper"
 page.extend.message.autoloader-update: # "Updating Composer autoloader"
 page.extend.message.installation-running: # "Installation running"
@@ -89,7 +135,14 @@ page.extend.message.package-install-info-fail: # "Unable to get installation inf
 page.extend.message.running-update-all: # "Running updates"
 page.extend.options: # "Extension Options"
 
+page.file-management.actions-for-files: # "Actions for files"
 page.file-management.message.upload-not-writable: # "Unable to write to upload destination. Check permissions on %TARGET%"
+
+page.login.placeholder.username: # "Your username"
+
+page.prefill.connection-timeout: # "Timeout attempting connection to the 'Lorem Ipsum' generator. Unable to add dummy content."
+page.prefill.database-update-required: # "Table not found for ContentType %CONTENTTYPE%, a database update is probably required."
+page.prefill.skipped-singleton: # "Skipped singleton <code>%key%</code> (already has a record)"
 
 #--- Legacy translation messages ----------------------------------------------
 
@@ -97,65 +150,21 @@ page.file-management.message.upload-not-writable: # "Unable to write to upload d
 "(no category)": "(ingen kategori)"
 "(no group)": "(ingen grupp)"
 "(none)": "(ingen)"
-"Add a brief, optional comment to describe what's changed.": "Lägg till en kort, valfri kommentar om vad som ändrats."
 "Add some sample <a href='%url%' class='btn btn-default'>Records with Loripsum text</a>": "Lägg till <a href='%url%' class='btn btn-default'>exempeldokument med Lorem Ipsum text</a>"
 "Added to <tt>%key%</tt> '%title%'": "Tillagt i <tt>%key%</tt> '%title%'"
 "An error occured while updating `%TABLE%`. The error is %ERROR%": "Ett fel inträffade under uppdateringen av '%TABLE%'. Felet är %ERROR%"
-"Are you sure you want to delete %FILENAME%?": "Är du säker du vill ta bort %FILENAME%?"
-"Are you sure you want to delete %username%?": "Är du säker på att du vill radera %username%?"
-"Are you sure you want to do this for %NUMBER% records?": "Är du säker du vill göra detta för %NUMBER% inlägg?"
-"Are you sure you want to do this for 1 record?": "Är du säker du vill göra detta för 1 inlägg?"
-"Are you sure you want to remove these files?": "Är du säker du vill ta bort dessa filer?"
-"Are you sure you want to remove these images?": "Är du säker du vill ta bort dessa bilder?"
-"Are you sure you want to remove this file?": "Är du säker på att du vill ta bort denna fil?"
-"Are you sure you want to remove this image?": "Är du säker på att du vill ta bort denna bild?"
-"Are you sure you wish to delete this record? There is no undo.": "Är du säker du vill ta bort detta inlägg? Det går inte att ångra."
-"Body": "Innehåll"
-"Categories": "Kategorier"
-"Category": "Kategori"
-"Choose an entry": "Välj ett inlägg"
-"Client error: %errormessage%": "Klientfel: %errormessage%"
-"Content": "Innehåll"
 "Current (saved) status:": "Nuvarande (sparad) status:"
-"Date": "Datum"
-"Datetime": "Datum/Tid"
 "Do you really want to delete %FOLDERNAME%?": "Vill du verkligen ta bort %FOLDERNAME%?"
 "Everybody": "Alla"
 "Excerpt": "Utdrag"
 "Expand sidebar": "Visa sidomeny"
-"Extension server returned an error: %errormessage%": "Tilläggsservern returnerade ett fel: %errormessage%"
-"File": "Fil"
 "File '%file%' could not be uploaded (wrong/disallowed file type). Make sure the file extension is one of the following:": "Fil '%file%' kunde inte laddas upp (fel/förbjuden filtyp). Se till att filtypen är en av följande:"
-"Filelist": "Fillista"
-"Floatfield": "Decimaltals fält"
-"Generic failure while testing connection to extension server: %errormessage%": "Ett fel inträffade när vi testade anslutningen till tilläggsservern: %errormessage%"
-"Geolocation": "Geolokalisering "
-"Html": "Html"
-"Image": "Bild"
-"Imagelist": "Bildlista"
-"Integerfield": "Heltalsfält"
 "Invalid menu path (%PATH%) set in menu.yml. Does not match any configured contenttypes or routes.": "Ogiltig meny sökväg (%PATH%) i menu.yml. Matchar inte några konfigurerade innehållstyper eller rutter."
 "Invalid menu path (%PATH%) set in menu.yml. Probably should be a link: instead!": "Ogiltig menyn sökväg (%PATH%) i menu.yml. Borde nog vara en 'link:' istället!"
-"Markdown": "Markdown"
-"Multiselect": "Flerval"
-"Select a page": "Välj en sida"
-"Select zero or more pages": "Välj en eller flera sidor"
-"Selectentry": "Välj inlägg"
-"Selectfield": "Välj fält"
-"Skipped <tt>%key%</tt> (already has records)": "Hoppade över <tt>%key%</tt> (har redan innehåll)"
-"Skipped <tt>%key%</tt> (not checked)": "Hoppade över <tt>%key%</tt> (inte vald)"
-"Slug": "Permalänk"
-"Tag": "Tagg"
-"Tags": "Taggar"
-"Teaser": "Teaser"
-"Template": "Mall"
-"Testing connection to extension server failed: %errormessage%": "Testning av anslutning till tilläggsserver misslyckades: %errormessage%"
-"Textarea": "Textfält"
 "The identifier and slug for '%taxonomytype%' are the not the same ('%slug%' vs. '%taxonomytype%'). Please edit taxonomy.yml, and make them match to prevent inconsistencies between database storage and your templates.": "Identifieraren och permalänken för '%taxonomytype%' är inte samma ('%slug%' vs. '%taxonomytype%'). Redigera taxonomy.yml för att förebygga motsägelser mellan databas och mall."
 "The settings for roles and permissions are stored in <code>%permissions%</code>.": "Inställningarna för roller och rättigheter lagras i <code>%permissions%</code>."
 "The slug '%slug%' is used in more than one contenttype. Please edit contenttypes.yml, and make them distinct.": "Permalänken '%slug%' används i mer än en innehållstyp. Redigera contenttypes.yml så att de är unika."
 "The translations file '%s' can't be created. You will have to use your own editor to make modifications to this file.": "Översättningsfilen '%s' kunde inte skapas. Du behöver använda din egen textredigerare för att ändra på filen."
-"This is a checkbox": "Detta är en Kryssruta"
 "This website is <a href='%url%' target='_blank' title='Sophisticated, lightweight & simple CMS'>Built with Bolt</a>.": "Denna sidan är <a href='%url%' target='_blank' title='Sofistikerat, snabbt & smidigt CMS'>byggd med Bolt</a>."
 "Title": "Titel"
 "Try logging in with your ftp-client and make the file readable. Else try to go <a>back</a> to the last page.": "Prova att logga in med din FTP-klient och gör filen läsbar. Annars gå <a>bak</a> till senaste sidan."
@@ -165,10 +174,8 @@ page.file-management.message.upload-not-writable: # "Unable to write to upload d
 "Unable to delete file: %FILE%": "Det går inte att ta bort filen: %FILE%"
 "Unable to rename directory: %DIR%": "Det gick inte att döpa om katalogen: %DIR%"
 "Unable to rename file: %FILE%": "Det går inte att döpa om på filen: %FILE%"
-"Video": "Video"
 "View (saved version) on site": "Se sparad version på sidan"
 "You've been logged on successfully.": "Du är nu inloggad."
-"filtered by <em>'%filter%'</em>": "filtrerat efter <em>\"%filter%\"</em>"
 
 #--- Translation messages -----------------------------------------------------
 
@@ -189,7 +196,6 @@ contenttypes.generic.invalid-relation: "I innehållstypen för '%contenttype%' d
 contenttypes.generic.last-modified: "Senast redigerade %contenttypes%"
 contenttypes.generic.new: "Ny %contenttype%"
 contenttypes.generic.no-latest: "Inga senaste %contenttype%"
-contenttypes.generic.no-proper-type: "I innehållstypen '%contenttype%', fältet '%field%' har 'typ: %type%', som inte är ett korrekt fält. Redigera contenttypes.yml för att lösa det."
 contenttypes.generic.no-recent: "Inga nyligen redigerade %contenttype%."
 contenttypes.generic.none-available: "Inga %contenttypes%."
 contenttypes.generic.not-existing: "%contenttype% du letade efter finns inte. Den har förmodligen blivit borttagen eller så har den aldrig funnits."
@@ -226,6 +232,8 @@ field.image.label.alt: "Alt"
 
 field.markdown.label.markedview: "Markdown"
 field.markdown.label.preview: "Förhandsgranska"
+
+field.repeater.delete-set: "Ta bort grupp"
 
 field.slug.button.edit: "Redigera"
 field.slug.button.lock: "Lås"
@@ -266,7 +274,6 @@ general.bolt-welcome-new-site: "Välkommen till din nya boltsite, %USER%."
 general.phrase.access-denied-logged-out: "Du har blivit utloggad."
 general.phrase.access-denied-permissions-edit-file: "Du har inte rättighet att redigera filen '%s'."
 general.phrase.access-denied-permissions-view-file-directory: "Du har inte rättighet att visa filen eller mappen '%s'."
-general.phrase.access-denied-privilege-edit-record: "Du har inte rättighet att redigera det dokumentet."
 general.phrase.access-denied-privilege-edit-user: "Du har inte rättighet att redigera den användaren."
 general.phrase.access-denied-privilege-view-page: "Du har inte rättighet att se den sidan."
 general.phrase.access-denied-self-action: "Du kan inte \"%s\" dig själv."
@@ -278,13 +285,13 @@ general.phrase.by: "av"
 general.phrase.cancel: "Avbryt"
 general.phrase.change-current-status: "Klicka för att ändra status."
 general.phrase.change-log: "Ändringslogg"
+general.phrase.changelog-what-changed: "Lägg till en kort, valfri kommentar om vad som ändrats."
 general.phrase.check-again: "Kontrollera igen"
 general.phrase.check-database: "Kontrollera databas"
 general.phrase.choose-record-link-to: "Välj dokumentet du vill länka till:"
 general.phrase.clear-cache: "Rensa cache"
 general.phrase.clear-cache-again: "Rensa cache igen"
 general.phrase.clear-change-log: "Rensa förändringslogg"
-general.phrase.clear-filter: "Rensa filter"
 general.phrase.clear-filter-sort: "Rensa sortering/filter"
 general.phrase.clear-system-log: "Rensa systemloggen"
 general.phrase.close-editor: "Stäng redigerare"
@@ -292,6 +299,16 @@ general.phrase.code-colon: "Kod:"
 general.phrase.collapse-sidebar: "Dölj sidomeny"
 general.phrase.configuration: "Konfiguration"
 general.phrase.configuration-main: "Huvudkonfiguration"
+general.phrase.confirm-delete-file: "Är du säker du vill ta bort %FILENAME%?"
+general.phrase.confirm-delete-user: "Är du säker på att du vill radera %username%?"
+general.phrase.confirm-record-multiple: "Är du säker du vill göra detta för %NUMBER% inlägg?"
+general.phrase.confirm-record-single: "Är du säker du vill göra detta för 1 inlägg?"
+general.phrase.confirm-remove-file: "Är du säker på att du vill ta bort denna fil?"
+general.phrase.confirm-remove-files: "Är du säker du vill ta bort dessa filer?"
+general.phrase.confirm-remove-image: "Är du säker på att du vill ta bort denna bild?"
+general.phrase.confirm-remove-images: "Är du säker du vill ta bort dessa bilder?"
+general.phrase.confirm-remove-record: "Är du säker du vill ta bort detta inlägg? Det går inte att ångra."
+general.phrase.content: "Innehåll"
 general.phrase.content-type-permissions: "Innehållsrättigheter"
 general.phrase.content-types: "Innehållstyper"
 general.phrase.create-user-first: "Skapa första användaren"
@@ -306,19 +323,15 @@ general.phrase.database-up-to-date-already: "Din databas är redan uppdaterad."
 general.phrase.delete: "Radera"
 general.phrase.delete-directory-name: "Radera %foldername%"
 general.phrase.delete-file-name: "Radera %filename%"
-general.phrase.delete-set: "Ta bort grupp"
 general.phrase.delete-user-name: "Radera %username%"
 general.phrase.depublication-date-colon: "Avpublicerings datum:"
 general.phrase.depublish: "Avpublicera"
 general.phrase.depublish-date-past: "Avpubliceringsdatumet har passerat. Ändra status om du vill avpublicera nu"
 general.phrase.deselect-all: "Avmarkera alla"
 general.phrase.details: "Information"
-general.phrase.directory-not-found-writable: "Mappen '%s' kunde inte hittas eller är inte läsbar."
 general.phrase.disable-user-name: "Deaktivera %username%"
-general.phrase.done-bang: "klart!"
 general.phrase.draft: "Utkast"
 general.phrase.duplicate-file-name: "Duplicera %filename%"
-general.phrase.duplicate-set: "Duplicera grupp"
 general.phrase.edit: "Redigera"
 general.phrase.edit-file: "Redigera fil"
 general.phrase.edit-role-permissions: "Redigera Roller och Rättigheter"
@@ -331,7 +344,6 @@ general.phrase.error-session-data-login: "Det gick inte att hämta sessionsdata.
 general.phrase.error-translation-file-not-readable: "Översättningsfilen '%s' är inte läsbar."
 general.phrase.error-user-name-password-incorrect: "Användarnamnet eller lösenordet är inte korrekt."
 general.phrase.extensions: "Tillägg"
-general.phrase.extras: "Tillägg"
 general.phrase.field: "Fält"
 general.phrase.field-fieldname: "Fältet \"%FIELD_NAME%\":"
 general.phrase.file-management: "Filhantering"
@@ -342,7 +354,7 @@ general.phrase.file-not-writable: "Filen '%s' är inte skrivbar. Du måste anvä
 general.phrase.file-size: "Filstorlek"
 general.phrase.file-upload-failed: "Det gick inte att ladda upp filerna."
 general.phrase.filter: "Filter"
-general.phrase.filtering: "Filtrering"
+general.phrase.filtered-by: "filtrerat efter"
 general.phrase.find: "Hitta"
 general.phrase.floating-point-required-bang: "Måste vara ett decimaltal!"
 general.phrase.folders: "Mappar"
@@ -351,6 +363,7 @@ general.phrase.general.phrase.uploaded-files: "Uppladdade filer"
 general.phrase.global-permissions: "Globala Rättigheter"
 general.phrase.hints-colon: "Tips:"
 general.phrase.id: "ID"
+general.phrase.image: "Bild"
 general.phrase.info: "Information"
 general.phrase.ip.address: "IP adress"
 general.phrase.keyword-ellipsis: "Sökord…"
@@ -381,7 +394,6 @@ general.phrase.no-content: "inget innehåll …"
 general.phrase.no-content-found: "Inget innehåll funnet."
 general.phrase.no-files-in-list: "Inga filer i listan ännu."
 general.phrase.no-images-in-list: "Inga bilder i listan ännu."
-general.phrase.no-relations-found-bang: "Inga relationer funna!"
 general.phrase.no-result-for-search-term: "Vi kunde inte hitta något för sökningen '%SEARCHTERM%'. Försök att söka efter något annat."
 general.phrase.no-such-action-for-user: "Det finns ingen sådan åtgärd för användaren '%s'."
 general.phrase.no-title: "ingen titel …"
@@ -403,11 +415,8 @@ general.phrase.overview: "Överblick"
 general.phrase.overview-for: "Överblick för"
 general.phrase.owner-colon: "Ägare:"
 general.phrase.pager-showing-from-to-of: "Visar %pager_for% %from% - %to% av %count%"
-general.phrase.path: "Sökväg"
-general.phrase.path-colon: "Sökväg:"
 general.phrase.path-image-file: "Sökväg till bildfilen"
 general.phrase.permalink: "Permalänk"
-general.phrase.permissions: "Rättigheter"
 general.phrase.please-logon: "Vänligen logga in."
 general.phrase.please-provide-username: "Vänligen skriv in ett användarnamn"
 general.phrase.preview: "Förhandsgranska"
@@ -490,7 +499,6 @@ general.phrase.value-new: "Nytt värde"
 general.phrase.value-old: "Gammalt värde"
 general.phrase.view-edit-templates: "Se/redigera Mallar"
 general.phrase.view-on-site: "Se på sidan"
-general.phrase.view-related: "Se relaterat innehåll"
 general.phrase.view-roles: "Se Roller"
 general.phrase.view-site: "Visa sida"
 general.phrase.warning: "Varning"
@@ -501,7 +509,6 @@ general.phrase.written-by-on: "Skriven av <em>%name%</em>, %date%"
 
 general.visit-bolt: "Besök Bolt.cm"
 
-generic.noscript.headline: "JavaScript är avstängt"
 generic.noscript.message: "JavaScript är avstängt i din webbläsare. Bolt kräver JavaScript för att fungera korrekt och ifall du fortsätter utan JavaScript så kan du förlora data."
 
 logs.change-log: "Ändringslogg"
@@ -516,13 +523,7 @@ logs.system-log.trimmed: "Systemloggen har blivit rensad."
 
 menu.configuration.routing: "Routing & url:er"
 
-page.checks.run-all: "Kör alla kontroller"
-page.checks.run-directory-checks: "Kör katalogkontroll"
-page.checks.run-email-checks: "Kör e-postkontroll"
-page.checks.run-php-ext-checks: "Kör PHP tilläggskontroll"
-
 page.ckeditor-browse-server.files: "Filer"
-page.ckeditor-browse-server.folders: "Mappar"
 page.ckeditor-browse-server.modified: "Modifierad"
 page.ckeditor-browse-server.size: "Filstorlek"
 page.ckeditor-browse-server.title: "Filer"
@@ -539,7 +540,6 @@ page.edit-file.note-related: "Denna filen har relaterade filer:"
 page.edit-file.title.edit: "Redigera fil"
 page.edit-file.title.view: "Se fil"
 
-page.edit-locale.button.save: "Spara"
 page.edit-locale.title.edit: "Redigera fil"
 page.edit-locale.title.view: "Se fil"
 
@@ -590,6 +590,10 @@ page.extend.button.show-all-versions: "Visa alla versioner"
 page.extend.button.update-all: "Uppdatera allt"
 page.extend.button.update-check: "Kolla efter uppdateringar"
 page.extend.button.update-package: "Uppdatera paket"
+page.extend.error-message-client: "Klientfel: %errormessage%"
+page.extend.error-message-connection: "Testning av anslutning till tilläggsserver misslyckades: %errormessage%"
+page.extend.error-message-generic: "%errormessage%\": \"Ett fel inträffade när vi testade anslutningen till tilläggsservern: %errormessage%\""
+page.extend.error-message-server: "Tilläggsservern returnerade ett fel: %errormessage%"
 page.extend.headline.currently-installed: "Dina installerade tillägg"
 page.extend.headline.install-new-extension: "Installera ett nytt tillägg"
 page.extend.headline.installation-complete: "Installation slutförd"
@@ -647,8 +651,6 @@ page.file-management.message.access-denied: "Uppladdning till denna mappen är i
 page.file-management.message.create-file: "Välj ett nytt filnamn!"
 page.file-management.message.create-folder: "Välj ett nytt mappnamn!"
 page.file-management.message.file-not-readable: "Filen är inte läsbar!"
-page.file-management.message.files-in: "Filer i %s"
-page.file-management.message.folder-access-denied: "Otillräckliga mapprättigheter"
 page.file-management.message.folder-not-found: "Mappen '%s' kunde inte hittas, eller är inte läsbar."
 page.file-management.message.save-failed-colon: "Fil '%s' kunde inte sparas:"
 page.file-management.message.save-failed-invalid-form: "Filen '%s' kunde inte sparas, eftersom formuläret inte var giltigt."
@@ -669,6 +671,8 @@ page.login.password-reset-link-sent: "En återställningslänk för lösenord ha
 page.login.password-show: "Visa"
 page.login.placeholder.password: "Ditt användarnamn"
 page.login.title: "Logga in till bolt"
+
+page.prefill.skipped-existing: "Hoppade över <code>%key%</code> (har redan innehåll)"
 
 panel.latest-activity.button.more: "Mer aktivitet"
 panel.latest-activity.by: "av"
@@ -691,5 +695,3 @@ permissions.roles.label.anonymous: "Anonym"
 permissions.roles.label.owner: "Ägare"
 
 users.actions-for-users: "Åtgärder för Användare"
-
-users.your-password: "Ditt lösenord"

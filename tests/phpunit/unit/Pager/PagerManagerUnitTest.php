@@ -2,13 +2,11 @@
 
 namespace Bolt\Tests\Pager;
 
+use PHPUnit\Framework\Assert;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Class PagerManagerUnitTest
- *  is intended for testing Bolt\Pager\PagerManager methods in separated way so it is testing ONE method at once.
- *
- * @package Bolt\Tests\Pager
+ * @covers \Bolt\Pager\PagerManager
  *
  * @author Rix Beck <rix@neologik.hu>
  */
@@ -28,6 +26,9 @@ class PagerManagerUnitTest extends PagerManagerTestBase
 
     /**
      * @dataProvider makeParameterIdProvider
+     *
+     * @param string     $expected
+     * @param string|int $suffix
      */
     public function testMakeParameterId($expected, $suffix)
     {
@@ -89,6 +90,7 @@ class PagerManagerUnitTest extends PagerManagerTestBase
         $manager->initialize($app['request']);
         $this->assertEquals('?' . $expected, (string) $manager);
     }
+
     public function testOffsetSet()
     {
         $manager = $this->createPagerManagerMockBuilder()
@@ -101,7 +103,7 @@ class PagerManagerUnitTest extends PagerManagerTestBase
         $expected = [];
         $expected['page_some'] = $this->createPager($base);
         $expected['page_some']->setManager($manager);
-        $this->assertEquals($expected, \PHPUnit_Framework_Assert::readAttribute($manager, 'pagers'));
+        $this->assertEquals($expected, Assert::readAttribute($manager, 'pagers'));
     }
 
     public function testOffsetGet()
@@ -159,6 +161,7 @@ class PagerManagerUnitTest extends PagerManagerTestBase
         $pagers = $refdata;
         $this->assertEquals($refkeys, $manager->keys());
     }
+
     /**
      * @return array
      */
@@ -202,6 +205,9 @@ class PagerManagerUnitTest extends PagerManagerTestBase
 
     /**
      * @dataProvider findInitializedPagerIdProvider
+     *
+     * @param array  $data
+     * @param string $expected
      */
     public function testFindInitializedPagerId($data, $expected)
     {
@@ -252,6 +258,6 @@ class PagerManagerUnitTest extends PagerManagerTestBase
             ->method('remapPagers')
             ->willReturn(['page' => 2, 'page_wine' => 9999]);
 
-        return [$manager, $expected, [ 'some' => 'thing']];
+        return [$manager, $expected, ['some' => 'thing']];
     }
 }

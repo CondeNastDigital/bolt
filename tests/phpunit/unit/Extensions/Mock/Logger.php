@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Tests\Extensions\Mock;
 
 /**
@@ -13,7 +14,7 @@ class Logger
 
     public function add($message, $level)
     {
-        $this->logs[] =  $message;
+        $this->logs[] = $message;
     }
 
     public function addRecord($level, $message, array $context = [])
@@ -35,6 +36,7 @@ class Logger
     {
         $this->logs[] = $message;
     }
+
     public function addWarning($message, array $context = [])
     {
         $this->logs[] = $message;

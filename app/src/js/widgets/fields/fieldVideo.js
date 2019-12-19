@@ -101,7 +101,7 @@
         },
 
         /**
-         * Gets video embedding info from http://api.embed.ly and then updates video fields.
+         * Gets video embedding info from the internal embed API and then updates video fields.
          *
          * @private
          */
@@ -109,12 +109,12 @@
             var self = this,
                 url = bolt.data('endpoint.embed'),
                 form = $('#id').closest('form'),
-                token = form.find('input[name="bolt_csrf_token"]').val(),
+                token = form.find('input[name="content_edit[_token]"]').val(),
                 request = {
-                    format:          'json',
-                    url:             self._ui.url.val(),
-                    bolt_csrf_token: token,
-                    provider:        'oembed'
+                    format:   'json',
+                    url:      self._ui.url.val(),
+                    _token:   token,
+                    provider: 'oembed'
                 };
 
             // If val is emptied, clear the video fields.
@@ -144,7 +144,7 @@
          * @param {Object} data - Date sent from embed.ly
          */
         _set: function (data) {
-            var thumbnailUrl = data.thumbnail_url || bolt.conf('paths.app') + 'view/img/default_empty_4x3.png';
+            var thumbnailUrl = data.thumbnail_url || this._ui.preview.data('defaultUrl');
 
             this._ui.html.val(data.html || '');
             this._ui.width.val(data.width || '');

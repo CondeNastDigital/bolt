@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Tests\Helper;
 
 use Bolt\Helpers\Html;
@@ -82,7 +83,7 @@ class HtmlTest extends BoltUnitTest
         );
         $this->assertEquals(
             '',
-            Html::providerLink("foo")
+            Html::providerLink('foo')
         );
         $this->assertEquals(
             '<a href="mailto:supercool@example.org">Supercool Webdesign Co.</a>',
@@ -117,5 +118,4 @@ class HtmlTest extends BoltUnitTest
             Html::providerLink(['http://example.org', '<b malformed HTML'])
         );
     }
-
 }

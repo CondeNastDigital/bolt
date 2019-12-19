@@ -1,9 +1,19 @@
 <?php
+
 namespace Bolt\Tests\Nut;
 
+use Bolt\Composer\PackageManager;
+use Bolt\Composer\Satis\PingService;
 use Bolt\Nut\ExtensionsInstall;
 use Bolt\Tests\BoltUnitTest;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Response;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * Class to test src/Nut/ExtensionsEnable.
@@ -17,37 +27,64 @@ class ExtensionsInstallTest extends BoltUnitTest
     {
         $app = $this->getApp();
 
-        $runner = $this->getMock('Bolt\Composer\PackageManager', ['requirePackage'], [$app]);
+        $runner = $this->getMockBuilder(PackageManager::class)
+            ->setMethods(['requirePackage'])
+            ->setConstructorArgs([$app])
+            ->getMock()
+        ;
         $runner->expects($this->any())
             ->method('requirePackage')
             ->will($this->returnValue(0));
 
-        $app['extend.manager'] = $runner;
+        $this->setService('extend.manager', $runner);
+        $this->setService('extend.ping', $this->getPingServiceMock(new Response(200, ['X-Foo' => 'Bar'])));
 
         $command = new ExtensionsInstall($app);
         $tester = new CommandTester($command);
 
         $tester->execute(['name' => 'test', 'version' => '1.0']);
         $result = $tester->getDisplay();
-        $this->assertRegExp('/Starting install of test:1.0… \[DONE\]/', trim($result));
+        $this->assertRegExp('/Installing test:1.0/', $result);
     }
 
     public function testFailed()
     {
         $app = $this->getApp();
 
-        $runner = $this->getMock('Bolt\Composer\PackageManager', ['requirePackage'], [$app]);
+        $runner = $this->getMockBuilder(PackageManager::class)
+            ->setMethods(['requirePackage'])
+            ->setConstructorArgs([$app])
+            ->getMock()
+        ;
         $runner->expects($this->any())
             ->method('requirePackage')
             ->will($this->returnValue(1));
 
-        $app['extend.manager'] = $runner;
+        $this->setService('extend.manager', $runner);
+        $this->setService('extend.ping', $this->getPingServiceMock(new RequestException('Mock testing failure', new Request('GET', 'http://localhost/ping'))));
 
         $command = new ExtensionsInstall($app);
         $tester = new CommandTester($command);
 
         $tester->execute(['name' => 'test', 'version' => '1.0']);
         $result = $tester->getDisplay();
-        $this->assertRegExp('/Starting install of test:1.0… \[FAILED\]/', trim($result));
+
+        $this->assertRegExp('/Testing connection to extension server failed: Mock testing failure/', $result);
+    }
+
+    private function getPingServiceMock($response)
+    {
+        $mock = new MockHandler([$response]);
+
+        $handler = HandlerStack::create($mock);
+        $client = new Client(['handler' => $handler]);
+
+        $requestStack = $this->createMock(RequestStack::class);
+        $requestStack
+            ->expects($this->atLeastOnce())
+            ->method('getCurrentRequest')
+        ;
+
+        return new PingService($client, $requestStack, 'http://localhost/ping');
     }
 }

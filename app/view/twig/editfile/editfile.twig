@@ -6,7 +6,14 @@
 
 {% block page_title context.write_allowed ? __('page.edit-file.title.edit') : __('page.edit-file.title.view') %}
 
-{% block page_subtitle context.basename %}
+{% form_theme context.form 'form_bolt_layout.twig' _self %}
+
+{%- block file_edit_save_button_icon %}
+    <i class="fa fa-flag"> </i>
+{% endblock -%}
+{%- block file_edit_revert_button_icon %}
+    <i class="fa fa-undo"> </i>
+{% endblock -%}
 
 {% block page_main %}
 
@@ -31,35 +38,38 @@
     <div class="row">
         <div class="col-xs-12">
 
-            {{ files_path(context.pathsegments, context.namespace, {'path': '', 'namespace': context.namespace}) }}
+            {{ files_path(context.file) }}
 
             {{ widgets('editfile_below_header', 'backend') }}
 
-            <form method="post" class="form-inline" id="editfile" autocomplete="off">
+            {{ form_start(context.form, {'attr': {'class': 'form-inline', 'autocomplete': 'off'}}) }}
                 {{ form_widget(context.form._token) }}
 
                 <div>
-                    <textarea{{ macro.attr(attr_text) }}>{{ context.form.vars.value.contents }}</textarea>
+                    {{ form_widget(context.form.contents,
+                        {
+                            'class': 'CodeMirror-scroll',
+                            'attr': {
+                                'data-bind': {'bind': 'editfile', readonly: context.write_allowed ? false : true}|json_encode,
+                                'style': 'width: 98%; min-height: 350px; white-space: pre; word-wrap: normal; overflow-x: scroll;'
+                            }
+                        })
+                    }}
                 </div>
 
                 <div>
-                    <button type="button" id="saveeditfile" class="btn btn-primary" {% if not context.write_allowed %}disabled{% endif %}>
-                        <i class="fa fa-flag"></i> {{ __('page.edit-file.button.save') }}
-                    </button>
-                    <a class="btn btn-default confirm {% if not context.write_allowed %}disabled{% endif %}" style="margin-left: 24px;"
-                       data-confirm="{{ __("page.edit-file.confirm-revert") }}"
-                       href="{{ path('fileedit', {'namespace': context.namespace, 'file': context.file}) }}"
-                    >
-                        <i class="fa fa-undo"></i> {{ __("page.edit-file.button.revert") }}
-                    </a>
+                    {{ form_widget(context.form.save) }}
+                    {{ form_widget(context.form.revert, {'attr': {
+                        'class': 'btn-default confirm',
+                        'data-confirm': __('page.edit-file.confirm-revert'),
+                        'style': 'margin-left: 24px;'
+                    }}) }}
 
                   <div class="relatedfiles">
-                    {% if context.filegroup|length > 1 %}
+                    {% if context.related|length > 0 %}
                       {{ __("page.edit-file.note-related") }}
-                      {% for related in context.filegroup %}
-                        {% if related != context.basename %}
-                          <a class="btn btn-tertiary btn-small" href="{{ path('fileedit', {'namespace': context.namespace, 'file': context.additionalpath ~ related}) }}">{{ related }}</a>
-                        {% endif %}
+                      {% for file in context.related %}
+                          <a class="btn btn-tertiary btn-small" href="{{ path('fileedit', {'namespace': file.mountPoint, 'file': file.path}) }}">{{ file.filename }}</a>
                       {% endfor %}
                     {% endif %}
                   </div>
@@ -71,35 +81,19 @@
                 ({{ buic_moment(context.datechanged) }})
             </p>
 
-            </form>
+            {{ form_end(context.form) }}
 
             {{ widgets('editfile_bottom', 'backend') }}
 
         </div>
     </div>
 
-    {% if context.filetype in ['twig', 'html', 'htm'] %}
-        {% set codemirror = ['xml', 'javascript', 'css', 'htmlmixed'] %}
-    {% elseif context.filetype == "php" %}
-        {% set codemirror = ['matchbrackets', 'javascript', 'css', 'htmlmixed', 'clike', 'php'] %}
-    {% elseif context.filetype == "yml" %}
-        {% set codemirror = ['yaml'] %}
-    {% elseif context.filetype == "md" %}
-        {% set codemirror = ['markdown'] %}
-    {% elseif context.filetype in ['css', 'less'] %}
-        {% set codemirror = ['css'] %}
-    {% elseif context.filetype == "js" %}
-        {% set codemirror = ['javascript'] %}
-    {% else %}
-        {% set codemirror = [] %}
-    {% endif %}
-
     {# use the files includes in ckeditor/codemirror plugin, instead of duplicating files. #}
     <link rel="stylesheet" property="stylesheet" href="{{ asset('js/ckeditor/plugins/codemirror/css/codemirror.min.css', 'bolt') }}">
     <script src="{{ asset('js/ckeditor/ckeditor.js', 'bolt') }}"></script>
-    <script src="{{ asset('js/ckeditor/plugins/codemirror/js/codemirror.min.js', 'bolt') }}"></script>
+    <script src="{{ asset('js/ckeditor/plugins/codemirror/js/codemirror.js', 'bolt') }}"></script>
     <script src="{{ asset('js/ckeditor/plugins/codemirror/js/codemirror.addons.search.min.js', 'bolt') }}"></script>
-    {% for file in codemirror %}
+    {% for file in context.codeMirrorPlugins %}
         <script src="{{ asset('js/ckeditor/plugins/codemirror/plugins/' ~ file ~ '.min.js', 'bolt') }}"></script>
     {% endfor %}
 

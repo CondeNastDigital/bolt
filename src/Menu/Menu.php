@@ -3,7 +3,7 @@
 namespace Bolt\Menu;
 
 /**
- * Class Menu
+ * Menu class.
  */
 class Menu
 {
@@ -21,8 +21,8 @@ class Menu
      */
     public function __construct($name, array $menu, $resolved = false)
     {
-        $this->name     = $name;
-        $this->menu     = $menu;
+        $this->name = $name;
+        $this->menu = $menu;
         $this->resolved = $resolved;
     }
 

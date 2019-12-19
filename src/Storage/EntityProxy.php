@@ -23,8 +23,8 @@ class EntityProxy
     /**
      * Constructor.
      *
-     * @param string             $entity    The class name of the object to find.
-     * @param string             $reference The identity of the object to find.
+     * @param string             $entity    the class name of the object to find
+     * @param string             $reference the identity of the object to find
      * @param EntityManager|null $em
      */
     public function __construct($entity, $reference, EntityManager $em = null)
@@ -80,5 +80,15 @@ class EntityProxy
         $this->load();
 
         return $this->proxy->$attribute = $value;
+    }
+
+    /**
+     * @return object
+     */
+    public function getProxy()
+    {
+        $this->load();
+
+        return $this->proxy;
     }
 }

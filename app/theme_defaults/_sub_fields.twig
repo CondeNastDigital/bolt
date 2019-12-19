@@ -66,7 +66,7 @@
         {# Finally, the repeaters #}
         {% if repeaters|default(false) == true and record.fieldtype(key) == "repeater" %}
 
-            {% if (app.request.get('_route') != "preview") %}
+            {% if (global.request.get('_route') != "preview") %}
 
                 {% for repeater in value %}
 

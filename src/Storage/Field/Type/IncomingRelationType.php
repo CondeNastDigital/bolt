@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Storage\Field\Type;
 
 use Bolt\Storage\Entity;
@@ -25,7 +26,7 @@ class IncomingRelationType extends RelationType
      * @param QueryBuilder  $query
      * @param ClassMetadata $metadata
      *
-     * @return void
+     * @return QueryBuilder|null|void
      */
     public function load(QueryBuilder $query, ClassMetadata $metadata)
     {
@@ -58,18 +59,20 @@ class IncomingRelationType extends RelationType
         $data = $this->normalizeData($data, $field);
 
         if (!$entity->getRelation()) {
-            $entity->setRelation($this->em->createCollection('Bolt\Storage\Entity\Relations'));
+            $entity->setRelation($this->em->createCollection(Entity\Relations::class));
         }
 
         foreach ($data as $relData) {
-            $rel = [];
-            $rel['id'] = $relData['id'];
-            $rel['from_id'] = $relData['fromid'];
-            $rel['from_contenttype'] = $relData['fromcontenttype'];
-            $rel['to_contenttype'] = (string) $entity->getContenttype();
-            $rel['to_id'] = $entity->getId();
-            $relEntity = new Entity\Relations($rel);
-            $entity->getRelation()->add($relEntity);
+            if (isset($relData['fromcontenttype'])) {
+                $rel = [];
+                $rel['id'] = $relData['id'];
+                $rel['from_id'] = $relData['fromid'];
+                $rel['from_contenttype'] = $relData['fromcontenttype'];
+                $rel['to_contenttype'] = (string) $entity->getContenttype();
+                $rel['to_id'] = $entity->getId();
+                $relEntity = new Entity\Relations($rel);
+                $entity->getRelation()->add($relEntity);
+            }
         }
     }
 

@@ -2,6 +2,7 @@
 
 namespace Bolt\Storage\Database\Schema;
 
+use Bolt\Common\Deprecated;
 use Bolt\Events\SchemaEvent;
 use Bolt\Events\SchemaEvents;
 use Bolt\Storage\Database\Schema\Table\BaseTable;
@@ -32,7 +33,7 @@ class Manager implements SchemaManagerInterface
     private $app;
 
     /** @deprecated Deprecated since 3.0, to be removed in 4.0. */
-    const INTEGRITY_CHECK_INTERVAL    = 1800; // max. validity of a database integrity check, in seconds
+    const INTEGRITY_CHECK_INTERVAL = 1800; // max. validity of a database integrity check, in seconds
     const INTEGRITY_CHECK_TS_FILENAME = 'dbcheck_ts'; // filename for the check timestamp file
 
     /**
@@ -55,7 +56,7 @@ class Manager implements SchemaManagerInterface
      */
     public function __call($name, $args)
     {
-        $this->app['logger.system']->warning('[DEPRECATED]: An extension called an invalid, or removed, integrity checker function: ' . $name, ['event' => 'deprecated']);
+        Deprecated::raw("An extension called an invalid, or removed, integrity checker function: $name. This will throw a fatal error in 4.0.");
     }
 
     /**
@@ -65,7 +66,7 @@ class Manager implements SchemaManagerInterface
      */
     public function __get($name)
     {
-        $this->app['logger.system']->warning('[DEPRECATED]: An extension called an invalid, or removed integrity, checker property: ' . $name, ['event' => 'deprecated']);
+        Deprecated::raw("An extension accessed an invalid, or removed, integrity checker property: $name. This will throw a fatal error in 4.0.");
     }
 
     /**
@@ -102,7 +103,9 @@ class Manager implements SchemaManagerInterface
     {
         $fromTables = $this->getInstalledTables();
         $toTables = $this->getSchemaTables();
-        $pending = $this->getSchemaComparator()->hasPending($fromTables, $toTables, $this->app['schema.content_tables']->keys());
+        $protectedTableNames = $this->app['schema.content_tables']->keys();
+
+        $pending = $this->getSchemaComparator()->hasPending($fromTables, $toTables, $protectedTableNames);
 
         if (!$pending) {
             $this->getSchemaTimer()->setCheckExpiry();
@@ -120,7 +123,9 @@ class Manager implements SchemaManagerInterface
     {
         $fromTables = $this->getInstalledTables();
         $toTables = $this->getSchemaTables();
-        $response = $this->getSchemaComparator()->compare($fromTables, $toTables, $this->app['schema.content_tables']->keys());
+        $protectedTableNames = $this->app['schema.content_tables']->keys();
+
+        $response = $this->getSchemaComparator()->compare($fromTables, $toTables, $protectedTableNames);
         if (!$response->hasResponses()) {
             $this->getSchemaTimer()->setCheckExpiry();
         }
@@ -138,7 +143,9 @@ class Manager implements SchemaManagerInterface
         // Do the initial check
         $fromTables = $this->getInstalledTables();
         $toTables = $this->getSchemaTables();
-        $this->getSchemaComparator()->compare($fromTables, $toTables, $this->app['schema.content_tables']->keys());
+        $protectedTableNames = $this->app['schema.content_tables']->keys();
+
+        $this->getSchemaComparator()->compare($fromTables, $toTables, $protectedTableNames, true);
         $response = $this->getSchemaComparator()->getResponse();
         $creates = $this->getSchemaComparator()->getCreates();
         $alters = $this->getSchemaComparator()->getAlters();
@@ -153,8 +160,8 @@ class Manager implements SchemaManagerInterface
         // Recheck now that we've processed
         $fromTables = $this->getInstalledTables();
         $toTables = $this->getSchemaTables();
-        $this->getSchemaComparator()->compare($fromTables, $toTables, $this->app['schema.content_tables']->keys());
-        if (!$this->getSchemaComparator()->hasPending($fromTables, $toTables, $this->app['schema.content_tables']->keys())) {
+        $this->getSchemaComparator()->compare($fromTables, $toTables, $protectedTableNames);
+        if (!$this->getSchemaComparator()->hasPending($fromTables, $toTables, $protectedTableNames)) {
             $this->getSchemaTimer()->setCheckExpiry();
         }
 
@@ -164,7 +171,7 @@ class Manager implements SchemaManagerInterface
     /**
      * Check if just the users table is present.
      *
-     * @return boolean
+     * @return bool
      */
     public function hasUserTable()
     {
@@ -240,9 +247,9 @@ class Manager implements SchemaManagerInterface
     /**
      * This method allows extensions to register their own tables.
      *
-     * @param callable $generator A generator function that takes the Schema
+     * @param callable $generator a generator function that takes the Schema
      *                            instance and returns a table or an array of
-     *                            tables.
+     *                            tables
      */
     public function registerExtensionTable(callable $generator)
     {

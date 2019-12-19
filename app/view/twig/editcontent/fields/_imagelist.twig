@@ -4,7 +4,6 @@
     extensions:  field.extensions|default([]),
     label:       field.label,
     upload:      field.upload|default(''),
-    can_upload:  field.canUpload,
     info:        field.info|default('info.upload.imagelist')
 } %}
 
@@ -13,7 +12,7 @@
 {% set attributes = {
     fileupload: {
         accept:       option.extensions ? '.' ~ option.extensions|join(',.') : '',
-        data_url:     url('upload', {' handler': option.upload }, true),
+        data_url:     path('upload', {' handler': option.upload }),
         id:           'fileupload-' ~ key,
         multiple:     true,
         name:         'files[]',
@@ -36,13 +35,13 @@
 
 {% set template_item %}
     <div class="item ui-state-default">
-        <a class="magnific" href="{{ app.paths.files }}%FILENAME_A%" title="%TITLE_A%">
-            <img src="{{ app.paths.bolt }}../thumbs/60x40/%FILENAME_A%" width="60" height="40">
+        <a class="magnific" href="%URL_A%" title="%TITLE_A%">
+            <img src="%PREVIEW_A%" width="60" height="40">
         </a>
         <input type="text" class="title" value="%TITLE_A%">
-        <input type="hidden" class="filename" value="%FILENAME_A%">
+        <input type="hidden" class="filename" value="%FILEPATH_A%">
         <a href="#" class="remove"><i class="fa fa-times"></i></a>
-        <span class="desc">%FILENAME_E%</span>
+        <span class="desc">%FILEPATH_E%</span>
     </div>
 {% endset %}
 {% set template_item = template_item|trim|preg_replace('/>\\s+</', '><') %}
@@ -50,6 +49,7 @@
 {#=== FIELDSET =======================================================================================================#}
 
 {% extends '@bolt/_base/_fieldset.twig' %}
+{% import '@bolt/_macro/_macro.twig' as macro %}
 
 {% block fieldset_type 'imagelist' %}
 {% block fieldset_widget 'fieldImagelist' %}
@@ -62,15 +62,28 @@
     {{ data('field.imagelist.template.empty', template_empty) }}
     {{ data('field.imagelist.template.item', template_item) }}
 
-    <div class="col-xs-12 dropzone">
+    <div class="col-xs-12 elm-dropzone">
         {# Imagelist #}
         <div class="list">
             {% for image in list %}
-                {{ template_item|replace({
-                    '%TITLE_A%':    image.title|e('html_attr'),
-                    '%FILENAME_A%': image.filename|e('html_attr'),
-                    '%FILENAME_E%': image.filename|e('html')
-                })|raw }}
+                {% set file = context.file_matcher.getImage(image.filename, false) %}
+                {% if file is not null %}
+                    {{ template_item|replace({
+                        '%TITLE_A%':    image.title|e('html_attr'),
+                        '%FILEPATH_E%': file.path|e('html'),
+                        '%FILEPATH_A%': file.path|e('html_attr'),
+                        '%PREVIEW_A%':  file.path|thumbnail(60, 40, 'c')|e('html_attr'),
+                        '%URL_A%':      file.url|e('html_attr'),
+                    })|raw }}
+                {% else %}
+                    {{ template_item|replace({
+                        '%TITLE_A%':    image.title|e('html_attr'),
+                        '%FILEPATH_E%': image.filename|e('html'),
+                        '%FILEPATH_A%': image.filename|e('html_attr'),
+                        '%PREVIEW_A%':  image.filename|thumbnail(60, 40, 'c')|e('html_attr'),
+                        '%URL_A%':      '#',
+                    })|raw }}
+                {% endif %}
             {% else %}
                 {{ template_empty|raw }}
             {% endfor %}
@@ -80,9 +93,8 @@
         <div class="buic-progress" data-bolt-widget="buicProgress"></div>
 
         {# Buttons #}
-        {% set can_upload = context.can.upload and option.can_upload %}
         <div class="clearfix">
-            {{ macro.upload_buttons('image', attributes.fileupload, option.upload, can_upload, true) }}
+            {{ macro.upload_buttons('image', attributes.fileupload, option.upload, context.can.upload, true) }}
 
             <textarea name="{{ name }}" class="hide">{{ list|json_encode() }}</textarea>
         </div>

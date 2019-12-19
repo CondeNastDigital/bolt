@@ -30,11 +30,11 @@ class BootException extends RuntimeException
     }
 
     /**
-     * @return boolean
+     * @return bool
      */
     public function hasResponse()
     {
-        return (boolean) $this->response;
+        return (bool) $this->response;
     }
 
     /**
@@ -69,6 +69,8 @@ class BootException extends RuntimeException
 
     /**
      * Exception due to a missing vendor/autoload.php file.
+     *
+     * @return static
      */
     public static function earlyExceptionComposer()
     {
@@ -79,24 +81,7 @@ Make sure you've installed the required components with Composer.
 EOM;
         echo sprintf(static::getEarlyExceptionHtml(), 'Bolt - Installation Incomplete', $message, static::getHintsComposer());
 
-        throw new static(strip_tags($message));
-    }
-
-    /**
-     * Exception due to a missing .bolt.yml or .bolt.php file.
-     */
-    public static function earlyExceptionMissingLoaderConfig()
-    {
-        $message = <<<EOM
-This installation is missing either a .bolt.yml file (default), or a .bolt.php file.
-<br><br>
-If you have uploaded this install via a file manager or FTP, please check that 
-"show hidden files" is turned on. After doing so, you will be able to see this 
-file and you can upload it to the root of your Bolt installation.
-EOM;
-        echo sprintf(static::getEarlyExceptionHtml(), 'Bolt - Installation Incomplete', $message, static::getHintsComposer());
-
-        throw new static(strip_tags($message));
+        return new static(strip_tags($message));
     }
 
     /**

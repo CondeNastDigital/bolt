@@ -39,18 +39,16 @@ if (!defined('BOLT_ROOT')) {
     }
 }
 
-// Path to Nut
-if (!defined('NUT_PATH')) {
-    if ($installType === 'composer') {
-        define('NUT_PATH', realpath(INSTALL_ROOT . '/vendor/bolt/bolt/app/nut'));
-    } elseif ($installType === 'git') {
-        define('NUT_PATH', realpath(INSTALL_ROOT . '/app/nut'));
+$verbose = false;
+foreach ($GLOBALS['argv'] as $value) {
+    if (preg_match('/^-[-]{0,1}v/', $value) === 1) {
+        $verbose = true;
     }
 }
-
-echo 'Codeception bootstrapped:' . PHP_EOL;
-echo '    Install type:     ' . $installType . PHP_EOL;
-echo '    Install root:     ' . INSTALL_ROOT . PHP_EOL;
-echo '    Bolt code root:   ' . BOLT_ROOT . PHP_EOL;
-echo '    Codeception root: ' . CODECEPTION_ROOT . PHP_EOL;
-echo '    Nut path:         ' . NUT_PATH . PHP_EOL;
+if ($verbose) {
+    echo 'Codeception bootstrapped:' . PHP_EOL;
+    echo '    Install type:     ' . $installType . PHP_EOL;
+    echo '    Install root:     ' . INSTALL_ROOT . PHP_EOL;
+    echo '    Bolt code root:   ' . BOLT_ROOT . PHP_EOL;
+    echo '    Codeception root: ' . CODECEPTION_ROOT . PHP_EOL;
+}

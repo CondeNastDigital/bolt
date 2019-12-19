@@ -1,8 +1,10 @@
 <?php
+
 namespace Bolt\Storage\Entity;
 
 use Bolt\Storage\Collection;
 use Bolt\Storage\ContentLegacyService;
+use Bolt\Storage\Mapping;
 use Bolt\Storage\Mapping\ContentTypeTitleTrait;
 use Carbon\Carbon;
 
@@ -12,8 +14,10 @@ use Carbon\Carbon;
 class Content extends Entity
 {
     use ContentRouteTrait;
+    use ContentTypeTrait;
     use ContentTypeTitleTrait;
 
+    /** @var string|Mapping\ContentType */
     protected $contenttype;
     /** @var ContentLegacyService */
     protected $_legacy;
@@ -37,6 +41,8 @@ class Content extends Entity
     protected $relation;
     /** @var Collection\Taxonomy */
     protected $taxonomy;
+    /** @var TemplateFields */
+    protected $templatefields;
 
     /** @var array @deprecated Deprecated since 3.0, to be removed in 4.0. */
     protected $group;
@@ -44,37 +50,23 @@ class Content extends Entity
     protected $sortorder;
 
     /**
-     * Getter for templates using {{ content.get(title) }} functions.
-     *
-     * @param string $key
-     *
-     * @return mixed
-     */
-    public function get($key)
-    {
-        if ($key === 'title') {
-            return $this->getTitle();
-        }
-
-        return $this->$key;
-    }
-
-    /**
-     * Setter for content values.
-     *
-     * @param string $key
-     * @param mixed  $value
+     * {@inheritdoc}
      */
     public function set($key, $value)
     {
         $setter = 'set' . ucfirst($key);
         if (is_array($value)) {
-            $value = array_filter($value);
+            // Filter empty values from the array
+            $value = array_filter($value, function ($item) {
+                return $item !== null && $item !== '';
+            });
         }
         $this->$setter($value);
     }
 
     /**
+     * @deprecated Deprecated since 3.0, to be removed in 4.0.
+     *
      * @return int
      */
     public function getSortorder()
@@ -83,6 +75,8 @@ class Content extends Entity
     }
 
     /**
+     * @deprecated Deprecated since 3.0, to be removed in 4.0.
+     *
      * @param int $sortorder
      */
     public function setSortorder($sortorder)
@@ -240,6 +234,7 @@ class Content extends Entity
 
     /**
      * @param string|null $contentType
+     *
      * @return Collection\Relations
      */
     public function getRelation($contentType = null)
@@ -284,6 +279,8 @@ class Content extends Entity
     }
 
     /**
+     * @deprecated Deprecated since 3.0, to be removed in 4.0.
+     *
      * @return array
      */
     public function getGroup()
@@ -292,6 +289,8 @@ class Content extends Entity
     }
 
     /**
+     * @deprecated Deprecated since 3.0, to be removed in 4.0.
+     *
      * @param array $group
      */
     public function setGroup($group)
@@ -300,7 +299,7 @@ class Content extends Entity
     }
 
     /**
-     * Helper to set an array of values
+     * Helper to set an array of values.
      *
      * @param array $values
      */
@@ -337,30 +336,52 @@ class Content extends Entity
      */
     public function getTitle()
     {
-        if (array_key_exists('title', $this->_fields)) {
-            return $this->_fields['title'];
+        $fields = $this->_fields;
+
+        if (array_key_exists('title', $fields)) {
+            return $fields['title'];
         }
 
-        $fieldName = $this->getTitleColumnName($this->contenttype);
+        $fieldNames = $this->getTitleColumnNames($this->contenttype);
 
-        return $this->$fieldName;
+        $title = [];
+        foreach ($fieldNames as $fieldName) {
+            // Make sure we add strings only, as some fields may be an array or DateTime.
+            if (array_key_exists($fieldName, $fields)) {
+                $title[] = is_array($fields[$fieldName]) ? implode(' ', $fields[$fieldName]) : (string) $fields[$fieldName];
+            }
+        }
+
+        return implode(' ', $title);
     }
 
+    /**
+     * @return string|Mapping\ContentType
+     */
     public function getContenttype()
     {
         return $this->contenttype;
     }
 
+    /**
+     * @param string|Mapping\ContentType $value
+     */
     public function setContenttype($value)
     {
         $this->contenttype = $value;
     }
 
+    /**
+     * @return TemplateFields|array|null
+     */
     public function getTemplatefields()
     {
         return $this->templatefields ?: [];
     }
 
+    /**
+     * @param TemplateFields|array|null $value
+     */
     public function setTemplatefields($value)
     {
         if ($value === null) {
@@ -397,7 +418,8 @@ class Content extends Entity
     {
         if (empty($date)) {
             return null;
-        } elseif (is_string($date)) {
+        }
+        if (is_string($date)) {
             return new Carbon($date);
         }
 

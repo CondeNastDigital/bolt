@@ -1,15 +1,19 @@
 <ul class="nav nav-tabs" id="filtertabs">
 
+    {% if not config.get('general/backend/stack/disable', false) %}
     <li class="active">
         <a href="#stacktab" data-toggle="tab">
             {{ __('general.phrase.stack') }}
         </a>
     </li>
+    {% endif %}
 
     {% for contenttype, records in context.results %}
-        <li>
+        <li
+        {%- if loop.first and config.get('general/backend/stack/disable') %} class="active"{% endif -%}
+        >
             <a href="#{{ contenttype }}" data-toggle="tab">
-                {{ app.config.get('contenttypes')[ contenttype ].name }}
+                {{ config.get('contenttypes')[ contenttype ].name }}
             </a>
         </li>
     {% endfor %}

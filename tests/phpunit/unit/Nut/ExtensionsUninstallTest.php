@@ -1,6 +1,8 @@
 <?php
+
 namespace Bolt\Tests\Nut;
 
+use Bolt\Composer\PackageManager;
 use Bolt\Nut\ExtensionsUninstall;
 use Bolt\Tests\BoltUnitTest;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -17,37 +19,48 @@ class ExtensionsUninstallTest extends BoltUnitTest
     {
         $app = $this->getApp();
 
-        $runner = $this->getMock('Bolt\Composer\PackageManager', ['removePackage'], [$app]);
+        $runner = $this->getMockBuilder(PackageManager::class)
+            ->setMethods(['removePackage'])
+            ->setConstructorArgs([$app])
+            ->getMock()
+        ;
         $runner->expects($this->any())
             ->method('removePackage')
             ->will($this->returnValue(0));
 
-        $app['extend.manager'] = $runner;
+        $this->setService('extend.manager', $runner);
 
         $command = new ExtensionsUninstall($app);
         $tester = new CommandTester($command);
 
         $tester->execute(['name' => 'test']);
         $result = $tester->getDisplay();
-        $this->assertRegExp('/Starting uninstall of test… \[DONE\]/', trim($result));
+        $this->assertRegExp('/Removed extension test/', $result);
     }
 
+    /**
+     * @group slow
+     */
     public function testFailed()
     {
         $app = $this->getApp();
 
-        $runner = $this->getMock('Bolt\Composer\PackageManager', ['removePackage'], [$app]);
+        $runner = $this->getMockBuilder(PackageManager::class)
+            ->setMethods(['removePackage'])
+            ->setConstructorArgs([$app])
+            ->getMock()
+        ;
         $runner->expects($this->any())
             ->method('removePackage')
             ->will($this->returnValue(1));
 
-        $app['extend.manager'] = $runner;
+        $this->setService('extend.manager', $runner);
 
         $command = new ExtensionsUninstall($app);
         $tester = new CommandTester($command);
 
         $tester->execute(['name' => 'test']);
         $result = $tester->getDisplay();
-        $this->assertRegExp('/Starting uninstall of test… \[FAILED\]/', trim($result));
+        $this->assertRegExp('/Unable to remove extension test/', $result);
     }
 }

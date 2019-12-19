@@ -1,13 +1,13 @@
 <?php
+
 namespace Bolt\Tests\Storage;
 
-use Bolt\Legacy\Storage;
+use Bolt\Storage\Collection;
+use Bolt\Storage\Entity;
 use Bolt\Tests\BoltUnitTest;
-use Bolt\Tests\Mocks\LoripsumMock;
-use Symfony\Component\HttpFoundation\Request;
 
 /**
- * Class to test src/Storage/Repository and field transforms for load and hydrate
+ * Class to test src/Storage/Repository and field transforms for load and hydrate.
  *
  * @author Ross Riley <riley.ross@gmail.com>
  */
@@ -28,7 +28,7 @@ class FieldSaveTest extends BoltUnitTest
             $this->assertNotEmpty($entry->slug);
         }
 
-        $newRels = $em->createCollection('Bolt\Storage\Entity\Relations');
+        $newRels = $em->createCollection(Entity\Relations::class);
         $record->setRelation($newRels);
         $em->save($record);
 
@@ -45,10 +45,10 @@ class FieldSaveTest extends BoltUnitTest
 
         $record = $repo->find(1);
 
-        $this->assertInstanceOf('Bolt\Storage\Collection\Taxonomy', $record->taxonomy['categories']);
-        $this->assertInstanceOf('Bolt\Storage\Collection\Taxonomy', $record->taxonomy['tags']);
+        $this->assertInstanceOf(Collection\Taxonomy::class, $record->taxonomy['categories']);
+        $this->assertInstanceOf(Collection\Taxonomy::class, $record->taxonomy['tags']);
 
-        $taxonomy = $em->createCollection('Bolt\Storage\Entity\Taxonomy');
+        $taxonomy = $em->createCollection(Entity\Taxonomy::class);
         $taxonomy->setFromPost(['categories' => []], $record);
         $record->setTaxonomy($taxonomy);
         $repo->save($record);
@@ -65,7 +65,8 @@ class FieldSaveTest extends BoltUnitTest
         $repo = $em->getRepository('showcases');
 
         $newEntity = $repo->create(['title' => 'Testing', 'slug' => 'testing', 'status' => 'published']);
-        $taxonomy = $em->createCollection('Bolt\Storage\Entity\Taxonomy');
+
+        $taxonomy = $em->createCollection(Entity\Taxonomy::class);
         $taxonomy->setFromPost(['taxonomy' => ['categories' => ['news', 'events']]], $newEntity);
         $newEntity->setTaxonomy($taxonomy);
         $repo->save($newEntity);
@@ -74,17 +75,15 @@ class FieldSaveTest extends BoltUnitTest
         $this->assertEquals(2, count($savedEntity->getCategories()));
     }
 
-    protected function addSomeContent()
+    /**
+     * {@inheritdoc}
+     */
+    protected function addSomeContent($contentTypes = null, $categories = null, $count = null)
     {
         $app = $this->getApp();
         $this->addDefaultUser($app);
-        $app['request'] = Request::create('/');
-        $app['config']->set('taxonomy/categories/options', ['news']);
-        $prefillMock = new LoripsumMock();
-        $app['prefill'] = $prefillMock;
-
-        $storage = new Storage($app);
-        $storage->prefill(['showcases', 'entries', 'pages']);
+        $storage = $app['storage'];
+        parent::addSomeContent(['showcases', 'entries', 'pages']);
 
         // We also set some relations between showcases and entries
         $showcases = $storage->getContent('showcases');

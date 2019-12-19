@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Tests\Extensions;
 
 use Bolt\Extensions\Snippets\Location;
@@ -11,9 +12,11 @@ use Bolt\Tests\BoltUnitTest;
  */
 class SnippetLocationTest extends BoltUnitTest
 {
-    public function testSetup()
+    /**
+     * @group legacy
+     */
+    public function testListAll()
     {
-        $app = $this->getApp();
         $location = new Location();
         $this->assertGreaterThan(1, $location->listAll());
     }

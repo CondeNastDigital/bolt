@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Storage\Field;
 
 /**
@@ -8,18 +9,17 @@ namespace Bolt\Storage\Field;
  *
  * @author Ross Riley <riley.ross@gmail.com>
  **/
-
 class Manager
 {
     protected $fields = [];
 
     protected $defaults = [
-        'text', 'integer', 'float', 'geolocation', 'imagelist', 'image', 'file', 'filelist', 'video', 'hidden', 'html',
-        'textarea', 'datetime', 'date', 'select', 'templateselect', 'templatefields', 'markdown', 'checkbox', 'slug',
-        'repeater',
+        'text', 'integer', 'float', 'geolocation', 'imagelist', 'image', 'file', 'filelist', 'embed', 'video', 'hidden',
+        'html', 'textarea', 'datetime', 'date', 'select', 'templateselect', 'templatefields', 'markdown', 'checkbox',
+        'slug', 'repeater', 'block',
     ];
 
-    protected $dummyFields = ['repeater'];
+    protected $dummyFields = ['repeater', 'block'];
 
     public function __construct()
     {
@@ -48,9 +48,9 @@ class Manager
     {
         if ($this->has($name)) {
             return $this->fields[$name];
-        } else {
-            return false;
         }
+
+        return false;
     }
 
     public function getDatabaseField($field)

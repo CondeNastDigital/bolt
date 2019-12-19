@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\EventListener;
 
 use Bolt\AccessControl\Permissions;
@@ -38,8 +39,10 @@ class StorageEventListener implements EventSubscriberInterface
     protected $loggerFlash;
     /** @var PasswordFactory */
     protected $passwordFactory;
-    /** @var integer */
+    /** @var int */
     protected $hashStrength;
+    /** @var bool */
+    protected $timedRecordsEnabled;
 
     /**
      * Constructor.
@@ -50,7 +53,8 @@ class StorageEventListener implements EventSubscriberInterface
      * @param UrlGeneratorInterface         $urlGenerator
      * @param FlashLoggerInterface          $loggerFlash
      * @param PasswordFactory               $passwordFactory
-     * @param integer                       $hashStrength
+     * @param int                           $hashStrength
+     * @param bool                          $timedRecordsEnabled
      */
     public function __construct(
         EntityManagerInterface $em,
@@ -59,7 +63,8 @@ class StorageEventListener implements EventSubscriberInterface
         UrlGeneratorInterface $urlGenerator,
         FlashLoggerInterface $loggerFlash,
         PasswordFactory $passwordFactory,
-        $hashStrength
+        $hashStrength,
+        $timedRecordsEnabled
     ) {
         $this->em = $em;
         $this->timedRecord = $timedRecord;
@@ -68,6 +73,7 @@ class StorageEventListener implements EventSubscriberInterface
         $this->loggerFlash = $loggerFlash;
         $this->passwordFactory = $passwordFactory;
         $this->hashStrength = $hashStrength;
+        $this->timedRecordsEnabled = $timedRecordsEnabled;
     }
 
     /**
@@ -149,10 +155,10 @@ class StorageEventListener implements EventSubscriberInterface
         $this->schemaCheck($event);
 
         // Check if we need to 'publish' any 'timed' records, or 'hold' any expired records.
-        if ($this->timedRecord->isDuePublish()) {
+        if ($this->timedRecordsEnabled && $this->timedRecord->isDuePublish()) {
             $this->timedRecord->publishTimedRecords();
         }
-        if ($this->timedRecord->isDueHold()) {
+        if ($this->timedRecordsEnabled && $this->timedRecord->isDueHold()) {
             $this->timedRecord->holdExpiredRecords();
         }
     }
@@ -175,10 +181,13 @@ class StorageEventListener implements EventSubscriberInterface
         );
 
         if ($validSession && $expired && $this->schemaManager->isUpdateRequired() && $notInCheck) {
-            $msg = Trans::__(
-                "The database needs to be updated/repaired. Go to 'Configuration' > '<a href=\"%link%\">Check Database</a>' to do this now.",
-                ['%link%' => $this->urlGenerator->generate('dbcheck')]
-                );
+            $msg = sprintf(
+                '%s > \'<a href="%s">%s</a>\' %s',
+                Trans::__('general.phrase.database-update-required-pre'),
+                $this->urlGenerator->generate('dbcheck'),
+                Trans::__('general.phrase.database-check'),
+                Trans::__('general.phrase.database-update-required-post')
+            );
             $this->loggerFlash->error($msg);
         }
     }

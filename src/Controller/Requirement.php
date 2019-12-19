@@ -1,10 +1,11 @@
 <?php
+
 namespace Bolt\Controller;
 
 use Bolt\Config;
 
 /**
- * Defines route requirements from content types / taxonomy configurations
+ * Defines route requirements from content types / taxonomy configurations.
  *
  * @author Carson Full <carsonfull@gmail.com>
  */

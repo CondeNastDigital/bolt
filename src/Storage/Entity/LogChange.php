@@ -1,5 +1,9 @@
 <?php
+
 namespace Bolt\Storage\Entity;
+
+use Bolt\Common\Json;
+use Bolt\Storage\Mapping\ClassMetadata;
 
 /**
  * Entity for change logs.
@@ -22,6 +26,8 @@ class LogChange extends Entity
     protected $diff;
     /** @var string */
     protected $comment;
+    /** @var ClassMetadata */
+    protected $contentTypeMeta;
 
     /**
      * @return \DateTime
@@ -152,7 +158,19 @@ class LogChange extends Entity
     }
 
     /**
+     * Allows injecting the metadata configuration into the record so output can be built based on variable types.
+     *
+     * @param ClassMetadata $config
+     */
+    public function setContentTypeMeta(ClassMetadata $config)
+    {
+        $this->contentTypeMeta = $config;
+    }
+
+    /**
      * Get changed fields.
+     *
+     * @param array $contentType
      *
      * @return array
      */
@@ -175,6 +193,7 @@ class LogChange extends Entity
             'imagelist'   => 'fieldList',
             'geolocation' => 'fieldGeolocation',
             'image'       => 'fieldImage',
+            'embed'       => 'fieldVideo',
             'select'      => 'fieldSelect',
             'video'       => 'fieldVideo',
         ];
@@ -183,6 +202,7 @@ class LogChange extends Entity
             if (!isset($fields[$key])) {
                 continue;
             }
+
             $type = $fields[$key]['type'];
             $changedFields[$key] = [
                 'type'   => $type,
@@ -235,8 +255,8 @@ class LogChange extends Entity
     {
         return [
             'type'   => $fields[$key]['type'],
-            'before' => ['render' => json_decode($value[0], true)],
-            'after'  => ['render' => json_decode($value[1], true)],
+            'before' => ['render' => Json::parse($value[0])],
+            'after'  => ['render' => Json::parse($value[1])],
         ];
     }
 
@@ -251,8 +271,8 @@ class LogChange extends Entity
      */
     private function fieldGeolocation($key, $value, array $fields)
     {
-        $before = json_decode($value[0], true);
-        $after  = json_decode($value[1], true);
+        $before = Json::parse($value[0]);
+        $after = Json::parse($value[1]);
 
         return [
             'type'   => $fields[$key]['type'],
@@ -286,8 +306,8 @@ class LogChange extends Entity
      */
     private function fieldImage($key, $value, array $fields)
     {
-        $before = json_decode($value[0], true);
-        $after  = json_decode($value[1], true);
+        $before = Json::parse($value[0]);
+        $after = Json::parse($value[1]);
 
         return [
             'type'   => $fields[$key]['type'],
@@ -307,6 +327,51 @@ class LogChange extends Entity
     }
 
     /**
+     * Compile changes for embed field types.
+     *
+     * @param string $key
+     * @param string $value
+     * @param array  $fields
+     *
+     * @return array
+     */
+    private function fieldOembed($key, $value, array $fields)
+    {
+        $before = Json::parse($value[0]);
+        $after = Json::parse($value[1]);
+
+        return [
+            'type'   => $fields[$key]['type'],
+            'before' => [
+                'render' => [
+                    'url'           => $before['url'],
+                    'type'          => $before['type'],
+                    'author_name'   => $before['author_name'],
+                    'author_url'    => $before['author_url'],
+                    'provider_name' => $before['provider_name'],
+                    'provider_url'  => $before['provider_url'],
+                    'height'        => $before['height'],
+                    'width'         => $before['width'],
+                    'html'          => $before['html'],
+                ],
+            ],
+            'after'  => [
+                'render' => [
+                    'url'           => $after['url'],
+                    'type'          => $after['type'],
+                    'author_name'   => $after['author_name'],
+                    'author_url'    => $after['author_url'],
+                    'provider_name' => $after['provider_name'],
+                    'provider_url'  => $after['provider_url'],
+                    'height'        => $after['height'],
+                    'width'         => $after['width'],
+                    'html'          => $after['html'],
+                ],
+            ],
+        ];
+    }
+
+    /**
      * Compile changes for select field types.
      *
      * @param string $key
@@ -319,10 +384,10 @@ class LogChange extends Entity
     {
         if (isset($fields[$key]['multiple']) && $fields[$key]['multiple']) {
             $before = $value[0];
-            $after  = $value[1];
+            $after = $value[1];
         } else {
             $before = $value[0];
-            $after  = $value[1];
+            $after = $value[1];
         }
 
         return [
@@ -343,8 +408,8 @@ class LogChange extends Entity
      */
     private function fieldVideo($key, $value, array $fields)
     {
-        $before = json_decode($value[0], true);
-        $after  = json_decode($value[1], true);
+        $before = Json::parse($value[0]);
+        $after = Json::parse($value[1]);
 
         return [
             'type'   => $fields[$key]['type'],

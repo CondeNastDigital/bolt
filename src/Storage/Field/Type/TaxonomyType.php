@@ -2,9 +2,11 @@
 
 namespace Bolt\Storage\Field\Type;
 
+use Bolt\Exception\StorageException;
 use Bolt\Storage\Collection;
 use Bolt\Storage\Entity;
 use Bolt\Storage\Mapping\ClassMetadata;
+use Bolt\Storage\Query;
 use Bolt\Storage\Query\QueryInterface;
 use Bolt\Storage\QuerySet;
 use Doctrine\DBAL\Query\QueryBuilder;
@@ -15,7 +17,7 @@ use Doctrine\DBAL\Query\QueryBuilder;
  *
  * @author Ross Riley <riley.ross@gmail.com>
  */
-class TaxonomyType extends FieldTypeBase
+class TaxonomyType extends JoinTypeBase
 {
     /**
      * Taxonomy fields allows queries on the parameters passed in.
@@ -29,19 +31,21 @@ class TaxonomyType extends FieldTypeBase
      * @param QueryInterface $query
      * @param ClassMetadata  $metadata
      *
-     * @return void
+     * @return QueryBuilder|null
      */
     public function query(QueryInterface $query, ClassMetadata $metadata)
     {
         $field = $this->mapping['fieldname'];
-
+        /** @var Query\SelectQuery $query */
         foreach ($query->getFilters() as $filter) {
-            foreach ((array)$filter->getKey() as $filterKey) {
+            foreach ((array) $filter->getKey() as $filterKey) {
                 if ($filterKey == $field) {
                     $this->rewriteQueryFilterParameters($filter, $query, $field, 'slug');
                 }
             }
         }
+
+        return null;
     }
 
     /**
@@ -54,7 +58,7 @@ class TaxonomyType extends FieldTypeBase
      * @param QueryBuilder  $query
      * @param ClassMetadata $metadata
      *
-     * @return void
+     * @return QueryBuilder|null
      */
     public function load(QueryBuilder $query, ClassMetadata $metadata)
     {
@@ -78,15 +82,20 @@ class TaxonomyType extends FieldTypeBase
             $alias = $from[0]['table'];
         }
 
+        $quotedField = $query->getConnection()->quoteIdentifier($field);
+
         $query
             ->addSelect($this->getPlatformGroupConcat("$field.id", $order, '_' . $field . '_id', $query))
             ->addSelect($this->getPlatformGroupConcat("$field.slug", $order, '_' . $field . '_slug', $query))
             ->addSelect($this->getPlatformGroupConcat("$field.name", $order, '_' . $field . '_name', $query))
             ->addSelect($this->getPlatformGroupConcat("$field.taxonomytype", $order, '_' . $field . '_taxonomytype',
                 $query))
-            ->leftJoin($alias, $target, $field,
-                "$alias.id = $field.content_id AND $field.contenttype='$boltname' AND $field.taxonomytype='$field'")
-            ->addGroupBy("$alias.id");
+            ->leftJoin($alias, $target, $quotedField,
+                "$alias.id = $quotedField.content_id AND $quotedField.contenttype='$boltname' AND $quotedField.taxonomytype='$field'")
+            ->addGroupBy("$alias.id")
+        ;
+
+        return null;
     }
 
     /**
@@ -96,12 +105,14 @@ class TaxonomyType extends FieldTypeBase
     {
         $taxName = $this->mapping['fieldname'];
 
-        $data = $this->normalizeData($data, $taxName);
+        $data = $this->normalizeData($data, $taxName, '|');
+        /** @var Entity\Content $entity */
         if (!count($entity->getTaxonomy())) {
-            $entity->setTaxonomy($this->em->createCollection('Bolt\Storage\Entity\Taxonomy'));
+            $entity->setTaxonomy($this->em->createCollection(Entity\Taxonomy::class));
         }
 
-        $fieldTaxonomy = $this->em->createCollection('Bolt\Storage\Entity\Taxonomy');
+        /** @var Collection\Taxonomy $fieldTaxonomy */
+        $fieldTaxonomy = $this->em->createCollection(Entity\Taxonomy::class);
         foreach ($data as $tax) {
             $tax['content_id'] = $entity->getId();
             $tax['contenttype'] = (string) $entity->getContenttype();
@@ -111,8 +122,11 @@ class TaxonomyType extends FieldTypeBase
             $fieldTaxonomy->add($taxEntity);
         }
         $this->set($entity, $fieldTaxonomy);
-        $entity->setGroup($this->getGroup($fieldTaxonomy));
-        $entity->setSortorder($this->getSortorder($fieldTaxonomy));
+        $grouping = $this->getGroup($fieldTaxonomy);
+        if ($grouping) {
+            $entity->setGroup($this->getGroup($fieldTaxonomy));
+            $entity->setSortorder($this->getSortorder($fieldTaxonomy));
+        }
     }
 
     /**
@@ -120,23 +134,25 @@ class TaxonomyType extends FieldTypeBase
      */
     public function persist(QuerySet $queries, $entity)
     {
+        $this->normalize($entity);
         $field = $this->mapping['fieldname'];
         $taxonomy = $entity->getTaxonomy()
             ->getField($field);
 
         // Fetch existing taxonomies
         $existingDB = $this->getExistingTaxonomies($entity) ?: [];
+        /** @var Collection\Taxonomy $collection */
         $collection = $this->em->getCollectionManager()
-            ->create('Bolt\Storage\Entity\Taxonomy');
+            ->create(Entity\Taxonomy::class);
         $collection->setFromDatabaseValues($existingDB);
         $toDelete = $collection->update($taxonomy);
-        $repo = $this->em->getRepository('Bolt\Storage\Entity\Taxonomy');
+        $repo = $this->em->getRepository(Entity\Taxonomy::class);
 
         $queries->onResult(
             function ($query, $result, $id) use ($repo, $collection, $toDelete) {
                 foreach ($collection as $entity) {
                     $entity->content_id = $id;
-                    $repo->save($entity, $silenceEvents = true);
+                    $repo->save($entity, true);
                 }
 
                 foreach ($toDelete as $entity) {
@@ -162,6 +178,8 @@ class TaxonomyType extends FieldTypeBase
      * @param string       $alias
      * @param QueryBuilder $query
      *
+     * @throws StorageException
+     *
      * @return string
      */
     protected function getPlatformGroupConcat($column, $order, $alias, QueryBuilder $query)
@@ -172,20 +190,27 @@ class TaxonomyType extends FieldTypeBase
 
         switch ($platform) {
             case 'mysql':
-                return "GROUP_CONCAT($column ORDER BY $order ASC) as $alias";
+                return "GROUP_CONCAT($column ORDER BY $order ASC SEPARATOR '|') as $alias";
             case 'sqlite':
-                return "GROUP_CONCAT($column) as $alias";
+                return "GROUP_CONCAT($column, '|') as $alias";
             case 'postgresql':
-                return "string_agg($column" . "::character varying, ',' ORDER BY $order) as $alias";
+                return "string_agg($column" . "::character varying, '|' ORDER BY $order) as $alias";
         }
+
+        throw new StorageException(sprintf('Unsupported platform: %s', $platform));
     }
 
+    /**
+     * @param Collection\Taxonomy $taxonomy
+     *
+     * @return array|null
+     */
     protected function getGroup(Collection\Taxonomy $taxonomy)
     {
         $group = null;
         $taxData = $this->mapping['data'];
         foreach ($taxonomy as $tax) {
-            if ($taxData['has_sortorder']) {
+            if ($taxData['behaves_like'] === 'grouping') {
                 // Previously we only cared about the last one… so yeah
                 $needle = $tax->getSlug();
                 $index = array_search($needle, array_keys($taxData['options']));
@@ -201,6 +226,11 @@ class TaxonomyType extends FieldTypeBase
         return $group;
     }
 
+    /**
+     * @param Collection\Taxonomy $taxonomy
+     *
+     * @return int
+     */
     protected function getSortorder(Collection\Taxonomy $taxonomy)
     {
         $taxData = $this->mapping['data'];
@@ -239,5 +269,28 @@ class TaxonomyType extends FieldTypeBase
             ->fetchAll();
 
         return $result ?: [];
+    }
+
+    /**
+     * The normalize method takes care of any pre-persist cleaning up.
+     *
+     * For taxonomies that allows us to support non standard data formats such
+     * as arrays that allow this style data setting to work...
+     *
+     *   `$entity->setCategories(['news', 'events']);`
+     *
+     *    or
+     *
+     *   `$entity->setCategories('news');`
+     *
+     * @param Entity\Content $entity
+     */
+    public function normalize($entity)
+    {
+        /** @var Collection\Taxonomy $collection */
+        $collection = $this->normalizeFromPost($entity, Entity\Taxonomy::class);
+        if ($collection) {
+            $entity->setTaxonomy($collection);
+        }
     }
 }

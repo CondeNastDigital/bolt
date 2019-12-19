@@ -4,13 +4,13 @@ namespace Bolt\Tests\Events;
 
 use Bolt\Events\MountEvent;
 use Bolt\Tests\BoltUnitTest;
+use PHPUnit_Framework_MockObject_MockObject as MockObject;
 use Silex\Application;
 use Silex\ControllerCollection;
-use Silex\ControllerProviderInterface;
 use Silex\Route;
 
 /**
- * Class to test Bolt\Events\MountEvent
+ * Class to test Bolt\Events\MountEvent.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
@@ -22,8 +22,8 @@ class MountEventTest extends BoltUnitTest
         $controllers = new ControllerCollection(new Route('/'));
         $mountEvent = new MountEvent($app, $controllers);
 
-        $this->assertInstanceOf('Bolt\Events\MountEvent', $mountEvent);
-        $this->assertInstanceOf('Silex\Application', $mountEvent->getApp());
+        $this->assertInstanceOf(MountEvent::class, $mountEvent);
+        $this->assertInstanceOf(Application::class, $mountEvent->getApp());
     }
 
     public function testMount()
@@ -31,7 +31,7 @@ class MountEventTest extends BoltUnitTest
         $app = $this->getApp();
 
         $route = new Route('/');
-        $controllers = $this->getMock('Silex\ControllerCollection', ['mount'], [$route]);
+        $controllers = $this->getMockControllerCollection(['mount'], $route);
         $controllers
             ->expects($this->once())
             ->method('mount')
@@ -41,48 +41,56 @@ class MountEventTest extends BoltUnitTest
         $mountEvent->mount('/', $controllers);
     }
 
+    /**
+     * @expectedException \LogicException
+     * @expectedExceptionMessage The "mount" method takes either a "ControllerCollection" or a "ControllerProviderInterface" instance.
+     */
     public function testMountInvalidCollection()
     {
         $app = $this->getApp();
 
         $route = new Route('/');
-        $controllers = $this->getMock('Silex\ControllerCollection', ['connect', 'mount'], [$route]);
+        $controllers = $this->getMockControllerCollection(['connect', 'mount'], $route);
         $controllers
             ->expects($this->never())
             ->method('mount')
         ;
 
-        $this->setExpectedException('LogicException', 'The "mount" method takes either a "ControllerCollection" or a "ControllerProviderInterface" instance.');
         $mountEvent = new MountEvent($app, $controllers);
         $mountEvent->mount('/', $route);
     }
 
+    /**
+     * @expectedException \LogicException
+     * @expectedExceptionMessage The method "Bolt\Tests\Events\Mock\ControllerMock::connect" must return a "ControllerCollection" instance. Got: "Bolt\Tests\Events\Mock\ClippyKoala"
+     */
     public function testMountInvalidCollectionConnect()
     {
         $app = $this->getApp();
 
         $route = new Route('/');
-        $controllers = $this->getMock('Silex\ControllerCollection', ['connect', 'mount'], [$route]);
+        $controllers = $this->getMockControllerCollection(['connect', 'mount'], $route);
         $controllers
             ->expects($this->never())
             ->method('mount')
         ;
 
-        $this->setExpectedException('LogicException', 'The method "Bolt\Tests\Events\ControllerMock::connect" must return a "ControllerCollection" instance. Got: "Bolt\Tests\Events\ClippyKoala"');
-
         $mountEvent = new MountEvent($app, $controllers);
-        $mountEvent->mount('/', new ControllerMock($route));
+        $mountEvent->mount('/', new Mock\ControllerMock($route));
     }
-}
 
-class ControllerMock implements ControllerProviderInterface
-{
-    public function connect(Application $app)
+    /**
+     * @param array $methods
+     * @param Route $route
+     *
+     * @return MockObject|ControllerCollection
+     */
+    protected function getMockControllerCollection($methods = ['connect', 'mount'], Route $route)
     {
-        return new ClippyKoala();
+        return $this->getMockBuilder(ControllerCollection::class)
+            ->setMethods($methods)
+            ->setConstructorArgs([$route])
+            ->getMock()
+            ;
     }
-}
-
-class ClippyKoala
-{
 }

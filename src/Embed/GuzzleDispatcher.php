@@ -7,7 +7,6 @@ use Embed\Http\ImageResponse;
 use Embed\Http\Response;
 use Embed\Http\Url;
 use GuzzleHttp\Client;
-use GuzzleHttp\Handler\CurlHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Promise;
@@ -43,7 +42,7 @@ class GuzzleDispatcher implements DispatcherInterface
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function dispatch(Url $url)
     {
@@ -61,7 +60,7 @@ class GuzzleDispatcher implements DispatcherInterface
     }
 
     /**
-     * @inheritDoc
+     * {@inheritdoc}
      */
     public function dispatchImages(array $urls)
     {
@@ -101,7 +100,7 @@ class GuzzleDispatcher implements DispatcherInterface
 
             /** @var Psr7\Response $response */
             $response = $result['value'];
-            $body = $response->getBody();
+            $body = (string) $response->getBody();
             $baseUrl = (array) $response->getHeader('X-Embed-Request-Uri');
             $redirectUriHistory = $response->getHeader('X-Guzzle-Redirect-History');
             $redirectUri = $redirectUriHistory ? array_pop($redirectUriHistory) : reset($baseUrl);
@@ -179,14 +178,14 @@ class GuzzleDispatcher implements DispatcherInterface
     private function getMimeType(Psr7\Response $response)
     {
         $header = $response->getHeader('Content-Type');
-        if ($header === null) {
-            $finfo = finfo_open(FILEINFO_MIME_TYPE);
-            $mime = finfo_buffer($finfo, $response->getBody());
-            finfo_close($finfo);
-
-            return $mime;
+        if ($header !== []) {
+            return reset($header);
         }
 
-        return reset($header);
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = finfo_buffer($finfo, $response->getBody()->getContents());
+        finfo_close($finfo);
+
+        return $mime;
     }
 }

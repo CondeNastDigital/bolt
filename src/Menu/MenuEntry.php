@@ -2,7 +2,10 @@
 
 namespace Bolt\Menu;
 
-use LogicException;
+use Bolt\Common\Serialization;
+use GuzzleHttp\Psr7\Uri;
+use Serializable;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
 /**
  * A menu entry item.
@@ -10,23 +13,53 @@ use LogicException;
  * @internal Do not extend. Backwards compatibility not guaranteed on this class presently.
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
+ * @author Carson Full <carsonfull@gmail.com>
  */
-class MenuEntry
+class MenuEntry implements Serializable
 {
-    /** @var MenuEntry */
+    /** @var MenuEntry|null */
     protected $parent;
     /** @var MenuEntry[] */
-    protected $children;
+    protected $children = [];
+
     /** @var string */
     protected $name;
     /** @var string */
     protected $label;
     /** @var string */
-    protected $uri;
-    /** @var string */
     protected $icon;
     /** @var string */
     protected $permission;
+    /** @var bool */
+    protected $group = false;
+
+    /** @var string */
+    protected $uri;
+    /** @var string */
+    protected $routeName;
+    /** @var array */
+    protected $routeParams;
+    /** @var string */
+    protected $routeGenerated;
+
+    /** @var UrlGeneratorInterface */
+    protected $urlGenerator;
+
+    /**
+     * Create the root menu entry.
+     *
+     * @param UrlGeneratorInterface $urlGenerator
+     * @param string                $basePath
+     *
+     * @return MenuEntry
+     */
+    public static function createRoot(UrlGeneratorInterface $urlGenerator, $basePath)
+    {
+        $root = new static('root', $basePath);
+        $root->urlGenerator = $urlGenerator;
+
+        return $root;
+    }
 
     /**
      * Constructor.
@@ -34,10 +67,38 @@ class MenuEntry
      * @param string $name
      * @param string $uri
      */
-    public function __construct($name, $uri)
+    public function __construct($name, $uri = null)
     {
         $this->name = $name;
         $this->uri = $uri;
+    }
+
+    /**
+     * @param string $name
+     * @param string $uri
+     *
+     * @return MenuEntry
+     */
+    public static function create($name, $uri = null)
+    {
+        return new static($name, $uri);
+    }
+
+    /**
+     * Set the uri to be generated with given route name and params.
+     *
+     * @param string $routeName
+     * @param array  $routeParams
+     *
+     * @return MenuEntry
+     */
+    public function setRoute($routeName, $routeParams = [])
+    {
+        $this->routeName = $routeName;
+        $this->routeParams = $routeParams;
+        $this->routeGenerated = null;
+
+        return $this;
     }
 
     /**
@@ -57,11 +118,27 @@ class MenuEntry
      */
     public function getUri()
     {
-        if (strpos($this->uri, '/') === 0) {
-            return $this->uri;
+        if ($this->routeGenerated) {
+            return $this->routeGenerated;
         }
 
-        return $this->parent ? $this->parent->getUri() . '/' . $this->uri : $this->uri;
+        if ($this->routeName !== null) {
+            return $this->routeGenerated = $this->urlGenerator->generate($this->routeName, $this->routeParams);
+        }
+
+        if (strpos($this->uri, '/') === 0 || !$this->parent) {
+            return $this->routeGenerated = $this->uri;
+        }
+
+        $parentUri = $this->parent ? $this->parent->getUri() : null;
+        if ($parentUri === null) {
+            return $this->routeGenerated = $this->uri;
+        }
+
+        $routeGenerated = new Uri($parentUri);
+        $routeGenerated = $routeGenerated->withPath($routeGenerated->getPath() . '/' . $this->uri);
+
+        return $this->routeGenerated = (string) $routeGenerated;
     }
 
     /**
@@ -137,6 +214,30 @@ class MenuEntry
     }
 
     /**
+     * Check if menu entry is a group.
+     *
+     * @return bool
+     */
+    public function isGroup()
+    {
+        return $this->group;
+    }
+
+    /**
+     * Set if the menu entry is a group.
+     *
+     * @param bool $group
+     *
+     * @return MenuEntry
+     */
+    public function setGroup($group)
+    {
+        $this->group = $group;
+
+        return $this;
+    }
+
+    /**
      * Add child menu entry.
      *
      * @param MenuEntry $menu
@@ -145,11 +246,11 @@ class MenuEntry
      */
     public function add(MenuEntry $menu)
     {
-        $name = $menu->getName();
-        $menu->setParent($this);
-        $this->children[$name] = $menu;
+        $menu->parent = $this;
+        $menu->urlGenerator = $this->urlGenerator;
+        $this->children[$menu->getName()] = $menu;
 
-        return $this->children[$name];
+        return $menu;
     }
 
     /**
@@ -161,7 +262,43 @@ class MenuEntry
      */
     public function get($name)
     {
-        return $this->children[$name];
+        if (isset($this->children[$name])) {
+            return $this->children[$name];
+        }
+
+        throw new \InvalidArgumentException(sprintf('Menu entry %s does not have a child named "%s"', $this->name, $name));
+    }
+
+    /**
+     * Returns true if the child is defined.
+     *
+     * @param string $name
+     *
+     * @return bool
+     */
+    public function has($name)
+    {
+        return isset($this->children[$name]);
+    }
+
+    /**
+     * Remove a menu entry's named child.
+     *
+     * @param string $name
+     */
+    public function remove($name)
+    {
+        unset($this->children[$name]);
+    }
+
+    /**
+     * Return the menu entry's parent.
+     *
+     * @return MenuEntry
+     */
+    public function parent()
+    {
+        return $this->parent;
     }
 
     /**
@@ -171,24 +308,38 @@ class MenuEntry
      */
     public function children()
     {
-        return (array) $this->children;
+        return $this->children;
     }
 
     /**
-     * Set the menu entry's parent object.
-     *
-     * @param MenuEntry $parent
-     *
-     * @return MenuEntry
+     * {@inheritdoc}
      */
-    public function setParent(MenuEntry $parent)
+    public function serialize()
     {
-        if ($this->parent !== null) {
-            throw new LogicException('Parent menu association can not be changed after being set.');
-        }
+        return Serialization::dump([
+            'parent'     => $this->parent,
+            'children'   => $this->children,
+            'name'       => $this->name,
+            'label'      => $this->label,
+            'icon'       => $this->icon,
+            'permission' => $this->getPermission(),
+            'uri'        => $this->getUri(),
+        ]);
+    }
 
-        $this->parent = $parent;
+    /**
+     * {@inheritdoc}
+     */
+    public function unserialize($serialized)
+    {
+        $data = Serialization::parse($serialized);
 
-        return $this;
+        $this->parent = $data['parent'];
+        $this->children = $data['children'];
+        $this->name = $data['name'];
+        $this->label = $data['label'];
+        $this->icon = $data['icon'];
+        $this->permission = $data['permission'];
+        $this->uri = $data['uri'];
     }
 }

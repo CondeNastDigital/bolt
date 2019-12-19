@@ -32,15 +32,13 @@ final class CheckPackage extends BaseAction
         $json = $jsonFile->parse();
         $jsonRequires = isset($json['require']) ? (array) $json['require'] : [];
 
-        /**
-         * @var string $packageName
-         * @var string $versionConstraint
-         */
+        /** @var string $packageName */
+        /** @var string $versionConstraint */
         foreach ($jsonRequires as $packageName => $versionConstraint) {
             try {
                 $remote = $this->findBestVersionForPackage($packageName, $versionConstraint, true);
             } catch (\Exception $e) {
-                $msg = sprintf('%s recieved an error from Composer: %s in %s::%s', __METHOD__, $e->getMessage(), $e->getFile(), $e->getLine());
+                $msg = sprintf('%s received an error from Composer: %s in %s::%s', __METHOD__, $e->getMessage(), $e->getFile(), $e->getLine());
                 $this->app['logger.system']->critical($msg, ['event' => 'exception', 'exception' => $e]);
 
                 throw new PackageManagerException($e->getMessage(), $e->getCode(), $e);

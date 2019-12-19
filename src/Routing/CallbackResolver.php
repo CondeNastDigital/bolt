@@ -1,8 +1,11 @@
 <?php
+
 namespace Bolt\Routing;
 
+use Bolt\Common\Deprecated;
+
 /**
- * Handles resolving callbacks from routing.yml that specify a class name
+ * Handles resolving callbacks from routing.yml that specify a class name.
  *
  * @author Carson Full <carsonfull@gmail.com>
  */
@@ -10,7 +13,11 @@ class CallbackResolver extends \Silex\CallbackResolver
 {
     /** @var \Pimple $app */
     protected $app;
-    /** @var array $classmap */
+    /**
+     * @deprecated Deprecated since 3.3, to be removed in 4.0.
+     *
+     * @var array
+     */
     protected $classmap;
 
     /**
@@ -20,6 +27,7 @@ class CallbackResolver extends \Silex\CallbackResolver
      * @param array   $classmap An array of class names as keys
      *                          mapped to their service name as values
      *                          Ex: 'Bolt\Controller\Frontend' => 'controller.frontend'
+     *                          Deprecated since 3.3, to be removed in 4.0.
      */
     public function __construct(\Pimple $app, array $classmap)
     {
@@ -55,6 +63,7 @@ class CallbackResolver extends \Silex\CallbackResolver
             return false; // Can't handle this, maybe already callable
         }
 
+        /** @deprecated Deprecated since 3.3, to be removed in 4.0. */
         if (isset($this->classmap[$cls])) {
             return true; // Will use service definition
         }
@@ -71,7 +80,7 @@ class CallbackResolver extends \Silex\CallbackResolver
     }
 
     /**
-     * Converts:
+     * Converts:.
      *
      * - Bolt\\Controller\\Frontend::hompeage to controller.frontend:homepage
      * - [Bolt\\Controller\\Frontend, homepage] to controller.frontend:homepage
@@ -80,7 +89,7 @@ class CallbackResolver extends \Silex\CallbackResolver
      *
      * @param string $name
      *
-     * @return array A callable array
+     * @return callable A callable array
      */
     public function convertCallback($name)
     {
@@ -102,7 +111,9 @@ class CallbackResolver extends \Silex\CallbackResolver
             return parent::convertCallback($name);
         }
 
+        /** @deprecated Deprecated since 3.3, to be removed in 4.0. */
         if (isset($this->classmap[$cls])) {
+            Deprecated::warn(sprintf('Mapping routes to legacy controllers such as "%s"', $cls), 3.3);
             $service = $this->classmap[$cls];
 
             return parent::convertCallback("$service:$method");

@@ -1,10 +1,11 @@
 <?php
+
 namespace Bolt\Storage\Field\Type;
 
 use Bolt\Storage\EntityManager;
+use Bolt\Storage\Mapping;
 use Bolt\Storage\QuerySet;
 use Carbon\Carbon;
-use Doctrine\DBAL\Types\Type;
 
 /**
  * This is one of a suite of basic Bolt field transformers that handles
@@ -15,12 +16,11 @@ use Doctrine\DBAL\Types\Type;
 class DateTimeType extends DateType
 {
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
     public function __construct(array $mapping = [], EntityManager $em = null)
     {
         parent::__construct($mapping, $em);
-        Type::overrideType(Type::DATETIME, 'Bolt\Storage\Mapping\Type\CarbonDateTimeType');
     }
 
     /**

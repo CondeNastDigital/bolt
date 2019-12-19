@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Controller;
 
 use Doctrine\Common\Collections\ArrayCollection;
@@ -84,7 +85,7 @@ abstract class ConfigurableBase extends Base
 
         foreach ($config['requirements'] ?: [] as $variable => $callback) {
             $callback = $this->callbackResolver->resolveCallback($callback);
-            $requirement = is_callable($callback) ? call_user_func($callback) : $callback;
+            $requirement = is_callable($callback) ? $callback() : $callback;
             $route->assert($variable, $requirement);
         }
 
@@ -121,7 +122,7 @@ abstract class ConfigurableBase extends Base
                 return null;
             }
 
-            return call_user_func($callback, $request, $app);
+            return $callback($request, $app);
         };
     }
 
@@ -143,13 +144,13 @@ abstract class ConfigurableBase extends Base
                 return null;
             }
 
-            return call_user_func($callback, $request, $response, $app);
+            return $callback($request, $response, $app);
         };
     }
 
     /**
      * Returns a closure that will resolve the class to use
-     * in middleware callback if one isn't specified
+     * in middleware callback if one isn't specified.
      *
      * @param array|string|null $callback
      *

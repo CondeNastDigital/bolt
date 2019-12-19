@@ -2,15 +2,15 @@
 
 namespace Bolt;
 
-use Bolt\Debug\ShutdownHandler;
+use Bolt\Common\Deprecated;
 use Bolt\Events\ControllerEvents;
 use Bolt\Events\MountEvent;
+use Bolt\Legacy\AppSingleton;
 use Bolt\Provider\LoggerServiceProvider;
 use Bolt\Provider\PathServiceProvider;
 use Cocur\Slugify\Bridge\Silex\SlugifyServiceProvider;
 use Silex;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Stopwatch;
 
 class Application extends Silex\Application
 {
@@ -19,11 +19,19 @@ class Application extends Silex\Application
      */
     const DEFAULT_LOCALE = 'en_GB';
 
+    /** @var bool */
+    protected $initialized;
+
     /**
      * @param array $values
      */
     public function __construct(array $values = [])
     {
+        parent::__construct();
+
+        /** @deprecated since 3.3, to be removed in 4.0. */
+        AppSingleton::set($this);
+
         /** @deprecated since 3.0, to be removed in 4.0. */
         $values['bolt_version'] = Version::VERSION;
         /** @deprecated since 3.0, to be removed in 4.0. */
@@ -36,50 +44,42 @@ class Application extends Silex\Application
         /** @internal Parameter to track a deprecated PHP version */
         $values['deprecated.php'] = version_compare(PHP_VERSION, '5.5.9', '<');
 
-        // Register PHP shutdown functions to catch fatal errors & exceptions
-        ShutdownHandler::register();
+        // Debug 1st phase: Register early error & exception handlers
+        $this->register(new Provider\DebugServiceProvider());
 
-        parent::__construct($values);
+        /*
+         * Extensions registration phase is actually during boot,
+         * but since it is the first SP to boot it acts like a
+         * late registration. However, services needed by Extension
+         * Manager cannot be modified.
+         *
+         * Extension 1st phase: Run extension's DI registration code.
+         */
+        $this->register(new Provider\ExtensionServiceProvider());
 
+        // Debug 2nd phase: Modify handlers with values from config
+        $this->register(new Provider\DebugServiceProvider(false));
+
+        // Extension 2nd phase: Run extension's boot code.
+        $this->register(new Provider\ExtensionServiceProvider(false));
+
+        if (isset($values['resources'])) {
+            $this['resources'] = $values['resources'];
+            unset($values['resources']);
+        }
         $this->register(new PathServiceProvider());
 
-        // Initialize the config. Note that we do this here, on 'construct'.
-        // All other initialisation is triggered from bootstrap.php
-        // Warning!
-        // One of a valid ResourceManager ['resources'] or ClassLoader ['classloader']
-        // must be defined for working properly
-        if (!isset($this['resources'])) {
-            $this['resources'] = new Configuration\ResourceManager($this);
-        } else {
-            $this['classloader'] = $this['resources']->getClassLoader();
-        }
-
-        $this['resources']->setApp($this);
         $this->initConfig();
         $this->initLogger();
-        $this['resources']->initialize();
-
-        if (($debugOverride = $this['config']->get('general/debug')) !== null) {
-            $this['debug'] = $debugOverride;
-        }
-
-        // Re-register the shutdown functions now that we know our debug setting
-        ShutdownHandler::register($this['debug']);
-        if (!isset($this['environment'])) {
-            $this['environment'] = $this['debug'] ? 'development' : 'production';
-        }
-
-        if (($locales = $this['config']->get('general/locale')) !== null) {
-            $locales = (array) $locales;
-            $this['locale'] = reset($locales);
-        }
-
-        // Initialize the 'editlink' and 'edittitle'.
-        $this['editlink'] = '';
-        $this['edittitle'] = '';
 
         // Initialize the JavaScript data gateway.
         $this['jsdata'] = [];
+
+        $this->initialize();
+
+        foreach ($values as $key => $value) {
+            $this[$key] = $value;
+        }
     }
 
     /**
@@ -87,6 +87,10 @@ class Application extends Silex\Application
      */
     public function run(Request $request = null)
     {
+        if (!$this->booted) {
+            $this->boot();
+        }
+
         if ($this['config']->get('general/caching/request')) {
             $this['http_cache']->run($request);
         } else {
@@ -112,6 +116,13 @@ class Application extends Silex\Application
 
     public function initialize()
     {
+        if ($this->initialized) {
+            Deprecated::method(3.3);
+
+            return;
+        }
+        $this->initialized = true;
+
         // Set up session handling
         $this->initSession();
 
@@ -129,9 +140,6 @@ class Application extends Silex\Application
 
         // Initialize debugging
         $this->initDebugging();
-
-        // Do a version check
-        $this['config.environment']->checkVersion();
 
         // Calling for BC. Controllers are mounted in ControllerServiceProvider now.
         $this->initMountpoints();
@@ -180,12 +188,14 @@ class Application extends Silex\Application
         $this
             ->register(new Provider\TwigServiceProvider())
             ->register(new Provider\RenderServiceProvider())
-            ->register(new Silex\Provider\HttpCacheServiceProvider(),
-                [
-                    'http_cache.cache_dir' => $this['resources']->getPath('cache/' . $this['environment'] . '/http'),
-                    'http_cache.options'   => $this['config']->get('general/performance/http_cache/options', []),
-                ]
-            );
+            ->register(new Silex\Provider\HttpCacheServiceProvider())
+        ;
+        $this['http_cache.cache_dir'] = function () {
+            return $this['path_resolver']->resolve('%cache%/' . $this['environment'] . '/http');
+        };
+        $this['http_cache.options'] = function () {
+            return $this['config']->get('general/performance/http_cache/options', []);
+        };
     }
 
     /**
@@ -193,16 +203,7 @@ class Application extends Silex\Application
      */
     public function initDebugging()
     {
-        // Set the error_reporting to the level specified in config.yml
-        if (($errorLevel = $this['config']->get($this['debug'] ? 'general/debug_error_level' : 'production_error_level')) !== null) {
-            error_reporting($errorLevel);
-        }
-
         $this->register(new Provider\DumperServiceProvider());
-
-        if (!$this['debug']) {
-            return;
-        }
 
         // Initialize Web Profiler providers
         $this->initProfiler();
@@ -226,9 +227,10 @@ class Application extends Silex\Application
         $this
             ->register(new Silex\Provider\HttpFragmentServiceProvider())
             ->register(new Silex\Provider\UrlGeneratorServiceProvider())
-            ->register(new Silex\Provider\ValidatorServiceProvider())
+            ->register(new Provider\ValidatorServiceProvider())
             ->register(new Provider\RoutingServiceProvider())
             ->register(new Silex\Provider\ServiceControllerServiceProvider()) // must be after Routing
+            ->register(new Provider\SecurityServiceProvider())
             ->register(new Provider\RandomGeneratorServiceProvider())
             ->register(new Provider\PermissionsServiceProvider())
             ->register(new Provider\StorageServiceProvider())
@@ -236,7 +238,6 @@ class Application extends Silex\Application
             ->register(new Provider\AccessControlServiceProvider())
             ->register(new Provider\UsersServiceProvider())
             ->register(new Provider\CacheServiceProvider())
-            ->register(new Provider\ExtensionServiceProvider())
             ->register(new Provider\StackServiceProvider())
             ->register(new Provider\OmnisearchServiceProvider())
             ->register(new Provider\TemplateChooserServiceProvider())
@@ -260,20 +261,17 @@ class Application extends Silex\Application
             ->register(new Provider\EmbedServiceProvider())
         ;
 
-        $this['paths'] = $this['resources']->getPaths();
-
-        // Initialize stopwatch even if debug is not enabled.
-        $this['stopwatch'] = $this->share(
-            function () {
-                return new Stopwatch\Stopwatch();
-            }
-        );
+        // Initialize our friendly configuration notice helpers, if available.
+        if (class_exists('\Bolt\ConfigurationNotices\Provider\ConfigurationNoticesProvider')) {
+            $this->register(new \Bolt\ConfigurationNotices\Provider\ConfigurationNoticesProvider());
+        }
     }
 
+    /**
+     * @deprecated Deprecated since 3.0, to be removed in 4.0.
+     */
     public function initExtensions()
     {
-        $this['extensions']->addManagedExtensions();
-        $this['extensions']->register($this);
     }
 
     /**
@@ -330,7 +328,7 @@ class Application extends Silex\Application
      *
      * @param string $name
      *
-     * @return boolean
+     * @return bool
      */
     public function __isset($name)
     {
@@ -338,7 +336,7 @@ class Application extends Silex\Application
     }
 
     /**
-     * Get the Bolt version string
+     * Get the Bolt version string.
      *
      * @return string
      *

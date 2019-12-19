@@ -15,8 +15,6 @@ class ApacheTest extends AbstractValidationTest
 {
     public function testApacheChecksValid()
     {
-        $this->extensionController->systemCheck(Validator::CHECK_APACHE)->shouldNotBeCalled();
-
         $_SERVER['SERVER_SOFTWARE'] = 'Apache 1.0';
 
         $this->_validation
@@ -28,31 +26,17 @@ class ApacheTest extends AbstractValidationTest
         $this->validator->check(Validator::CHECK_APACHE);
     }
 
+    /**
+     * @expectedException \Bolt\Exception\Configuration\Validation\System\ApacheValidationException
+     */
     public function testApacheChecksInvalid()
     {
-        $this->extensionController->systemCheck(Validator::CHECK_APACHE)->shouldBeCalled();
-
         $_SERVER['SERVER_SOFTWARE'] = 'Apache 1.0';
 
         $this->_validation
             ->expects($this->once())
             ->method('is_readable')
             ->will($this->returnValue(false));
-
-        $this->validator->check(Validator::CHECK_APACHE);
-    }
-
-    public function testApacheCheckCanBeDisabled()
-    {
-        $this->extensionController->systemCheck(Validator::CHECK_APACHE)->shouldNotBeCalled();
-
-        $_SERVER['SERVER_SOFTWARE'] = 'Apache 1.0';
-
-        $this->_validation
-            ->expects($this->never())
-            ->method('is_readable');
-
-        $this->validator->disableApacheChecks = true;
 
         $this->validator->check(Validator::CHECK_APACHE);
     }

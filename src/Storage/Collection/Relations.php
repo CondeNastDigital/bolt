@@ -9,7 +9,7 @@ use Bolt\Storage\EntityProxy;
 use Doctrine\Common\Collections\ArrayCollection;
 
 /**
- * This class stores an array collection of Relations Entities
+ * This class stores an array collection of Relations Entities.
  *
  * @author Ross Riley <riley.ross@gmail.com>
  */
@@ -113,6 +113,26 @@ class Relations extends ArrayCollection
     }
 
     /**
+     * Get the related types that are in the collection, grouped by ContentType key.
+     *
+     * @internal
+     *
+     * @return array
+     */
+    public function getGrouped()
+    {
+        $types = [];
+        $elements = $this->toArray();
+        /** @var Entity\Relations $element */
+        foreach ($elements as $element) {
+            $type = $element->get('to_contenttype');
+            $types[$type][] = $element;
+        }
+
+        return $types;
+    }
+
+    /**
      * This loops over the existing collection to see if the properties in the incoming
      * are already available on a saved record. To do this it checks the four key properties
      * if there's a match it returns the original, otherwise
@@ -139,7 +159,7 @@ class Relations extends ArrayCollection
     }
 
     /**
-     * Gets a specific relation type name from the overall collection
+     * Gets a specific relation type name from the overall collection.
      *
      * @param string $fieldName
      * @param bool   $biDirectional
@@ -180,7 +200,7 @@ class Relations extends ArrayCollection
     }
 
     /**
-     * Identifies which relations are incoming to the given entity
+     * Identifies which relations are incoming to the given entity.
      *
      * @param Entity\Content $entity
      *
@@ -204,6 +224,7 @@ class Relations extends ArrayCollection
         if ($this->em === null) {
             throw new StorageException('Unable to load collection values. Ensure that EntityManager is set on ' . __CLASS__);
         }
+
         $collection = new LazyCollection();
         $proxies = $this->getField($offset);
         foreach ($proxies as $proxy) {
@@ -211,5 +232,15 @@ class Relations extends ArrayCollection
         }
 
         return $collection;
+    }
+
+    public function serialize()
+    {
+        $output = [];
+        foreach ($this as $k => $existing) {
+            $output[$existing->getToContenttype()][] = spl_object_hash($existing);
+        }
+
+        return $output;
     }
 }

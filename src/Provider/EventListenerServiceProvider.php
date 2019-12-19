@@ -27,13 +27,35 @@ class EventListenerServiceProvider implements ServiceProviderInterface
             }
         );
 
+        $app['disable_xss_protection_routes'] = [
+            'preview',
+            'fileedit',
+        ];
+        $app['listener.disable_xss_protection'] = $app->share(
+            function ($app) {
+                return new Listener\DisableXssProtectionListener($app['disable_xss_protection_routes']);
+            }
+        );
+
         $app['listener.exception'] = $app->share(
             function ($app) {
                 return new Listener\ExceptionListener(
+                    $app['twig'],
+                    $app['path_resolver']->resolve('root'),
+                    $app['filesystem']->getDir('cache://exception/' . $app['environment']),
+                    $app['slugify'],
+                    $app['debug'],
                     $app['config'],
-                    $app['controller.exception'],
-                    $app['logger.system']
+                    $app['users'],
+                    $app['session'],
+                    $app['request_stack']
                 );
+            }
+        );
+
+        $app['listener.exception_json'] = $app->share(
+            function ($app) {
+                return new Listener\ExceptionToJsonListener($app['path_resolver']);
             }
         );
 
@@ -43,9 +65,14 @@ class EventListenerServiceProvider implements ServiceProviderInterface
                     $app['config']->get('theme/notfound') ?: $app['config']->get('general/notfound'),
                     $app['storage.legacy'],
                     $app['templatechooser'],
-                    $app['twig'],
-                    $app['render']
+                    $app['twig']
                 );
+            }
+        );
+
+        $app['listener.system_logger'] = $app->share(
+            function ($app) {
+                return new Listener\SystemLoggerListener($app['logger.system']);
             }
         );
 
@@ -84,11 +111,17 @@ class EventListenerServiceProvider implements ServiceProviderInterface
         $app['listener.snippet'] = $app->share(
             function ($app) {
                 return new Listener\SnippetListener(
-                    $app['asset.queue.snippet'],
-                    $app['config'],
-                    $app['resources'],
-                    $app['render']
+                    $app['asset.queues'],
+                    $app['canonical'],
+                    $app['asset.packages'],
+                    $app['config']
                 );
+            }
+        );
+
+        $app['listener.template_view'] = $app->share(
+            function ($app) {
+                return new Listener\TemplateViewListener($app['twig']);
             }
         );
 
@@ -115,12 +148,16 @@ class EventListenerServiceProvider implements ServiceProviderInterface
         $dispatcher = $app['dispatcher'];
 
         $listeners = [
+            'profile',
             'general',
-            'exception',
+            'disable_xss_protection',
+            'exception_json',
             'not_found',
+            'system_logger',
             'snippet',
             'redirect',
             'flash_logger',
+            'template_view',
             'zone_guesser',
             'pager',
         ];
@@ -131,6 +168,8 @@ class EventListenerServiceProvider implements ServiceProviderInterface
             }
         }
 
-        $dispatcher->addSubscriber($app['listener.profile']);
+        if (isset($app['listener.exception']) && !$app['config']->get('general/debug_error_use_symfony')) {
+            $dispatcher->addSubscriber($app['listener.exception']);
+        }
     }
 }

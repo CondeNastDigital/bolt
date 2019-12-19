@@ -1,12 +1,16 @@
 <?php
+
 namespace Bolt\Provider;
 
 use Bolt;
 use Bolt\Nut;
-use Bolt\Nut\NutApplication;
+use Bolt\SimpleDeploy\Nut\SetupDeploy;
 use LogicException;
 use Silex\Application;
 use Silex\ServiceProviderInterface;
+use Stecman\Component\Symfony\Console\BashCompletion\CompletionCommand;
+use Symfony\Bridge;
+use Symfony\Component\Console\Application as ConsoleApplication;
 use Symfony\Component\Console\Command\Command;
 
 class NutServiceProvider implements ServiceProviderInterface
@@ -15,48 +19,71 @@ class NutServiceProvider implements ServiceProviderInterface
     {
         $app['nut'] = $app->share(
             function ($app) {
-                $console = new NutApplication();
+                $console = new ConsoleApplication();
 
                 $console->setName('Bolt console tool - Nut');
                 $console->setVersion(Bolt\Version::VERSION);
 
+                $console->getHelperSet()->set(new Nut\Helper\ContainerHelper($app));
+
                 $console->addCommands($app['nut.commands']);
+
+                $console->setDispatcher($app['dispatcher']);
 
                 return $console;
             }
         );
 
+        $app['nut.command.twig_debug'] = $app->share(function () { return new Bridge\Twig\Command\DebugCommand(); });
+        $app['nut.command.twig_lint'] = $app->share(function () { return new Bridge\Twig\Command\LintCommand(); });
+
         $app['nut.commands'] = $app->share(
             function ($app) {
-                return [
-                    new Nut\CacheClear($app),
-                    new Nut\ConfigGet($app),
-                    new Nut\ConfigSet($app),
-                    new Nut\CronRunner($app),
-                    new Nut\DatabaseCheck($app),
-                    new Nut\DatabaseExport($app),
-                    new Nut\DatabaseImport($app),
-                    new Nut\DatabasePrefill($app),
-                    new Nut\DatabaseRepair($app),
-                    new Nut\Extensions($app),
-                    new Nut\ExtensionsDumpAutoload($app),
-                    new Nut\ExtensionsInstall($app),
-                    new Nut\ExtensionsSetup($app),
-                    new Nut\ExtensionsUninstall($app),
-                    new Nut\ExtensionsUpdate($app),
-                    new Nut\Info($app),
-                    new Nut\Init($app),
-                    new Nut\LogClear($app),
-                    new Nut\LogTrim($app),
-                    new Nut\ServerRun($app),
-                    new Nut\SetupSync($app),
-                    new Nut\TestRunner($app),
-                    new Nut\UserAdd($app),
-                    new Nut\UserManage($app),
-                    new Nut\UserResetPassword($app),
-                    new Nut\UserRoleAdd($app),
-                    new Nut\UserRoleRemove($app),
+                $commands = [
+                    new Nut\CacheClear(),
+                    new Nut\ConfigGet(),
+                    new Nut\ConfigSet(),
+                    new Nut\CronRunner(),
+                    new Nut\DatabaseCheck(),
+                    new Nut\DatabaseExport(),
+                    new Nut\DatabaseImport(),
+                    new Nut\DatabaseOptimize(),
+                    new Nut\DatabasePrefill(),
+                    new Nut\DatabaseRepair(),
+                    new Nut\Extensions(),
+                    new Nut\ExtensionsDumpAutoload(),
+                    new Nut\ExtensionsInstall(),
+                    new Nut\ExtensionsSetup(),
+                    new Nut\ExtensionsUninstall(),
+                    new Nut\ExtensionsUpdate(),
+                    new Nut\Info(),
+                    new Nut\Init(),
+                    new Nut\LogClear(),
+                    new Nut\LogTrim(),
+                    new Nut\PimpleDump(),
+                    new Nut\ServerRun(),
+                    new Nut\SetupRun(),
+                    new Nut\SetupSync(),
+                    new Nut\TestRunner(),
+                    new Nut\UserAdd(),
+                    new Nut\UserManage(),
+                    new Nut\UserResetPassword(),
+                    new Nut\UserRoleAdd(),
+                    new Nut\UserRoleRemove(),
+                    new Nut\UsersList(),
+                    new Nut\DebugEvents(),
+                    new Nut\DebugServiceProviders(),
+                    new Nut\DebugRouter(),
+                    new Nut\RouterMatch(),
+                    new CompletionCommand(),
+                    $app['nut.command.twig_debug'],
+                    $app['nut.command.twig_lint'],
                 ];
+                if (class_exists(SetupDeploy::class)) {
+                    $commands[] = new SetupDeploy();
+                }
+
+                return $commands;
             }
         );
 
@@ -113,5 +140,9 @@ class NutServiceProvider implements ServiceProviderInterface
 
     public function boot(Application $app)
     {
+        if (PHP_SAPI === 'cli') {
+            $app['nut.command.twig_debug']->setTwigEnvironment($app['twig']);
+            $app['nut.command.twig_lint']->setTwigEnvironment($app['twig']);
+        }
     }
 }

@@ -11,10 +11,11 @@ use Bolt\Storage\EntityManager;
 use Bolt\Storage\EventProcessor\TimedRecord;
 use PasswordLib\Password\Factory as PasswordFactory;
 use PasswordLib\Password\Implementation\Blowfish;
+use PHPUnit\Framework\TestCase;
 use Prophecy\Argument;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
-class StorageEventListenerTest extends \PHPUnit_Framework_TestCase
+class StorageEventListenerTest extends TestCase
 {
     /** @var Users */
     private $user;
@@ -53,7 +54,8 @@ class StorageEventListenerTest extends \PHPUnit_Framework_TestCase
             $this->urlGenerator->reveal(),
             $this->flashLogger->reveal(),
             $this->passwordFactory->reveal(),
-            5
+            5,
+            false
         );
 
         $this->storageEvent = $this->prophesize(StorageEvent::class);
@@ -90,6 +92,8 @@ class StorageEventListenerTest extends \PHPUnit_Framework_TestCase
      * It should detect already hashed passwords.
      *
      * @dataProvider providePreSaveAlreadyHashed
+     *
+     * @param mixed $hash
      */
     public function testOnPreSavePasswordAlreadyHashed($hash)
     {
@@ -105,12 +109,11 @@ class StorageEventListenerTest extends \PHPUnit_Framework_TestCase
     {
         return [
             [
-                Blowfish::getPrefix() . '07$usesomesillystringfore2uDLvp1Ii2e./U9C8sBjqp8I90dH6hi'
+                Blowfish::getPrefix() . '07$usesomesillystringfore2uDLvp1Ii2e./U9C8sBjqp8I90dH6hi',
             ],
             [
                 '$P$ABCDEFGHIJKLMNOPQRSTUVWXYZ01234',
-            ]
+            ],
         ];
-
     }
 }

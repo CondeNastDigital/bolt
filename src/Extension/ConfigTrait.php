@@ -2,12 +2,13 @@
 
 namespace Bolt\Extension;
 
-use Bolt\Config;
+use Bolt\Collection\Arr;
 use Bolt\Filesystem\Exception\RuntimeException;
 use Bolt\Filesystem\Handler\DirectoryInterface;
-use Bolt\Filesystem\Handler\YamlFile;
-use Bolt\Helpers\Arr;
+use Bolt\Filesystem\Handler\FileInterface;
+use Bolt\Filesystem\Handler\ParsableInterface;
 use Bolt\Storage\Field\FieldInterface;
+use Bolt\Storage\FieldManager;
 use Pimple as Container;
 
 /**
@@ -43,11 +44,34 @@ trait ConfigTrait
     protected function extendConfigService()
     {
         $app = $this->getContainer();
-        foreach ((array) $this->registerFields() as $fieldClass) {
-            if ($fieldClass instanceof FieldInterface) {
-                $app['config']->getFields()->addField($fieldClass);
-            }
+
+        $extFields = (array) $this->registerFields();
+        if ($extFields === []) {
+            return;
         }
+
+        $newFields = [];
+        foreach ($extFields as $fieldClass) {
+            if (!$fieldClass instanceof FieldInterface) {
+                continue;
+            }
+            $newFields[$fieldClass->getName()] = get_class($fieldClass);
+        }
+        $app['storage.typemap'] = array_merge($app['storage.typemap'], $newFields);
+
+        $app['storage.field_manager'] = $app->share(
+            $app->extend(
+                'storage.field_manager',
+                function ($manager) use ($extFields) {
+                    foreach ($extFields as $fieldName => $fieldClass) {
+                        /** @var FieldManager $manager */
+                        $manager->addFieldType($fieldClass->getName(), $fieldClass);
+                    }
+
+                    return $manager;
+                }
+            )
+        );
     }
 
     /**
@@ -75,23 +99,20 @@ trait ConfigTrait
         $this->config = $this->getDefaultConfig();
 
         $app = $this->getContainer();
-        $filesystem = $app['filesystem'];
 
-        $file = new YamlFile();
-        $filesystem->getFile(sprintf('config://extensions/%s.%s.yml', strtolower($this->getName()), strtolower($this->getVendor())), $file);
+        $file = $app['filesystem']->getFile(strtolower("extensions_config://{$this->getName()}.{$this->getVendor()}.yml"));
 
         if (!$file->exists()) {
             try {
                 $this->copyDistFile($file);
-            } catch (\RuntimeException $e) {
+            } catch (RuntimeException $e) {
                 return $this->config;
             }
         }
 
         $this->addConfig($file);
 
-        $localFile = new YamlFile();
-        $file->getParent()->getFile($file->getFilename('.yml') . '_local.yml', $localFile);
+        $localFile = $file->getParent()->getFile($file->getFilename('.yml') . '_local.yml');
         if ($localFile->exists()) {
             $this->addConfig($localFile);
         }
@@ -102,9 +123,9 @@ trait ConfigTrait
     /**
      * Merge in a yaml file to the config.
      *
-     * @param YamlFile $file
+     * @param ParsableInterface $file
      */
-    private function addConfig(YamlFile $file)
+    private function addConfig(ParsableInterface $file)
     {
         $app = $this->getContainer();
 
@@ -117,26 +138,21 @@ trait ConfigTrait
         }
 
         if (is_array($newConfig)) {
-            $this->config = Arr::mergeRecursiveDistinct($this->config, $newConfig);
+            $this->config = Arr::replaceRecursive($this->config, $newConfig);
         }
     }
 
     /**
-     * Copy config.yml.dist to config/extensions.
+     * Copy config.yml.dist to extension config dir.
      *
-     * @param YamlFile $file
+     * @param FileInterface $file
      */
-    private function copyDistFile(YamlFile $file)
+    private function copyDistFile(FileInterface $file)
     {
-        $app = $this->getContainer();
-        $filesystem = $app['filesystem']->getFilesystem('extensions');
-
-        /** @var YamlFile $distFile */
-        $distFile = $filesystem->get(sprintf('%s/config/config.yml.dist', $this->getBaseDirectory()->getPath()), new YamlFile());
-        if (!$distFile->exists()) {
-            throw new \RuntimeException(sprintf('No config.yml.dist file found at extensions://%s', $this->getBaseDirectory()->getPath()));
-        }
+        $distFile = $this->getBaseDirectory()->getFile('config/config.yml.dist');
         $file->write($distFile->read());
+
+        $app = $this->getContainer();
         $app['logger.system']->info(
             sprintf('Copied %s to %s', $distFile->getFullPath(), $file->getFullPath()),
             ['event' => 'extensions']

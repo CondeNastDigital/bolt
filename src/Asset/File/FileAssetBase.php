@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Asset\File;
 
 use Bolt\Controller\Zone;
@@ -18,9 +19,9 @@ abstract class FileAssetBase implements FileAssetInterface
     protected $packageName;
     /** @var string */
     protected $url;
-    /** @var boolean */
+    /** @var bool */
     protected $late;
-    /** @var integer */
+    /** @var int */
     protected $priority;
     /** @var string */
     protected $location;
@@ -39,6 +40,17 @@ abstract class FileAssetBase implements FileAssetInterface
     {
         $this->path = $path;
         $this->packageName = $packageName;
+    }
+
+    /**
+     * @param string $path
+     * @param string $packageName
+     *
+     * @return FileAssetInterface
+     */
+    public static function create($path = null, $packageName = null)
+    {
+        return new static($path, $packageName);
     }
 
     /**
@@ -132,7 +144,7 @@ abstract class FileAssetBase implements FileAssetInterface
      */
     public function isLate()
     {
-        return (boolean) $this->late;
+        return (bool) $this->late;
     }
 
     /**

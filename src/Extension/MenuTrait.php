@@ -2,6 +2,7 @@
 
 namespace Bolt\Extension;
 
+use Bolt\Common\Deprecated;
 use Bolt\Menu\MenuEntry;
 use Pimple as Container;
 
@@ -30,23 +31,29 @@ trait MenuTrait
      * Call this in register method.
      *
      * @internal
+     *
+     * @throws \InvalidArgumentException
      */
     final protected function extendMenuService()
     {
         $app = $this->getContainer();
 
-        $app['menu.admin'] = $app->share(
+        $app['menu.admin_builder'] = $app->share(
             $app->extend(
-                'menu.admin',
+                'menu.admin_builder',
                 function (MenuEntry $menus) {
+                    if (!$menus->has('custom')) {
+                        return $menus;
+                    }
+
                     /** @var MenuEntry $menus */
-                    $extendMenu = $menus->get('extend');
+                    $extendMenu = $menus->get('custom');
 
                     foreach ($this->registerMenuEntries() as $menuEntry) {
                         if (!$menuEntry instanceof MenuEntry) {
                             throw new \InvalidArgumentException(sprintf(
                                 '%s::registerMenuEntries() should return a list of Bolt\Menu\MenuEntry objects. Got: %s',
-                                get_called_class(),
+                                static::class,
                                 get_class($menuEntry)
                             ));
                         }
@@ -75,6 +82,8 @@ trait MenuTrait
      */
     final protected function addMenuEntry($label, $path, $icon = null, $permission = null)
     {
+        Deprecated::method(null, 'registerMenuEntries');
+
         $this->menuEntries[] = (new MenuEntry($label, $path))
             ->setLabel($label)
             ->setIcon($icon)

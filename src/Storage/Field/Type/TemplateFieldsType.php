@@ -1,12 +1,17 @@
 <?php
+
 namespace Bolt\Storage\Field\Type;
 
+use Bolt\Common\Json;
+use Bolt\Storage\Entity;
 use Bolt\Storage\EntityManager;
 use Bolt\Storage\Mapping\ClassMetadata;
 use Bolt\Storage\Mapping\ContentType;
 use Bolt\Storage\QuerySet;
 use Bolt\TemplateChooser;
 use Doctrine\DBAL\Types\Type;
+use Twig\Environment;
+use Twig\Error\LoaderError;
 
 /**
  * This is one of a suite of basic Bolt field transformers that handles
@@ -16,18 +21,24 @@ use Doctrine\DBAL\Types\Type;
  */
 class TemplateFieldsType extends FieldTypeBase
 {
-    public $mapping;
-    public $em;
+    /** @var TemplateChooser */
     public $chooser;
+    /** @var Environment */
+    private $twig;
 
-    public function __construct(array $mapping = [], EntityManager $em, TemplateChooser $chooser = null)
+    /**
+     * Constructor.
+     *
+     * @param array           $mapping
+     * @param EntityManager   $em
+     * @param TemplateChooser $chooser
+     * @param Environment     $twig
+     */
+    public function __construct(array $mapping, EntityManager $em, TemplateChooser $chooser, Environment $twig)
     {
-        $this->mapping = $mapping;
+        parent::__construct($mapping, $em);
         $this->chooser = $chooser;
-        $this->em = $em;
-        if ($em) {
-            $this->setPlatform($em->createQueryBuilder()->getConnection()->getDatabasePlatform());
-        }
+        $this->twig = $twig;
     }
 
     /**
@@ -35,18 +46,24 @@ class TemplateFieldsType extends FieldTypeBase
      */
     public function hydrate($data, $entity)
     {
+        /** @var string $key */
         $key = $this->mapping['fieldname'];
         $type = $this->getStorageType();
         $value = $type->convertToPHPValue($data[$key], $this->getPlatform());
         $this->set($entity, $value, $data);
     }
 
+    /**
+     * @param object $entity
+     * @param mixed  $value
+     * @param mixed  $rawData
+     */
     public function set($entity, $value, $rawData = null)
     {
         $key = $this->mapping['fieldname'];
         $metadata = $this->buildMetadata($entity, $rawData);
 
-        $builder = $this->em->getEntityBuilder('Bolt\Storage\Entity\TemplateFields');
+        $builder = $this->em->getEntityBuilder(Entity\TemplateFields::class);
         $builder->setClassMetadata($metadata);
         $templatefieldsEntity = $builder->createFromDatabaseValues($value);
 
@@ -56,6 +73,9 @@ class TemplateFieldsType extends FieldTypeBase
         $entity->$key = $templatefieldsEntity;
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function persist(QuerySet $queries, $entity)
     {
         $key = $this->mapping['fieldname'];
@@ -65,7 +85,7 @@ class TemplateFieldsType extends FieldTypeBase
 
         $type = $this->getStorageType();
 
-        if (null !== $value) {
+        if ($value !== null) {
             $metadata = $this->buildMetadata($entity);
             $value = $this->serialize($value, $metadata);
             $value = $type->convertToDatabaseValue($value, $this->getPlatform());
@@ -78,20 +98,26 @@ class TemplateFieldsType extends FieldTypeBase
         $qb->setParameter($key, $value);
     }
 
-    protected function serialize($input, $metadata)
+    /**
+     * @param string        $input
+     * @param ClassMetadata $metadata
+     *
+     * @return array
+     */
+    protected function serialize($input, ClassMetadata $metadata)
     {
         $output = [];
         foreach ($metadata->getFieldMappings() as $field) {
-            $fieldobj = $this->em->getFieldManager()->get($field['fieldtype'], $field);
-            $type = $fieldobj->getStorageType();
+            $fieldObj = $this->em->getFieldManager()->get($field['fieldtype'], $field);
+            $type = $fieldObj->getStorageType();
             $key = $field['fieldname'];
 
             // Hack … remove soon
             if (!isset($input[$key])) {
                 continue;
             }
-            if ($this->isJson($input[$key])) {
-                $input[$key] = json_decode($input[$key], true);
+            if (Json::test($input[$key])) {
+                $input[$key] = Json::parse($input[$key]);
             }
             $output[$key] = $type->convertToDatabaseValue($input[$key], $this->getPlatform());
         }
@@ -99,12 +125,24 @@ class TemplateFieldsType extends FieldTypeBase
         return $output;
     }
 
+    /**
+     * @param object     $entity
+     * @param array|null $rawData
+     *
+     * @return ClassMetadata
+     */
     protected function buildMetadata($entity, $rawData = null)
     {
-        $template = $this->chooser->record($entity, $rawData);
         $metadata = new ClassMetadata(get_class($entity));
 
-        if (isset($this->mapping['config'][$template])) {
+        try {
+            $template = $this->chooser->record($entity, $rawData);
+            $template = $this->twig->resolveTemplate($template)->getSourceContext()->getName();
+        } catch (LoaderError $e) {
+            $template = null;
+        }
+
+        if ($template && isset($this->mapping['config'][$template])) {
             $mappings = $this->em->getMapper()->loadMetadataForFields($this->mapping['config'][$template]['fields']);
             $metadata->setFieldMappings((array) $mappings);
         }
@@ -125,6 +163,6 @@ class TemplateFieldsType extends FieldTypeBase
      */
     public function getStorageType()
     {
-        return Type::getType('json_array');
+        return Type::getType('json');
     }
 }

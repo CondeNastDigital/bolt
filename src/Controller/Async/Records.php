@@ -18,12 +18,12 @@ class Records extends AsyncBase
     {
         $c->method('POST');
 
-        $c->post('/content/{action}', 'action')
+        $c->post('/content/action', 'action')
             ->bind('contentaction');
     }
 
     /**
-     * Perform an action on a Contenttype record.
+     * Perform an action on a ContentType record.
      *
      * The action part of the POST request should take the form:
      * [
@@ -68,11 +68,10 @@ class Records extends AsyncBase
 
         foreach ($actionData as $contentTypeSlug => $recordIds) {
             if (!$this->getContentType($contentTypeSlug)) {
-                // sprintf('Attempt to modify invalid ContentType: %s', $contentTypeSlug);
+                // Attempt to modify invalid ContentType
                 continue;
-            } else {
-                $this->app['storage.request.modify']->action($contentTypeSlug, $recordIds);
             }
+            $this->app['storage.request.modify']->action($contentTypeSlug, $recordIds);
         }
 
         $referer = Request::create($request->server->get('HTTP_REFERER'));
@@ -88,6 +87,7 @@ class Records extends AsyncBase
             ->setPage($referer->query->get('page_' . $contentType))
             ->setFilter($referer->query->get('filter'))
             ->setTaxonomies($taxonomy)
+            ->setGroupSort(true)
         ;
 
         $context = [

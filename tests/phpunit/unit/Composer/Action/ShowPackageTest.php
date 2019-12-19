@@ -1,10 +1,11 @@
 <?php
-namespace Bolt\Tests\Composer\Action;
 
-use Bolt\Composer\Action\ShowPackage;
+namespace Bolt\Tests\Composer\Action;
 
 /**
  * Class to test src/Composer/Action/ShowPackage.
+ *
+ * @group slow
  *
  * @author Ross Riley <riley.ross@gmail.com>
  */
@@ -19,7 +20,7 @@ class ShowPackageTest extends ActionUnitTest
     }
 
     /**
-     * This test has been disabled at 2015-07-18 due to problems with Travis & composer
+     * This test has been disabled at 2015-07-18 due to problems with Travis & composer.
      *
      * @see https://github.com/bolt/bolt/issues/3829
      */

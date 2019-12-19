@@ -7,11 +7,15 @@ use Bolt\Asset\Injector;
 use Bolt\Asset\QueueInterface;
 use Bolt\Asset\Snippet\Snippet;
 use Bolt\Asset\Target;
+use Bolt\Common\Deprecated;
+use Bolt\Common\Thrower;
 use Bolt\Controller\Zone;
 use Bolt\Render;
 use Doctrine\Common\Cache\CacheProvider;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Twig\Environment;
+use Twig\Markup;
 
 /**
  * Widget queue processor.
@@ -29,28 +33,34 @@ class Queue implements QueueInterface
     protected $injector;
     /** @var \Doctrine\Common\Cache\CacheProvider */
     protected $cache;
-    /** @var \Bolt\Render */
+    /** @var Environment */
     protected $render;
 
-    /** @var boolean */
+    /** @var bool */
     private $deferAdded;
 
     /**
      * Constructor.
      *
+     * NOTE: Constructor type hint for Environment omitted for BC, add in v4
+     *
      * @param Injector      $injector
      * @param CacheProvider $cache
-     * @param Render        $render
+     * @param Environment   $render
      */
-    public function __construct(Injector $injector, CacheProvider $cache, Render $render)
+    public function __construct(Injector $injector, CacheProvider $cache, $render)
     {
         $this->injector = $injector;
         $this->cache = $cache;
         $this->render = $render;
+
+        if ($render instanceof Render) {
+            Deprecated::warn('Passing Bolt\Render to the widget queue constructor', 3.3, 'Pass in Twig\Environment instead.');
+        }
     }
 
     /**
-     * Add a wiget to the queue.
+     * Add a widget to the queue.
      *
      * @param WidgetAssetInterface $widget
      */
@@ -77,7 +87,7 @@ class Queue implements QueueInterface
      *
      * @param string $key
      *
-     * @return \Twig_Markup|string
+     * @return Markup|string
      */
     public function getRendered($key)
     {
@@ -115,17 +125,11 @@ class Queue implements QueueInterface
         return $this->queue;
     }
 
-    /**
-     * Get the number of queued widgets.
-     *
-     * @param string $location Location (e.g. 'dashboard_aside_top')
-     * @param string $zone     Either Zone::FRONTEND or Zone::BACKEND
-     *
-     * @return boolean
-     */
     public function hasItemsInQueue($location, $zone = Zone::FRONTEND)
     {
-        return (boolean) $this->countItemsInQueue($location, $zone);
+        Deprecated::method(3.4, 'Queue::has');
+
+        return $this->has($location, $zone);
     }
 
     /**
@@ -134,15 +138,35 @@ class Queue implements QueueInterface
      * @param string $location Location (e.g. 'dashboard_aside_top')
      * @param string $zone     Either Zone::FRONTEND or Zone::BACKEND
      *
-     * @return boolean
+     * @return bool
      */
+    public function has($location, $zone = Zone::FRONTEND)
+    {
+        return (bool) $this->count($location, $zone);
+    }
+
     public function countItemsInQueue($location, $zone = Zone::FRONTEND)
+    {
+        Deprecated::method(3.4, 'Queue::count');
+
+        return $this->count($location, $zone);
+    }
+
+    /**
+     * Get the number of queued widgets.
+     *
+     * @param string $location Location (e.g. 'dashboard_aside_top')
+     * @param string $zone     Either Zone::FRONTEND or Zone::BACKEND
+     *
+     * @return int
+     */
+    public function count($location, $zone = Zone::FRONTEND)
     {
         $count = 0;
 
         foreach ($this->queue as $widget) {
             if ($widget->getZone() === $zone && $widget->getLocation() === $location) {
-                $count++;
+                ++$count;
             }
         }
 
@@ -194,22 +218,8 @@ class Queue implements QueueInterface
             return $html;
         }
 
-        /** @var \Exception $e */
-        $e = null;
-        set_error_handler(
-            function ($errno, $errstr) use (&$e) {
-                return $e = new \Exception($errstr, $errno);
-            }
-        );
+        $html = Thrower::call([$widget, '__toString']);
 
-        // Get the HTML from object cast and rethrow an exception if present
-        $html = (string) $widget;
-
-        restore_error_handler();
-
-        if ($e instanceof \Exception) {
-            throw $e;
-        }
         if ($widget->getCacheDuration() !== null) {
             $this->cache->save($key, $html, $widget->getCacheDuration());
         }

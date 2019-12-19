@@ -91,8 +91,15 @@
 
                 // Copy values from source to new set.
                 $(setToDuplicate).find(":input").each(function (index) {
-                    var val = $(this).val();
-                    if (val) {
+                    var $input = $(this),
+                        inputId = $input.attr('id'),
+                        val = $input.val(),
+                        isCke = $input.hasClass('ckeditor');
+
+                    // Check for a loaded ckeditor first, as data may have changed since the input loaded
+                    if (isCke && typeof CKEDITOR.instances[inputId] !== 'undefined') {
+                        $(newSet).find(':input').eq(index).val(CKEDITOR.instances[inputId].getData());
+                    } else if (val) {
                         $(newSet).find(':input').eq(index).val(val);
                     }
                 });
@@ -124,6 +131,29 @@
                 setToMove.insertAfter(setToMove.next('.repeater-group'));
                 self._renumber();
                 self._resetEditors(setToMove);
+            });
+
+            self.element.on('click', '.repeater-collapse', function () {
+                var setToToggle = $(this).closest('.repeater-group').find('.panel-body');
+
+                $(this).toggleClass('collapsed');
+                setToToggle.slideToggle();
+            });
+
+            self.element.on('click', '.hide-all-blocks', function () {
+                var $container = $(this).closest('.bolt-field-repeater');
+                var setToHide = $container.find('.panel-body');
+                $container.find('.repeater-collapse').addClass('collapsed');
+
+                setToHide.slideUp();
+            });
+
+            self.element.on('click', '.show-all-blocks', function () {
+                var $container = $(this).closest('.bolt-field-repeater');
+                var setToShow = $container.find('.panel-body');
+                $container.find('.repeater-collapse').removeClass('collapsed');
+
+                setToShow.slideDown();
             });
 
             // Add initial groups until minimum number is reached.
@@ -228,7 +258,9 @@
             var editors = container.find('.ckeditor');
 
             editors.each(function (i, editor) {
-                cke.instances[editor.id].destroy();
+                if (cke.instances[editor.id]) {
+                    cke.instances[editor.id].destroy();
+                }
                 cke.replace(editor.id);
             });
         },

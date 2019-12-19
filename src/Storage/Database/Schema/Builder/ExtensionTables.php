@@ -9,6 +9,8 @@ use Doctrine\DBAL\Schema\Table;
 /**
  * Builder for Bolt extension tables.
  *
+ * @internal
+ *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
 class ExtensionTables extends BaseBuilder
@@ -40,10 +42,10 @@ class ExtensionTables extends BaseBuilder
         }
 
         foreach ($this->tableGenerators as $generator) {
-            $table = call_user_func($generator, $schema);
+            $table = $generator($schema);
 
             if (is_array($table)) {
-                /** @var Table $t */
+                /** @var Table[] $table */
                 foreach ($table as $t) {
                     $alias = str_replace($this->prefix, '', $t->getName());
                     $t->addOption('alias', $alias);
@@ -69,9 +71,9 @@ class ExtensionTables extends BaseBuilder
      *
      * @deprecated Deprecated since 3.0, to be removed in 4.0.
      *
-     * @param callable $generator A generator function that takes the Schema
+     * @param callable $generator a generator function that takes the Schema
      *                            instance and returns a table or an array of
-     *                            tables.
+     *                            tables
      */
     public function addTable(callable $generator)
     {

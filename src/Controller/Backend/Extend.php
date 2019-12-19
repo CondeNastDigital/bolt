@@ -3,15 +3,19 @@
 namespace Bolt\Controller\Backend;
 
 use Bolt;
+use Bolt\Composer\Satis\PingService;
 use Bolt\Exception\PackageManagerException;
+use Bolt\Extension\ResolvedExtension;
+use Bolt\Filesystem\Exception\FileNotFoundException;
+use Bolt\Filesystem\Exception\IOException;
 use Bolt\Translation\Translator as Trans;
 use Composer\Package\PackageInterface;
 use Silex\Application;
 use Silex\ControllerCollection;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Webmozart\PathUtil\Path;
 
 class Extend extends BackendBase
 {
@@ -24,6 +28,10 @@ class Extend extends BackendBase
      */
     protected function addRoutes(ControllerCollection $c)
     {
+        $c->get('', 'overview')
+            ->bind('extensions');
+
+        // Allows BC with 3.2 and earlier, to be removed in 4.0
         $c->get('', 'overview')
             ->bind('extend');
 
@@ -155,36 +163,35 @@ class Extend extends BackendBase
      */
     public function generateTheme(Request $request)
     {
-        $theme = $request->get('theme');
-        $newName = $request->get('name');
+        $theme = $request->query->get('theme');
+        $newName = $request->query->get('name');
 
         if (empty($theme)) {
             return new Response(Trans::__('page.extend.theme.generation.missing.name'));
         }
 
-        if (! $newName) {
+        if (!$newName) {
             $newName = basename($theme);
         }
 
-        $source = $this->resources()->getPath('extensions/vendor/' . $theme);
-        $destination = $this->resources()->getPath('themebase/' . $newName);
-        if (is_dir($source)) {
-            $filesystem = new Filesystem();
-            try {
-                $filesystem->mkdir($destination);
-                $filesystem->mirror($source, $destination);
-
-                if (file_exists($destination . '/config.yml.dist')) {
-                    $filesystem->copy($destination . '/config.yml.dist', $destination . '/config.yml');
-                }
-
-                return new Response(Trans::__('page.extend.theme.generation.success'));
-            } catch (\Exception $e) {
-                return new Response(Trans::__('page.extend.theme.generation.failure'));
-            }
+        $source = $this->filesystem()->getDir('extensions://vendor/' . $theme);
+        if (!$source->exists()) {
+            return $this->getJsonException(new PackageManagerException(Trans::__('page.extend.message.invalid-theme-source-dir', ['%SOURCE%', $source])));
         }
 
-        return $this->getJsonException(new PackageManagerException(Trans::__('page.extend.message.invalid-theme-source-dir', ['%SOURCE%', $source])));
+        try {
+            $this->filesystem()->mirror('extensions://vendor/' . $theme, 'themes://' . $newName);
+
+            try {
+                $this->filesystem()->copy("themes://$newName/config.yml.dist", "themes://$newName/config.yml");
+            } catch (FileNotFoundException $e) {
+                // Ignore if there's no dist file
+            }
+        } catch (IOException $e) {
+            return new Response(Trans::__('page.extend.theme.generation.failure'));
+        }
+
+        return new Response(Trans::__('page.extend.theme.generation.success'));
     }
 
     /**
@@ -270,7 +277,20 @@ class Extend extends BackendBase
      */
     public function installInfo(Request $request)
     {
-        $package = $request->get('package');
+        $package = $request->query->get('package');
+        if ($package === null) {
+            $message = 'Extension browser request query was missing or invalid, check your web server configuration.';
+
+            return $this->getJsonException(new \Exception($message));
+        }
+        if ($package === '') {
+            $message = sprintf(
+                'No extension was selected. Try entering a name and press the "%s" button.',
+                Trans::__('page.extend.button.browse-versions')
+            );
+
+            return $this->getJsonException(new \Exception($message));
+        }
         $versions = ['dev' => [], 'beta' => [], 'RC' => [], 'stable' => []];
 
         try {
@@ -291,7 +311,7 @@ class Extend extends BackendBase
     /**
      * Package install chooser modal.
      *
-     * @return \Bolt\Response\BoltResponse
+     * @return \Bolt\Response\TemplateResponse|\Symfony\Component\HttpFoundation\JsonResponse
      */
     public function installPackage()
     {
@@ -303,12 +323,17 @@ class Extend extends BackendBase
     }
 
     /**
-     * The main 'Extend' page.
+     * The main 'Extensions' page.
      *
-     * @return \Bolt\Response\BoltResponse
+     * @return \Bolt\Response\TemplateResponse|\Symfony\Component\HttpFoundation\JsonResponse
      */
     public function overview()
     {
+        /** @var PingService $pinger */
+        $pinger = $this->app['extend.ping'];
+        // Ping the extensions server to confirm connection
+        $this->app['extend.online'] = $pinger->ping(true);
+
         try {
             return $this->render('@bolt/extend/extend.twig', $this->getRenderContext());
         } catch (\Exception $e) {
@@ -382,11 +407,10 @@ class Extend extends BackendBase
      */
     public function update(Request $request)
     {
-        $package = $request->get('package') ? $request->get('package') : null;
-        $update = $package ? [$package] : [];
+        $package = $request->query->get('package');
 
         try {
-            $response = $this->app['extend.manager']->updatePackage($update);
+            $response = $this->app['extend.manager']->updatePackage((array) $package);
         } catch (\Exception $e) {
             return $this->getJsonException($e);
         }
@@ -435,16 +459,22 @@ class Extend extends BackendBase
      */
     private function getRenderContext()
     {
-        $extensionsPath = $this->resources()->getPath('extensions');
+        $bundled = array_filter(
+            $this->app['extensions']->all(),
+            function (ResolvedExtension $ext) {
+                return $ext->isBundled();
+            }
+        );
 
         return [
-            'messages'       => $this->app['extend.manager']->getMessages(),
+            'messages'       => $this->app['extend.ping']->getMessages(),
             'enabled'        => $this->app['extend.enabled'],
             'writeable'      => $this->app['extend.writeable'],
             'online'         => $this->app['extend.online'],
-            'extensionsPath' => $extensionsPath,
+            'extensionsPath' => $this->app['path_resolver']->resolve('extensions'),
             'site'           => $this->app['extend.site'],
             'extendVersion'  => Bolt\Version::forComposer(),
+            'bundled'        => $bundled,
         ];
     }
 
@@ -465,10 +495,12 @@ class Extend extends BackendBase
      */
     private function getJsonException(\Exception $e)
     {
+        $file = Path::makeRelative($e->getFile(), $this->app['path_resolver']->resolve('root'));
+
         $error = [
             'error' => [
                 'type'    => get_class($e),
-                'file'    => $e->getFile(),
+                'file'    => $file,
                 'line'    => $e->getLine(),
                 'message' => $e->getMessage(),
             ],

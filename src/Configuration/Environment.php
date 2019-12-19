@@ -23,7 +23,10 @@ class Environment
     /** @var Filesystem */
     protected $filesystem;
     /** @var string */
-    protected $rootPath;
+    protected $boltPath;
+    /** @var string */
+    protected $boltAssetsPath;
+
     /** @var string */
     protected $appPath;
     /** @var string */
@@ -37,17 +40,17 @@ class Environment
     /**
      * Constructor.
      *
-     * @param string $appPath
-     * @param string $viewPath
+     * @param string $boltPath
+     * @param string $boltAssetsPath
      * @param Cache  $cache
      * @param Pimple $actions
      * @param string $boltVersion
      */
-    public function __construct($appPath, $viewPath, Cache $cache, Pimple $actions, $boltVersion)
+    public function __construct($boltPath, $boltAssetsPath, Cache $cache, Pimple $actions, $boltVersion)
     {
         $this->filesystem = new Filesystem();
-        $this->appPath = rtrim($appPath, '/');
-        $this->viewPath = rtrim($viewPath, '/');
+        $this->boltPath = $boltPath;
+        $this->boltAssetsPath = $boltAssetsPath;
         $this->cache = $cache;
         $this->actions = $actions;
         $this->boltVersion = $boltVersion;
@@ -56,7 +59,7 @@ class Environment
     /**
      * Has a Bolt version change been detected.
      *
-     * @return boolean
+     * @return bool
      */
     public function hasVersionChange()
     {
@@ -72,7 +75,7 @@ class Environment
         if ($this->checkCacheVersion()) {
             return;
         }
-        $this->syncView();
+        $this->syncAssets();
         $this->cache->flushAll();
         $this->updateAutoloader();
         $this->updateCacheVersion();
@@ -83,13 +86,18 @@ class Environment
      *
      * @return array|null
      */
-    public function syncView()
+    public function syncAssets()
     {
-        $views = ['css', 'fonts', 'img', 'js'];
+        if ($this->boltPath . '/app/view' === $this->boltAssetsPath) {
+            return null;
+        }
+
+        $assetDirs = ['css', 'fonts', 'img', 'js'];
         $response = null;
-        foreach ($views as $dir) {
+
+        foreach ($assetDirs as $dir) {
             try {
-                $this->syncViewDirectory($dir);
+                $this->syncAssetsDirectory($dir);
             } catch (IOException $e) {
                 $response[] = $e->getMessage();
             } catch (\UnexpectedValueException $e) {
@@ -105,24 +113,20 @@ class Environment
      *
      * @param string $dir
      */
-    protected function syncViewDirectory($dir)
+    protected function syncAssetsDirectory($dir)
     {
-        if ($this->viewPath === $this->appPath . '/view') {
-            return;
-        }
-
-        $source = $this->appPath . '/view/' . $dir;
-        $target = $this->viewPath . '/' . $dir;
+        $source = $this->boltPath . '/app/view/' . $dir;
+        $target = $this->boltAssetsPath . '/' . $dir;
 
         // Mirror source and destination, overwrite existing file and clean up removed files
         $this->filesystem->mirror($source, $target, null, ['override' => true, 'delete' => true]);
     }
 
     /**
-     * Check if the cache version matches Bolt's current version
+     * Check if the cache version matches Bolt's current version.
      *
-     * @return boolean TRUE  - versions match
-     *                 FALSE - versions don't match
+     * @return bool TRUE  - versions match
+     *              FALSE - versions don't match
      */
     protected function checkCacheVersion()
     {
@@ -133,7 +137,7 @@ class Environment
         }
 
         $version = md5($this->boltVersion);
-        $cached  = file_get_contents($fileName);
+        $cached = file_get_contents($fileName);
 
         if ($version === $cached) {
             return true;
@@ -162,7 +166,7 @@ class Environment
     }
 
     /**
-     * Write our version string out to given cache directory
+     * Write our version string out to given cache directory.
      */
     protected function updateCacheVersion()
     {

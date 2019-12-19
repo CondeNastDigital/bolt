@@ -2,12 +2,16 @@
 
 namespace Bolt\Tests\Controller\Backend;
 
+use Bolt\Application;
 use Bolt\Controller\Zone;
-use Bolt\Response\BoltResponse;
+use Bolt\Logger\FlashLogger;
+use Bolt\Response\TemplateView;
 use Bolt\Tests\Controller\ControllerUnitTest;
+use Bolt\Tests\Mocks\LoripsumMock;
+use Symfony\Component\Form\FormErrorIterator;
+use Symfony\Component\Form\FormView;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\GetResponseEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
@@ -30,7 +34,7 @@ class GeneralTest extends ControllerUnitTest
         $this->setRequest(Request::create('/bolt'));
 
         $request = $this->getRequest();
-        $kernel = $this->getMock('Symfony\\Component\\HttpKernel\\HttpKernelInterface');
+        $kernel = $this->createMock(HttpKernelInterface::class);
         $app['dispatcher']->dispatch(KernelEvents::REQUEST, new GetResponseEvent($kernel, $request, HttpKernelInterface::MASTER_REQUEST));
 
         $this->assertEquals('backend', Zone::get($request));
@@ -43,13 +47,13 @@ class GeneralTest extends ControllerUnitTest
 
         $response = $this->controller()->about();
 
-        $this->assertEquals('@bolt/about/about.twig', $response->getTemplateName());
+        $this->assertEquals('@bolt/about/about.twig', $response->getTemplate());
     }
 
     public function testClearCache()
     {
         $this->allowLogin($this->getApp());
-        $cache = $this->getCacheMock();
+        $cache = $this->getMockCache();
         $cache->expects($this->at(0))
             ->method('flushAll')
             ->will($this->returnValue(false));
@@ -60,40 +64,38 @@ class GeneralTest extends ControllerUnitTest
 
         $this->setService('cache', $cache);
         $this->setRequest(Request::create('/bolt/clearcache'));
-        $this->checkTwigForTemplate($this->getApp(), '@bolt/clearcache/clearcache.twig');
 
-        $this->controller()->clearCache();
-        $this->assertNotEmpty($this->getFlashBag()->get('error'));
+        /** @var Application $app */
+        $app = $this->getApp();
+        $flashes = $this->createMock(FlashLogger::class);
+        $this->setService('logger.flash', $flashes);
+
+        $flashes->expects($this->once())
+            ->method('error');
+
+        $flashes->expects($this->once())
+            ->method('success');
+
+        $response = $this->controller()->clearCache();
+        $this->assertEquals('@bolt/clearcache/clearcache.twig', $response->getTemplate());
 
         $this->setRequest(Request::create('/bolt/clearcache'));
-        $this->checkTwigForTemplate($this->getApp(), '@bolt/clearcache/clearcache.twig');
 
-        $this->controller()->clearCache();
-        $this->assertNotEmpty($this->getFlashBag()->get('success'));
+        $response = $this->controller()->clearCache();
+        $this->assertEquals('@bolt/clearcache/clearcache.twig', $response->getTemplate());
     }
 
     public function testDashboard()
     {
-        $render = $this->getRenderMock($this->getApp());
-        $phpunit = $this;
-        $testHandler = function ($template, $context) use ($phpunit) {
-            $phpunit->assertEquals('@bolt/dashboard/dashboard.twig', $template);
-            $phpunit->assertNotEmpty($context['context']);
-            $phpunit->assertArrayHasKey('latest', $context['context']);
-            $phpunit->assertArrayHasKey('suggestloripsum', $context['context']);
-
-            return new Response();
-        };
-
-        $render->expects($this->atLeastOnce())
-            ->method('render')
-            ->will($this->returnCallback($testHandler));
-        $this->allowLogin($this->getApp());
-
-        $this->setService('render', $render);
-
         $this->setRequest(Request::create('/bolt'));
-        $this->controller()->dashboard();
+
+        $response = $this->controller()->dashboard();
+
+        $this->assertEquals('@bolt/dashboard/dashboard.twig', $response->getTemplate());
+        $context = $response->getContext();
+        $this->assertArrayHasKey('context', $context);
+        $this->assertArrayHasKey('latest', $context['context']);
+        $this->assertArrayHasKey('suggestloripsum', $context['context']);
     }
 
     public function testOmnisearch()
@@ -101,9 +103,9 @@ class GeneralTest extends ControllerUnitTest
         $this->allowLogin($this->getApp());
 
         $this->setRequest(Request::create('/bolt/omnisearch', 'GET', ['q' => 'test']));
-        $this->checkTwigForTemplate($this->getApp(), '@bolt/omnisearch/omnisearch.twig');
 
-        $this->controller()->omnisearch($this->getRequest());
+        $response = $this->controller()->omnisearch($this->getRequest());
+        $this->assertEquals('@bolt/omnisearch/omnisearch.twig', $response->getTemplate());
     }
 
     public function testPrefill()
@@ -111,39 +113,20 @@ class GeneralTest extends ControllerUnitTest
         $this->setRequest(Request::create('/bolt/prefill'));
         $response = $this->controller()->prefill($this->getRequest());
         $context = $response->getContext();
-        $this->assertEquals(4, count($context['context']['contenttypes']));
-        $this->assertInstanceOf('Symfony\Component\Form\FormView', $context['context']['form']);
+        $this->assertEquals(5, count($context['context']['contenttypes']));
+        $this->assertInstanceOf(FormView::class, $context['context']['form']);
 
         // Test the post
         $this->setRequest(Request::create('/bolt/prefill', 'POST', ['contenttypes' => 'pages']));
         $response = $this->controller()->prefill($this->getRequest());
         $this->assertEquals('/bolt/prefill', $response->getTargetUrl());
 
-        // Test for the Exception if connection fails to the prefill service
-        $store = $this->getMock('Bolt\Storage', ['preFill'], [$this->getApp()]);
-
         $app = $this->getApp();
-        if ($app['guzzle.api_version'] === 5) {
-            $guzzleRequest = new \GuzzleHttp\Message\Request('GET', '');
-        } else {
-            $guzzleRequest = new \GuzzleHttp\Psr7\Request('GET', '');
-        }
-        $store->expects($this->any())
-            ->method('preFill')
-            ->will($this->returnCallback(function () use ($guzzleRequest) {
-                throw new \GuzzleHttp\Exception\RequestException('', $guzzleRequest);
-        }));
-
-        $this->setService('storage', $store);
-
-        $logger = $this->getMock('Monolog\Logger', ['error'], ['test']);
-        $logger->expects($this->once())
-            ->method('error')
-            ->with("Timeout attempting connection to the 'Lorem Ipsum' generator. Unable to add dummy content.");
-        $this->setService('logger.system', $logger);
+        $app['prefill'] = new LoripsumMock();
 
         $this->setRequest(Request::create('/bolt/prefill', 'POST', ['contenttypes' => 'pages']));
-        $this->controller()->prefill($this->getRequest());
+        $response = $this->controller()->prefill($this->getRequest());
+        $this->assertInstanceOf(RedirectResponse::class, $response);
     }
 
     public function testTranslation()
@@ -151,49 +134,64 @@ class GeneralTest extends ControllerUnitTest
         $this->removeCSRF($this->getApp());
 
         // Render new translation file
-        $this->setRequest(Request::create('/bolt/tr/contenttypes/en_CY'));
-        $response = $this->controller()->translation($this->getRequest(), 'contenttypes', 'en_CY');
+        $this->setRequest(Request::create('/bolt/tr'));
+        $response = $this->controller()->translation($this->getRequest(), 'messages', 'en_GB');
 
-        $this->assertTrue($response instanceof BoltResponse, 'Response is not instance of BoltResponse');
-        $this->assertEquals('@bolt/editlocale/editlocale.twig', $response->getTemplateName());
+        $this->assertTrue($response instanceof TemplateView, 'Response is not instance of TemplateView');
+        $this->assertEquals('@bolt/editlocale/editlocale.twig', $response->getTemplate());
         $context = $response->getContext();
-        $this->assertEquals('contenttypes.en_CY.yml', $context['context']['basename']);
+        $this->assertEquals('messages.en_GB.yml', $context['context']['basename']);
 
         // Save updated content and redirect back to page
         $this->setRequest(Request::create(
-            '/bolt/tr/contenttypes/en_CY',
+            '/bolt/tr',
             'POST',
             [
-                'form' => [
+                'file_edit' => [
                     'contents' => 'test content at least 10 chars',
                     '_token'   => 'xyz',
                 ],
             ]
         ));
 
-        $response = $this->controller()->translation($this->getRequest(), 'contenttypes', 'en_CY');
+        $response = $this->controller()->translation($this->getRequest(), 'messages', 'en_GB');
 
-        $this->assertTrue($response instanceof RedirectResponse);
-        $this->assertTrue($response->isRedirect('/bolt/tr/contenttypes/en_CY'));
+        $this->assertInstanceOf(TemplateView::class, $response);
+        $this->assertArrayHasKey('context', $context);
+        $this->assertArrayHasKey('form', $context['context']);
+        $this->assertInstanceOf(FormView::class, $context['context']['form']);
 
-        $this->rmdir($this->getService('resources')->getPath('app/resources/translations/en_CY'));
+        /** @var FormView $form */
+        $form = $context['context']['form'];
+        /** @var FormErrorIterator $errors */
+        $errors = $form->vars['errors'];
+        $this->assertFalse($errors->getForm()->get('contents')->isValid());
 
         // Check that YML parse errors get caught
         $this->setRequest(Request::create(
-            '/bolt/tr/contenttypes/en_CY',
+            '/bolt/tr',
             'POST',
             [
-                'form' => [
-                    'contents' => '- this is invalid yaml markup: *thisref',
+                'file_edit' => [
+                    'contents' => 'form true',
                     '_token'   => 'xyz',
                 ],
             ]
         ));
-        $this->controller()->translation($this->getRequest(), 'contenttypes', 'en_CY');
 
-        $this->assertTrue($response instanceof RedirectResponse, 'Response is not instance of RedirectResponse');
-        $errors = $this->getFlashBag()->get('error');
-        $this->assertRegExp('/could not be saved/', $errors[0]);
+        $response = $this->controller()->translation($this->getRequest(), 'contenttypes', 'en_GB');
+        $context = $response->getContext()->toArray();
+
+        $this->assertInstanceOf(TemplateView::class, $response);
+        $this->assertArrayHasKey('context', $context);
+        $this->assertArrayHasKey('form', $context['context']);
+        $this->assertInstanceOf(FormView::class, $context['context']['form']);
+
+        /** @var FormView $form */
+        $form = $context['context']['form'];
+        /** @var FormErrorIterator $errors */
+        $errors = $form->vars['errors'];
+        $this->assertFalse($errors->getForm()->get('contents')->isValid());
     }
 
     /**

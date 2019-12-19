@@ -2,10 +2,12 @@
 
 namespace Bolt\Tests\Controller\Async;
 
+use Bolt\Common\Json;
 use Bolt\Controller\Zone;
-use Bolt\Response\BoltResponse;
+use Bolt\Response\TemplateView;
 use Bolt\Tests\Controller\ControllerUnitTest;
 use GuzzleHttp\Exception\RequestException;
+use Psr\Http\Message\RequestInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -32,7 +34,7 @@ class GeneralTest extends ControllerUnitTest
         $request = $this->getRequest();
         $request->cookies->set($app['token.authentication.name'], 'dropbear');
 
-        $kernel = $this->getMock('Symfony\\Component\\HttpKernel\\HttpKernelInterface');
+        $kernel = $this->createMock(HttpKernelInterface::class);
         $app['dispatcher']->dispatch(KernelEvents::REQUEST, new GetResponseEvent($kernel, $request, HttpKernelInterface::MASTER_REQUEST));
 
         $this->assertEquals('async', Zone::get($request));
@@ -57,35 +59,25 @@ class GeneralTest extends ControllerUnitTest
 
         $response = $this->controller()->changeLogRecord('pages', 1);
 
-        $this->assertTrue($response instanceof BoltResponse);
-        $this->assertSame('@bolt/components/panel-change-record.twig', $response->getTemplateName());
-        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertTrue($response instanceof TemplateView);
+        $this->assertSame('@bolt/components/panel-change-record.twig', $response->getTemplate());
     }
 
     public function testDashboardNewsWithInvalidRequest()
     {
         $this->setRequest(Request::create('/async/dashboardnews'));
         $app = $this->getApp();
-        $testGuzzle = $this->getMock('GuzzleHttp\Client', ['get'], []);
+        $testGuzzle = $this->getMockGuzzleClient();
+        $requestInterface = $this->createMock(RequestInterface::class);
+        $testGuzzle->expects($this->at(0))->method('get')->will($this->throwException(new RequestException('Mock Fail', $requestInterface)));
 
-        if ($app['guzzle.api_version'] === 5) {
-            $guzzleInterface = $this->getMock('GuzzleHttp\Message\RequestInterface');
-            $testGuzzle->expects($this->at(0))->method('get')->will($this->throwException(new RequestException('Mock Fail', $guzzleInterface)));
-        } else {
-            $guzzleInterface = $this->getMock('Psr\Http\Message\RequestInterface');
-            $testGuzzle->expects($this->at(0))->method('get')->will($this->throwException(new RequestException('Mock Fail', $guzzleInterface)));
-        }
+        $this->setService('guzzle.client', $testGuzzle);
 
-        $app['guzzle.client'] = $testGuzzle;
-
-        $changeRepository = $this->getService('storage')->getRepository('Bolt\Storage\Entity\LogChange');
-        $systemRepository = $this->getService('storage')->getRepository('Bolt\Storage\Entity\LogSystem');
-        $logger = $this->getMock('Bolt\Logger\Manager', ['info', 'error'], [$app, $changeRepository, $systemRepository]);
-
+        $logger = $this->getMockLoggerManager();
         $logger->expects($this->at(1))
             ->method('error')
             ->with($this->stringContains('Error occurred'));
-        $app['logger.system'] = $logger;
+        $this->setService('logger.system', $logger);
         $this->controller()->dashboardNews($this->getRequest());
     }
 
@@ -94,24 +86,19 @@ class GeneralTest extends ControllerUnitTest
         $this->setRequest(Request::create('/async/dashboardnews'));
         $app = $this->getApp();
         $app['cache']->flushAll();
-        $testGuzzle = $this->getMock('GuzzleHttp\Client', ['get'], []);
-        $testRequest = $this->getMock('GuzzleHttp\Message', ['getBody']);
-        $testRequest->expects($this->any())
-                    ->method('getBody')
-                    ->will($this->returnValue('invalidstring'));
+        $testGuzzle = $this->getMockGuzzleClient();
+        $testRequest = $this->createMock(RequestInterface::class);
         $testGuzzle->expects($this->any())
-                    ->method('get')
-                    ->will($this->returnValue($testRequest));
-        $app['guzzle.client'] = $testGuzzle;
+            ->method('get')
+            ->will($this->returnValue($testRequest))
+        ;
+        $this->setService('guzzle.client', $testGuzzle);
 
-        $changeRepository = $this->getService('storage')->getRepository('Bolt\Storage\Entity\LogChange');
-        $systemRepository = $this->getService('storage')->getRepository('Bolt\Storage\Entity\LogSystem');
-        $logger = $this->getMock('Bolt\Logger\Manager', ['info', 'error'], [$app, $changeRepository, $systemRepository]);
-
+        $logger = $this->getMockLoggerManager();
         $logger->expects($this->at(1))
             ->method('error')
             ->with($this->stringContains('Invalid JSON'));
-        $app['logger.system'] = $logger;
+        $this->setService('logger.system', $logger);
         $this->controller()->dashboardNews($this->getRequest());
     }
 
@@ -122,15 +109,17 @@ class GeneralTest extends ControllerUnitTest
         $this->setRequest(Request::create('/async/dashboardnews'));
         $app['config']->set('general/branding/news_variable', 'testing');
 
-        $testGuzzle = $this->getMock('GuzzleHttp\Client', ['get'], []);
-        $testRequest = $this->getMock('GuzzleHttp\Message', ['getBody']);
-        $testRequest->expects($this->any())
-                    ->method('getBody')
-                    ->will($this->returnValue('{"testing":[{"item":"one"},{"item":"two"},{"item":"three"}]}'));
+        $testGuzzle = $this->getMockGuzzleClient();
+        $requestInterface = $this->createMock(RequestInterface::class);
+        $requestInterface
+            ->method('getBody')
+            ->will($this->returnValue('{"testing":[{"item":"one"},{"item":"two"},{"item":"three"}]}'))
+        ;
         $testGuzzle->expects($this->any())
-                    ->method('get')
-                    ->will($this->returnValue($testRequest));
-        $app['guzzle.client'] = $testGuzzle;
+            ->method('get')
+            ->will($this->returnValue($requestInterface))
+        ;
+        $this->setService('guzzle.client', $testGuzzle);
 
         $response = $this->controller()->dashboardNews($this->getRequest());
 
@@ -143,9 +132,8 @@ class GeneralTest extends ControllerUnitTest
         $this->setRequest(Request::create('/async/dashboardnews'));
 
         $response = $this->controller()->dashboardNews($this->getRequest());
-        $this->assertTrue($response instanceof BoltResponse);
-        $this->assertSame('@bolt/components/panel-news.twig', $response->getTemplateName());
-        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertTrue($response instanceof TemplateView);
+        $this->assertSame('@bolt/components/panel-news.twig', $response->getTemplate());
     }
 
     public function testLastModified()
@@ -154,9 +142,8 @@ class GeneralTest extends ControllerUnitTest
 
         $response = $this->controller()->lastModified('page', 1);
 
-        $this->assertTrue($response instanceof BoltResponse);
-        $this->assertSame('@bolt/components/panel-lastmodified.twig', $response->getTemplateName());
-        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertTrue($response instanceof TemplateView);
+        $this->assertSame('@bolt/components/panel-lastmodified.twig', $response->getTemplate());
     }
 
     public function testLatestactivity()
@@ -165,9 +152,8 @@ class GeneralTest extends ControllerUnitTest
 
         $response = $this->controller()->latestActivity();
 
-        $this->assertTrue($response instanceof BoltResponse);
-        $this->assertSame('@bolt/components/panel-activity.twig', $response->getTemplateName());
-        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
+        $this->assertTrue($response instanceof TemplateView);
+        $this->assertSame('@bolt/components/panel-activity.twig', $response->getTemplate());
     }
 
     /**
@@ -202,11 +188,11 @@ class GeneralTest extends ControllerUnitTest
         $this->assertTrue($response instanceof JsonResponse);
         $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
 
-        $json = json_decode($response->getContent());
+        $json = Json::parse($response->getContent());
 
-        $this->assertSame('Omnisearch', $json[0]->label);
-        $this->assertSame('New Showcase', $json[1]->label);
-        $this->assertSame('View Showcases', $json[2]->label);
+        $this->assertSame('Omnisearch', $json[0]['label']);
+        $this->assertSame('New Showcase', $json[1]['label']);
+        $this->assertSame('View Showcases', $json[2]['label']);
     }
 
     public function testPopularTags()
@@ -218,35 +204,27 @@ class GeneralTest extends ControllerUnitTest
         $this->assertTrue($response instanceof JsonResponse);
         $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
 
-        $json = json_decode($response->getContent());
+        $json = Json::parse($response->getContent());
         $tags = $this->getDefaultTags();
 
         $this->assertCount(20, $json);
-        $this->assertTrue(in_array($json[0]->name, $tags));
+        $this->assertTrue(in_array($json[0]['name'], $tags));
     }
 
-    public function testReadme()
-    {
-    }
-
-    public function testTags()
-    {
-        //         $this->setRequest(Request::create('/async/tags/tags'));
+//    public function testTags()
+//    {
+//         $this->setRequest(Request::create('/async/tags/tags'));
 //         $response = $this->controller()->tags($this->getRequest(), 'tags');
-
+//
 //         $this->assertTrue($response instanceof JsonResponse);
 //         $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
-
-//         $json = json_decode($response->getContent());
+//
+//         $json = Json::parse($response->getContent());
 //         $tags = $this->getDefaultTags();
-
+//
 //         $this->assertCount(20, $json);
-//         $this->assertTrue(in_array($json[0]->name, $tags));
-    }
-
-    public function testWidget()
-    {
-    }
+//         $this->assertTrue(in_array($json[0]['name'], $tags));
+//    }
 
     /**
      * @return \Bolt\Controller\Async\General

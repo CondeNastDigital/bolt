@@ -2,8 +2,9 @@
 
 namespace Bolt\Provider;
 
-use Bolt\Filesystem\Handler\JsonFile;
+use Bolt\Helpers\Deprecated;
 use Bolt\Storage\Database\Schema\Builder;
+use Bolt\Storage\Database\Schema\Comparison;
 use Bolt\Storage\Database\Schema\LazySchemaManager;
 use Bolt\Storage\Database\Schema\Manager;
 use Bolt\Storage\Database\Schema\Table;
@@ -61,10 +62,9 @@ class DatabaseSchemaServiceProvider implements ServiceProviderInterface
             }
         );
 
-        /** @deprecated Deprecated since 3.0, to be removed in 4.0. */
         $app['integritychecker'] = $app->share(
             function ($app) {
-                $app['logger.system']->warning("[DEPRECATED]: An extension is using app['integritychecker'] and this has been replaced with app['schema'].", ['event' => 'deprecated']);
+                Deprecated::service('integritychecker', 3.0, 'schema');
 
                 return $app['schema'];
             }
@@ -103,10 +103,12 @@ class DatabaseSchemaServiceProvider implements ServiceProviderInterface
                 $acne = new \Pimple();
 
                 foreach (array_keys($contentTypes) as $contentType) {
-                    // @codingStandardsIgnoreStart
                     $tableName = $contentTypes[$contentType]['tablename'];
-                    $acne[$tableName] = $app->share(function () use ($platform, $prefix) { return new Table\ContentType($platform, $prefix); });
-                    // @codingStandardsIgnoreEnd
+                    $acne[$tableName] = $app->share(
+                        function () use ($platform, $prefix) {
+                            return new Table\ContentType($platform, $prefix);
+                        }
+                    );
                 }
 
                 return $acne;
@@ -126,21 +128,27 @@ class DatabaseSchemaServiceProvider implements ServiceProviderInterface
                 $acne = new \Pimple();
 
                 foreach ($app['schema.base_tables']->keys() as $baseName) {
-                    // @codingStandardsIgnoreStart
-                    $acne[$baseName] = $app->share(function () use ($app, $baseName) { return $app['schema.base_tables'][$baseName]; });
-                    // @codingStandardsIgnoreEnd
+                    $acne[$baseName] = $app->share(
+                        function () use ($app, $baseName) {
+                            return $app['schema.base_tables'][$baseName];
+                        }
+                    );
                 }
 
                 foreach ($app['schema.content_tables']->keys() as $baseName) {
-                    // @codingStandardsIgnoreStart
-                    $acne[$baseName] = $app->share(function () use ($app, $baseName) { return $app['schema.content_tables'][$baseName]; });
-                    // @codingStandardsIgnoreEnd
+                    $acne[$baseName] = $app->share(
+                        function () use ($app, $baseName) {
+                            return $app['schema.content_tables'][$baseName];
+                        }
+                    );
                 }
 
                 foreach ($app['schema.extension_tables']->keys() as $baseName) {
-                    // @codingStandardsIgnoreStart
-                    $acne[$baseName] = $app->share(function () use ($app, $baseName) { return $app['schema.extension_tables'][$baseName]; });
-                    // @codingStandardsIgnoreEnd
+                    $acne[$baseName] = $app->share(
+                        function () use ($app, $baseName) {
+                            return $app['schema.extension_tables'][$baseName];
+                        }
+                    );
                 }
 
                 return $acne;
@@ -195,16 +203,16 @@ class DatabaseSchemaServiceProvider implements ServiceProviderInterface
 
         $app['schema.timer'] = $app->share(
             function ($app) {
-                return new Timer($app['filesystem.cache']->getFile(Timer::CHECK_TIMESTAMP_FILE));
+                return new Timer($app['filesystem']->getFile('cache://dbcheck.ts'));
             }
         );
 
         $app['schema.comparator.factory'] = $app->protect(
             function () use ($app) {
                 $platforms = [
-                    'mysql'      => '\\Bolt\\Storage\\Database\\Schema\\Comparison\\MySql',
-                    'postgresql' => '\\Bolt\\Storage\\Database\\Schema\\Comparison\\PostgreSql',
-                    'sqlite'     => '\\Bolt\\Storage\\Database\\Schema\\Comparison\\Sqlite',
+                    'mysql'      => Comparison\MySql::class,
+                    'postgresql' => Comparison\PostgreSql::class,
+                    'sqlite'     => Comparison\Sqlite::class,
                 ];
                 $platformName = $app['db']->getDatabasePlatform()->getName();
 

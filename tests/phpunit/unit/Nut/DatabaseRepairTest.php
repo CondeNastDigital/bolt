@@ -1,9 +1,11 @@
 <?php
+
 namespace Bolt\Tests\Nut;
 
 use Bolt\Nut\DatabaseRepair;
 use Bolt\Storage\Database\Schema\Table;
 use Bolt\Tests\BoltUnitTest;
+use Doctrine\DBAL;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
@@ -13,18 +15,43 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 class DatabaseRepairTest extends BoltUnitTest
 {
-    public function testRunNormal()
+    public function testSchemaUpToDate()
     {
+        /** @deprecated Drop when minimum PHP version is 7.1 or greater. */
+        if (DBAL\Version::compare('2.6.3') >= 0) {
+            $this->markTestSkipped();
+        }
+
         $app = $this->getApp();
         $command = new DatabaseRepair($app);
         $tester = new CommandTester($command);
 
         $tester->execute([]);
         $result = $tester->getDisplay();
-        $this->assertEquals('Your database is already up to date.', trim($result));
+        $this->assertRegExp('/Your database is already up to date/', $result);
     }
 
-    public function testRunChanged()
+    public function testUpdateSchema()
+    {
+        $tester = $this->getTester();
+        $tester->execute([], ['interactive' => false]);
+        $result = $tester->getDisplay();
+        $this->assertRegExp('/Created table `bolt_newcontent`/', $result);
+    }
+
+    public function testUpdateSchemaDumpSql()
+    {
+        $this->resetDb();
+        $tester = $this->getTester();
+        $tester->execute(['--dump-sql' => true]);
+        $result = $tester->getDisplay();
+        $this->assertRegExp('/CREATE TABLE bolt_newcontent/', $result);
+    }
+
+    /**
+     * @return CommandTester
+     */
+    private function getTester()
     {
         $app = $this->getApp(false);
         $app['config']->set('contenttypes/newcontent', [
@@ -40,12 +67,9 @@ class DatabaseRepairTest extends BoltUnitTest
             }
         );
 
-        $app->boot();
         $command = new DatabaseRepair($app);
         $tester = new CommandTester($command);
 
-        $tester->execute([]);
-        $result = $tester->getDisplay();
-        $this->assertRegExp('/Created table `bolt_newcontent`/', $result);
+        return $tester;
     }
 }

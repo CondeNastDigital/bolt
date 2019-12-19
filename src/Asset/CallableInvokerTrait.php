@@ -2,7 +2,7 @@
 
 namespace Bolt\Asset;
 
-use Bolt\Helpers\Arr;
+use Bolt\Collection\Arr;
 use ReflectionFunction;
 use ReflectionMethod;
 use ReflectionObject;
@@ -31,10 +31,10 @@ trait CallableInvokerTrait
     protected function invokeCallable(callable $callback, $callbackArguments)
     {
         if ($callbackArguments === null) {
-            return call_user_func($callback);
+            return $callback();
         }
 
-        if (Arr::isIndexedArray($callbackArguments)) {
+        if (Arr::isIndexed($callbackArguments)) {
             return call_user_func_array($callback, (array) $callbackArguments);
         }
 

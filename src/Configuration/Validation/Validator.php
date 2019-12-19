@@ -3,12 +3,9 @@
 namespace Bolt\Configuration\Validation;
 
 use Bolt\Config;
-use Bolt\Configuration\LowlevelChecks;
-use Bolt\Configuration\ResourceManager;
-use Bolt\Controller;
+use Bolt\Configuration\PathResolver;
 use Bolt\Exception\BootException;
 use Bolt\Logger\FlashLoggerInterface;
-use Symfony\Component\HttpFoundation\Response;
 
 /**
  * System validator.
@@ -18,29 +15,23 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * @author Gawain Lynch <gawain.lynch@gmail.com>
  */
-class Validator extends LowlevelChecks implements ValidatorInterface
+class Validator implements ValidatorInterface
 {
     const CHECK_APACHE = 'apache';
     const CHECK_CACHE = 'cache';
     const CHECK_CONFIG = 'configuration';
     const CHECK_DATABASE = 'database';
-    const CHECK_MAGIC_QUOTES = 'magic-quotes';
-    const CHECK_SAFE_MODE = 'safe-mode';
 
-    /** @var Controller\Exception */
-    private $exceptionController;
     /** @var Config */
     private $configManager;
-    /** @var ResourceManager */
-    private $resourceManager;
+    /** @var PathResolver */
+    private $pathResolver;
     /** @var FlashLoggerInterface */
     private $flashLogger;
     /** @var array */
     private $check = [
         self::CHECK_CONFIG       => Configuration::class,
         self::CHECK_DATABASE     => Database::class,
-        self::CHECK_MAGIC_QUOTES => MagicQuotes::class,
-        self::CHECK_SAFE_MODE    => SafeMode::class,
         self::CHECK_CACHE        => Cache::class,
         self::CHECK_APACHE       => Apache::class,
     ];
@@ -48,21 +39,17 @@ class Validator extends LowlevelChecks implements ValidatorInterface
     /**
      * Constructor.
      *
-     * @param Controller\Exception $exceptionController
      * @param Config               $config
-     * @param ResourceManager      $resourceManager
+     * @param PathResolver         $pathResolver
      * @param FlashLoggerInterface $flashLogger
      */
     public function __construct(
-        Controller\Exception $exceptionController,
         Config $config,
-        ResourceManager $resourceManager,
+        PathResolver $pathResolver,
         FlashLoggerInterface $flashLogger
     ) {
-        parent::__construct($resourceManager);
-        $this->exceptionController = $exceptionController;
         $this->configManager = $config;
-        $this->resourceManager = $resourceManager;
+        $this->pathResolver = $pathResolver;
         $this->flashLogger = $flashLogger;
     }
 
@@ -99,15 +86,11 @@ class Validator extends LowlevelChecks implements ValidatorInterface
      */
     public function check($checkName)
     {
-        if ($this->disableApacheChecks && $checkName === 'apache') {
-            return null;
-        }
-
         $className = $this->check[$checkName];
 
         return $this
             ->getValidator($className, $checkName)
-            ->check($this->exceptionController)
+            ->check()
         ;
     }
 
@@ -116,21 +99,12 @@ class Validator extends LowlevelChecks implements ValidatorInterface
      */
     public function checks()
     {
-        if ($this->disableApacheChecks) {
-            unset($this->check['apache']);
-        }
-
         foreach ($this->check as $checkName => $className) {
-            $response = $this
+            $this
                 ->getValidator($className, $checkName)
-                ->check($this->exceptionController)
+                ->check()
             ;
-            if ($response instanceof Response) {
-                return $response;
-            }
         }
-
-        return null;
     }
 
     /**
@@ -148,8 +122,8 @@ class Validator extends LowlevelChecks implements ValidatorInterface
         if (!$validator instanceof ValidationInterface) {
             throw new BootException(sprintf('System validator was given a validation class %s that does not implement %s', $className, ValidationInterface::class));
         }
-        if ($validator instanceof ResourceManagerAwareInterface) {
-            $validator->setResourceManager($this->resourceManager);
+        if ($validator instanceof PathResolverAwareInterface) {
+            $validator->setPathResolver($this->pathResolver);
         }
         if ($validator instanceof ConfigAwareInterface) {
             $validator->setConfig($this->configManager);

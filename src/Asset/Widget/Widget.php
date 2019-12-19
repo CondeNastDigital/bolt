@@ -1,7 +1,9 @@
 <?php
+
 namespace Bolt\Asset\Widget;
 
 use Bolt\Asset\CallableInvokerTrait;
+use Bolt\Common\Json;
 
 /**
  * Widget objects.
@@ -31,15 +33,23 @@ class Widget implements WidgetAssetInterface
     protected $prefix;
     /** @var string */
     protected $postfix;
-    /** @var boolean */
+    /** @var bool */
     protected $defer;
-    /** @var integer */
+    /** @var int */
     protected $priority;
-    /** @var integer */
+    /** @var int */
     protected $cacheDuration;
 
     /** @var string */
     private $rendered;
+
+    /**
+     * @return WidgetAssetInterface
+     */
+    public static function create()
+    {
+        return new static();
+    }
 
     public function offsetExists($offset)
     {
@@ -75,7 +85,7 @@ class Widget implements WidgetAssetInterface
     public function setKey()
     {
         if ($this->key === null) {
-            $this->key = md5(json_encode(get_object_vars($this)));
+            $this->key = md5(Json::dump(get_object_vars($this)));
         }
 
         return $this;
@@ -242,7 +252,7 @@ class Widget implements WidgetAssetInterface
      */
     public function isDeferred()
     {
-        return (boolean) $this->defer;
+        return (bool) $this->defer;
     }
 
     /**
@@ -250,7 +260,7 @@ class Widget implements WidgetAssetInterface
      */
     public function setDefer($defer)
     {
-        $this->defer = (boolean) $defer;
+        $this->defer = (bool) $defer;
 
         return $this;
     }
@@ -260,7 +270,7 @@ class Widget implements WidgetAssetInterface
      */
     public function getPriority()
     {
-        return (integer) $this->priority;
+        return (int) $this->priority;
     }
 
     /**
@@ -268,7 +278,7 @@ class Widget implements WidgetAssetInterface
      */
     public function setPriority($priority)
     {
-        $this->priority = (integer) $priority;
+        $this->priority = (int) $priority;
 
         return $this;
     }

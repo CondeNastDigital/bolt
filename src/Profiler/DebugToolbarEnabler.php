@@ -1,4 +1,5 @@
 <?php
+
 namespace Bolt\Profiler;
 
 use Silex\Application;
@@ -10,7 +11,7 @@ use Symfony\Component\HttpKernel\Event\GetResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
- * Enables debug toolbar if applicable
+ * Enables debug toolbar if applicable.
  *
  * @author Carson Full <carsonfull@gmail.com>
  */
@@ -20,11 +21,11 @@ class DebugToolbarEnabler implements ServiceProviderInterface, EventSubscriberIn
     protected $listener;
     /** @var EventDispatcherInterface */
     protected $dispatcher;
-    /** @var boolean */
+    /** @var bool */
     protected $debugLoggedOff;
 
     /**
-     * Enable toolbar if logged in or debug mode is enabled
+     * Enable toolbar if logged in or debug mode is enabled.
      *
      * @param GetResponseEvent $event
      */
@@ -48,7 +49,6 @@ class DebugToolbarEnabler implements ServiceProviderInterface, EventSubscriberIn
      */
     public function register(Application $app)
     {
-        $this->debugLoggedOff = $app['config']->get('general/debug_show_loggedoff', false);
     }
 
     /**
@@ -59,6 +59,7 @@ class DebugToolbarEnabler implements ServiceProviderInterface, EventSubscriberIn
         $this->listener = $app['web_profiler.toolbar.listener'];
         $this->dispatcher = $app['dispatcher'];
         $this->dispatcher->addSubscriber($this);
+        $this->debugLoggedOff = $app['config']->get('general/debug_show_loggedoff', false);
     }
 
     /**

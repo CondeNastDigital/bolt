@@ -1,11 +1,13 @@
 <?php
+
 namespace Bolt\Storage\Repository;
 
-use Bolt\Helpers\Arr;
+use Bolt\Collection\Arr;
 use Bolt\Storage\Entity;
 use Bolt\Storage\Repository;
 use Doctrine\DBAL\Query\Expression\CompositeExpression;
 use Doctrine\DBAL\Query\QueryBuilder;
+use Doctrine\DBAL\Types\Type;
 
 /**
  * A Repository class that handles storage operations for the log tables.
@@ -17,7 +19,7 @@ abstract class BaseLogRepository extends Repository
      *
      * @param \DateTime $period
      *
-     * @return boolean
+     * @return bool
      */
     public function trimLog($period)
     {
@@ -38,7 +40,7 @@ abstract class BaseLogRepository extends Repository
         $qb = $this->createQueryBuilder();
         $qb->delete($this->getTableName())
              ->where('date < :date')
-             ->setParameter('date', $period, \Doctrine\DBAL\Types\Type::DATETIME);
+             ->setParameter('date', $period, Type::DATETIME);
 
         return $qb;
     }
@@ -46,7 +48,7 @@ abstract class BaseLogRepository extends Repository
     /**
      * Clear the log table.
      *
-     * @return boolean
+     * @return bool
      */
     public function clearLog()
     {
@@ -57,12 +59,13 @@ abstract class BaseLogRepository extends Repository
 
         return $qb->getConnection()->executeQuery($query)->execute();
     }
+
     /**
      * Get content log's activity entries.
      *
-     * @param integer $page
-     * @param integer $amount
-     * @param array   $options
+     * @param int   $page
+     * @param int   $amount
+     * @param array $options
      *
      * @return Entity\LogChange[]
      */
@@ -76,9 +79,9 @@ abstract class BaseLogRepository extends Repository
     /**
      * Build the query to get the log entries.
      *
-     * @param integer $page
-     * @param integer $amount
-     * @param array   $options
+     * @param int   $page
+     * @param int   $amount
+     * @param array $options
      *
      * @return QueryBuilder
      */
@@ -87,8 +90,8 @@ abstract class BaseLogRepository extends Repository
         $qb = $this->createQueryBuilder();
         $qb->select('*')
             ->orderBy('id', 'DESC')
-            ->setMaxResults(intval($amount))
-            ->setFirstResult(intval(($page - 1) * $amount));
+            ->setMaxResults((int) $amount)
+            ->setFirstResult((int) (($page - 1) * $amount));
 
         $this->addWhereActivity($qb, $options);
 
@@ -101,7 +104,7 @@ abstract class BaseLogRepository extends Repository
      *
      * @param array $options
      *
-     * @return integer|false
+     * @return int|false
      */
     public function getActivityCount(array $options = [])
     {
@@ -165,7 +168,7 @@ abstract class BaseLogRepository extends Repository
         foreach ($options as $columnName => $option) {
             if (empty($options[$columnName])) {
                 continue;
-            } elseif (Arr::isIndexedArray($options)) {
+            } elseif (Arr::isIndexed($options)) {
                 $key = $parentColumnName . '_' . $columnName;
                 $orX->add("$parentColumnName = :$key");
                 $qb->setParameter($key, $option);
@@ -183,7 +186,7 @@ abstract class BaseLogRepository extends Repository
      *
      * @param array|false $result
      *
-     * @return integer|false
+     * @return int|false
      */
     protected function getCount($result)
     {
@@ -192,16 +195,5 @@ abstract class BaseLogRepository extends Repository
         }
 
         return false;
-    }
-
-    /**
-     * Creates a query builder instance namespaced to this repository
-     *
-     * @return QueryBuilder
-     */
-    public function createQueryBuilder($alias = null)
-    {
-        return $this->em->createQueryBuilder()
-            ->from($this->getTableName());
     }
 }

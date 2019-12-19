@@ -2,7 +2,9 @@
 
 namespace Bolt\Filesystem;
 
+use Bolt\Common\Ini;
 use Bolt\Config;
+use Bolt\Filesystem\Exception\IOException;
 use Bolt\Library as Lib;
 
 /**
@@ -20,7 +22,7 @@ class FilePermissions
     protected $allowed = [];
     /** @var array Regex list represented resources forbidden for edition. */
     protected $blocked = [];
-    /** @var double Maximum upload size allowed by PHP, in bytes. */
+    /** @var float Maximum upload size allowed by PHP, in bytes. */
     protected $maxUploadSize;
 
     /**
@@ -34,6 +36,7 @@ class FilePermissions
 
         $this->allowedPrefixes = [
             'config',
+            'extensions_config',
             'files',
             'theme',
             'themes',
@@ -85,16 +88,22 @@ class FilePermissions
      *
      * @param string $originalFilename
      *
+     * @throws IOException
+     *
      * @return bool
      */
     public function allowedUpload($originalFilename)
     {
+        // Check if file_uploads ini directive is true
+        if (Ini::getBool('file_uploads') === false) {
+            throw new IOException('File uploads are not allowed, check the file_uploads ini directive.');
+        }
         // no UNIX-hidden files
         if ($originalFilename[0] === '.') {
             return false;
         }
         // only whitelisted extensions
-        $extension = strtolower(Lib::getExtension($originalFilename));
+        $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
         $allowedExtensions = $this->getAllowedUploadExtensions();
 
         return in_array($extension, $allowedExtensions);
@@ -113,20 +122,20 @@ class FilePermissions
     /**
      * Get the maximum upload size the server is configured to accept.
      *
-     * @return double
+     * @return float
      */
     public function getMaxUploadSize()
     {
         if (!isset($this->maxUploadSize)) {
-            $size = Lib::filesizeToBytes(ini_get('post_max_size'));
+            $size = Ini::getBytes('post_max_size');
 
-            $uploadMax = Lib::filesizeToBytes(ini_get('upload_max_filesize'));
+            $uploadMax = Ini::getBytes('upload_max_filesize');
             if (($uploadMax > 0) && ($uploadMax < $size)) {
                 $size = $uploadMax;
             } else {
                 // This reduces the reported max size by a small amount to take account of the difference between
                 // the uploaded file size and the size of the eventual post including other data.
-                $size = $size * 0.995;
+                $size *= 0.995;
             }
 
             $this->maxUploadSize = $size;
